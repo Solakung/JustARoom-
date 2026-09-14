@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>The Backrooms: Level 0 (The Lobby)</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #0d0d08;
+      font-family: 'Courier New', Courier, monospace;
+      touch-action: none; /* ป้องกัน Pull-to-refresh และ Pinch-to-zoom */
+    }
+    #canvas-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* กล้องฟิล์ม VHS Overlay */
+    .vhs-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 5;
+      background: radial-gradient(circle, rgba(0,0,0,0) 55%, rgba(15,18,5,0.7) 100%);
+      box-shadow: inset 0 0 100px rgba(0,0,0,0.8);
+    }
+    .hud {
+      position: absolute;
+      top: 16px;
+      left: 18px;
+      color: #9cbb7a;
+      text-shadow: 0 0 4px #5a7b3c;
+      font-size: 14px;
+      letter-spacing: 1px;
+      z-index: 6;
+      pointer-events: none;
+    }
+    .hud .rec {
+      color: #ff3333;
+      display: inline-block;
+      margin-right: 8px;
+      animation: blink 1.2s infinite;
+    }
+    @keyframes blink {
+      0%, 49% { opacity: 1; }
+      50%, 100% { opacity: 0; }
+    }
+    #crosshair {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 6px;
+      height: 6px;
+      background-color: rgba(230, 230, 180, 0.4);
+      border-radius: 50%;
+      z-index: 6;
+      pointer-events: none;
+    }
+
+    /* หน้าจอ Start / Game Over / Win */
+    .modal-screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(10, 11, 8, 0.94);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      color: #dfd89d;
+      z-index: 20;
+      padding: 24px;
+      text-align: center;
+    }
+    .modal-screen h1 {
+      font-size: 28px;
+      letter-spacing: 4px;
+      margin-bottom: 12px;
+      color: #e5cb5b;
+      text-shadow: 0 0 10px rgba(229, 203, 91, 0.5);
+    }
+    .modal-screen p {
+      font-size: 14px;
+      max-width: 480px;
+      line-height: 1.6;
+      margin-bottom: 22px;
+      color: #b0aa82;
+    }
+    .btn {
+      background: #2a2c1d;
+      color: #f0e6a8;
+      border: 1px solid #757143;
+      padding: 12px 28px;
+      font-size: 16px;
+      font-family: inherit;
+      letter-spacing: 2px;
+      cursor: pointer;
+      box-shadow: 0 0 8px rgba(117, 113, 67, 0.4);
+      transition: all 0.2s ease;
+    }
+    .btn:hover, .btn:active {
+      background: #4a4d2e;
+      color: #ffffff;
+      box-shadow: 0 0 14px rgba(229, 203, 91, 0.8);
+    }
+
+    /* Static Screen effect เมื่อโดนจับ */
+    #static-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 15;
+      display: none;
+      pointer-events: none;
+      opacity: 0.85;
+    }
+
+    /* Virtual Joystick สำหรับหน้าจอมือถือ */
+    #joystick-area {
+      position: absolute;
+      bottom: 24px;
+      left: 24px;
+      width: 130px;
+      height: 130px;
+      border-radius: 50%;
+      background: rgba(255, 255, 220, 0.05);
+      border: 1.5px solid rgba(220, 220, 160, 0.25);
+      z-index: 10;
+      touch-action: none;
+      display: none; /* เปิดอัตโนมัติเมื่อตรวจพบ Touch Device */
+    }
+    #joystick-knob {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: rgba(210, 195, 120, 0.4);
+      border: 1px solid rgba(255, 255, 200, 0.6);
+      pointer-events: none;
+    }
+    #touch-look-zone {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 55%;
+      height: 100%;
+      z-index: 9;
+      touch-action: none;
+      display: none;
+    }
+  </style>
+  <!-- Three.js CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+  <div id="canvas-container"></div>
+  <div class="vhs-overlay"></div>
+  <canvas id="static-canvas"></canvas>
+
+  <!-- HUD -->
+  <div class="hud">
+    <div><span class="rec">● REC</span> [PLAY] SP 00:04:12</div>
+    <div style="font-size: 11px; margin-top: 4px; opacity: 0.7;">LEVEL 0: THE LOBBY // ESCAPE SOUGHT</div>
+  </div>
+  <div id="crosshair"></div>
+
+  <!-- Touch Controls -->
+  <div id="joystick-area">
+    <div id="joystick-knob"></div>
+  </div>
+  <div id="touch-look-zone"></div>
+
+  <!-- Start Screen -->
+  <div id="start-screen" class="modal-screen">
+    <h1>THE BACKROOMS</h1>
+    <p>
+      คุณตกลงมายัง <b>Level 0: The Lobby</b><br>
+      กลิ่นพรมชื้นเก่า แสงนีออนสลัวสีเหลืองหม่น และเสียงหึ่งของหลอดไฟ<br><br>
+      <b>การควบคุม:</b><br>
+      • <b>PC:</b> เดินด้วย W, A, S, D | คลิกเพื่อล็อกเมาส์หันมุมมอง (ESC เพื่อปลด)<br>
+      • <b>Mobile:</b> จอยสติ๊กซ้ายเดิน | ปัดนิ้วฝั่งขวาหมุนมุมมอง<br><br>
+      <i>เป้าหมาย: หาประตูทางออกฉุกเฉิน (EXIT) และระวัง Entity ในเงามืด</i>
+    </p>
+    <button id="start-btn" class="btn">TAP TO ENTER</button>
+  </div>
+
+  <!-- Game Over Screen -->
+  <div id="gameover-screen" class="modal-screen" style="display: none;">
+    <h1 style="color: #ff4d4d; text-shadow: 0 0 12px #ff1a1a;">SIGNAL LOST</h1>
+    <p>คุณถูก Entity จู่โจมในความมืด...</p>
+    <button id="restart-btn" class="btn">TRY AGAIN</button>
+  </div>
+
+  <!-- Win Screen -->
+  <div id="win-screen" class="modal-screen" style="display: none;">
+    <h1 style="color: #62d662; text-shadow: 0 0 12px #32a832;">YOU ESCAPED</h1>
+    <p>คุณพบประตูทางออกและหลบหนีออกจาก Level 0 ได้สำเร็จ!</p>
+    <button id="playagain-btn" class="btn">PLAY AGAIN</button>
+  </div>
+
+  <script>
+    /* ==========================================================================
+       1. ผังห้องเขาวงกต (2D Array Map: 18x18)
+       0 = ทางเดิน, 1 = กำแพงวอลเปเปอร์, 2 = จุดเกิดผู้เล่น, 3 = ประตูทางออก, 4 = จุดเกิด Entity
+       ========================================================================== */
+    const MAP = [
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+      [1, 2, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+      [1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1],
+      [1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1],
+      [1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+      [1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
+      [1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1],
+      [1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1],
+      [1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 1],
+      [1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1],
+      [1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1],
+      [1, 0, 0, 0, 1, 4, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1],
+      [1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1],
+      [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1],
+      [1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 1],
+      [1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1],
+      [1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 3, 1],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    ];
+    const UNIT_SIZE = 4; // ขนาดแต่ละบล็อกใน 3D (เมตร)
+    const WALL_HEIGHT = 3.6;
+
+    /* ==========================================================================
+       2. Web Audio API: สังเคราะห์เสียงบรรยากาศ & SFX
+       ========================================================================== */
+    let audioCtx = null;
+    let humOsc1 = null, humOsc2 = null, humGain = null;
+    let alarmOsc = null, alarmGain = null;
+
+    function initAudio() {
+      if (audioCtx) return;
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AudioContext();
+
+      // 1. เสียงหึ่งความถี่ต่ำของหลอดไฟนีออน (Fluorescent Hum: 60Hz + 120Hz Harmonics)
+      humOsc1 = audioCtx.createOscillator();
+      humOsc1.type = 'sawtooth';
+      humOsc1.frequency.setValueAtTime(60, audioCtx.currentTime);
+
+      humOsc2 = audioCtx.createOscillator();
+      humOsc2.type = 'sine';
+      humOsc2.frequency.setValueAtTime(120, audioCtx.currentTime);
+
+      const filter = audioCtx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(180, audioCtx.currentTime);
+
+      humGain = audioCtx.createGain();
+      humGain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+
+      humOsc1.connect(filter);
+      humOsc2.connect(filter);
+      filter.connect(humGain);
+      humGain.connect(audioCtx.destination);
+
+      humOsc1.start();
+      humOsc2.start();
+
+      // 2. เสียงเตือนภัย / กรีดร้องของ Entity เมื่อผู้เล่นเข้าใกล้
+      alarmOsc = audioCtx.createOscillator();
+      alarmOsc.type = 'sawtooth';
+      alarmOsc.frequency.setValueAtTime(450, audioCtx.currentTime);
+
+      alarmGain = audioCtx.createGain();
+      alarmGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+
+      const alarmFilter = audioCtx.createBiquadFilter();
+      alarmFilter.type = 'bandpass';
+      alarmFilter.frequency.setValueAtTime(800, audioCtx.currentTime);
+      alarmFilter.Q.setValueAtTime(3.0, audioCtx.currentTime);
+
+      alarmOscนี่คือโค้ดเกม **Backrooms: Level 0 (The Lobby)** แบบ First-Person 3D เต็มรูปแบบ รวมทุกอย่างไว้ในไฟล์เดียว **`index.html`** พร้อมนำไปอัปโหลดขึ้น GitHub Pages และเล่นได้ทันทีทั้งบนคอมพิวเตอร์และมือถือ โดยใช้ Procedural Textures จาก HTML Canvas และสังเคราะห์เสียงด้วย Web Audio API ทั้งหมด
+
+```html
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>The Backrooms: Level 0 (The Lobby)</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0d0d08;
+      font-family: monospace;
+      touch-action: none;
+    }
+    #game-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+    .vhs-filter {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 5;
+      background: radial-gradient(circle, rgba(0,0,0,0) 50%, rgba(10,12,5,0.7) 100%);
+      box-shadow: inset 0 0 80px rgba(0,0,0,0.85);
+    }
+    .hud {
+      position: absolute;
+      top: 14px;
+      left: 16px;
+      color: #9cb873;
+      font-size: 13px;
+      letter-spacing: 1px;
+      z-index: 6;
+      pointer-events: none;
+      text-shadow: 0 0 5px rgba(100,160,50,0.6);
+    }
+    .hud .rec {
+      color: #ff3333;
+      animation: blink 1.2s infinite;
+    }
+    @keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+    #crosshair {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 5px;
+      height: 5px;
+      background: rgba(230, 230, 180, 0.5);
+      border-radius: 50%;
+      z-index: 6;
+      pointer-events: none;
+    }
+    .screen-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(10, 11, 7, 0.94);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      color: #dfd89d;
+      z-index: 25;
+      padding: 24px;
+      text-align: center;
+    }
+    .screen-overlay h1 {
+      font-size: 26px;
+      letter-spacing: 3px;
+      margin-bottom: 12px;
+      color: #e5cb5b;
+      text-shadow: 0 0 10px rgba(229, 203, 91, 0.5);
+    }
+    .screen-overlay p {
+      font-size: 13px;
+      max-width: 440px;
+      line-height: 1.6;
+      margin-bottom: 20px;
+      color: #b0aa82;
+    }
+    .btn {
+      background: #252818;
+      color: #f0e6a8;
+      border: 1px solid #757143;
+      padding: 12px 28px;
+      font-size: 15px;
+      font-family: inherit;
+      letter-spacing: 2px;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(117, 113, 67, 0.4);
+    }
+    .btn:active {
+      background: #4a4d2e;
+      color: #fff;
+    }
+    #static-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 20;
+      display: none;
+      pointer-events: none;
+    }
+    /* Touch Controls */
+    #joystick-base {
+      position: absolute;
+      bottom: 30px;
+      left: 30px;
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: rgba(240, 240, 180, 0.08);
+      border: 1.5px solid rgba(220, 220, 160, 0.25);
+      z-index: 10;
+      display: none;
+    }
+    #joystick-thumb {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: rgba(220, 200, 120, 0.35);
+      border: 1px solid rgba(255, 255, 200, 0.6);
+      pointer-events: none;
+    }
+    #touch-look-zone {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 55%;
+      height: 100%;
+      z-index: 9;
+      display: none;
+    }
+  </style>
+  <script src="[https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js](https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js)"></script>
+</head>
+<body>
+  <div id="game-container"></div>
+  <div class="vhs-filter"></div>
+  <canvas id="static-canvas"></canvas>
+
+  <div class="hud">
+    <div><span class="rec">● REC</span> [PLAY] SP 00:04:12</div>
+    <div style="font-size: 11px; margin-top: 3px; opacity: 0.7;">LEVEL 0: THE LOBBY</div>
+  </div>
+  <div id="crosshair"></div>
+
+  <!-- Touch UI -->
+  <div id="joystick-base"><div id="joystick-thumb"></div></div>
+  <div id="touch-look-zone"></div>
+
+  <!-- Start Screen -->
+  <div id="start-screen" class="screen-overlay">
+    <h1>THE BACKROOMS</h1>
+    <p>
+      <b>Level 0: The Lobby</b><br>
+      กลิ่นพรมชื้น แสงสีเหลืองหม่น และเสียงหึ่งของหลอดไฟนีออน<br><br>
+      <b>การควบคุม:</b><br>
+      • <b>PC:</b> W, A, S, D เดิน | คลิกเมาส์เพื่อหมุนมุมมอง<br>
+      • <b>Mobile:</b> จอยสติ๊กซ้ายเดิน | ลากนิ้วฝั่งขวาหันมุมมอง<br><br>
+      <i>เป้าหมาย: หาประตูหนีไฟ (EXIT) สีแดง และหลบหนี Entity</i>
+    </p>
+    <button id="start-btn" class="btn">TAP TO ENTER</button>
+  </div>
+
+  <!-- Game Over Screen -->
+  <div id="gameover-screen" class="screen-overlay" style="display: none;">
+    <h1 style="color: #ff4a4a; text-shadow: 0 0 15px #f00;">SIGNAL LOST</h1>
+    <p>คุณถูกบางสิ่งในเงามืดกลืนกิน...</p>
+    <button id="restart-btn" class="btn">TRY AGAIN</button>
+  </div>
+
+  <!-- Win Screen -->
+  <div id="win-screen" class="screen-overlay" style="display: none;">
+    <h1 style="color: #6ed66e; text-shadow: 0 0 15px #0f0;">YOU ESCAPED</h1>
+    <p>คุณพบทางออกฉุกเฉินและหลุดพ้นจาก Level 0 สำเร็จ!</p>
+    <button id="playagain-btn" class="btn">ENTER AGAIN</button>
+  </div>
+
+  <script>
+    // -------------------------------------------------------------
+    // 1. ผังห้องเขาวงกต (18x18 Map)
+    // 0 = ทางเดิน, 1 = กำแพง, 2 = จุดเริ่ม, 3 = ทางออก, 4 = Entity
+    // -------------------------------------------------------------
+    const MAP = [
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+      [1, 2, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+      [1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1],
+      [1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1],
+      [1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+      [1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
+      [1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1],
+      [1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1],
+      [1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 1],
+      [1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1],
+      [1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1],
+      [1, 0, 0, 0, 1, 4, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1],
+      [1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1],
+      [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1],
+      [1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 1],
+      [1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1],
+      [1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 3, 1],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    ];
+    const CELL_SIZE = 4;
+    const WALL_H = 3.6;
+
+    // -------------------------------------------------------------
+    // 2. Procedural Canvas Textures (สร้าง Texture อัตโนมัติ)
+    // -------------------------------------------------------------
+    function createWallTexture() {
+      const c = document.createElement('canvas');
+      c.width = 256; c.height = 256;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#bfa55a';
+      ctx.fillRect(0, 0, 256, 256);
+      // ลายวอลเปเปอร์สีเหลืองแบบ Backrooms
+      ctx.strokeStyle = '#a68c42';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < 256; x += 16) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0); ctx.lineTo(x, 256);
+        ctx.stroke();
+      }
+      for (let i = 0; i < 2000; i++) {
+        ctx.fillStyle = Math.random() > 0.5 ? '#a88f44' : '#c9af62';
+        ctx.fillRect(Math.random() * 256, Math.random() * 256, 1.5, 1.5);
+      }
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      return tex;
+    }
+
+    function createCarpetTexture() {
+      const c = document.createElement('canvas');
+      c.width = 256; c.height = 256;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#6e6542';
+      ctx.fillRect(0, 0, 256, 256);
+      for (let i = 0; i < 4000; i++) {
+        ctx.fillStyle = Math.random() > 0.5 ? '#575033' : '#807750';
+        ctx.fillRect(Math.random() * 256, Math.random() * 256, 2, 2);
+      }
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      นี่คือไฟล์เกม **`index.html`** แบบ Single-file ที่รวม HTML, CSS, JavaScript, Three.js, Procedural Canvas Textures และ Web Audio API ไว้อย่างสมบูรณ์ พร้อมนำไปอัปโหลดขึ้น GitHub Pages เพื่อเปิดเล่นบนเว็บได้ทันทีทั้งบนคอมพิวเตอร์และมือถือ:
+
+```html
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>The Backrooms: Level 0</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-select: none; user-select: none; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #0c0d08; font-family: monospace; touch-action: none; }
+    #viewport { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+    .vhs {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5;
+      background: radial-gradient(circle, rgba(0,0,0,0) 45%, rgba(12,14,6,0.7) 100%);
+      box-shadow: inset 0 0 100px rgba(0,0,0,0.85);
+    }
+    .hud {
+      position: absolute; top: 16px; left: 18px; color: #9cbb7a; font-size: 13px; letter-spacing: 1px;
+      z-index: 6; pointer-events: none; text-shadow: 0 0 4px #5a7b3c;
+    }
+    .hud .rec { color: #ff3333; animation: pulse 1s infinite; }
+    @keyframes pulse { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+    #crosshair {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 4px; height: 4px; background: rgba(220, 220, 180, 0.6); border-radius: 50%;
+      z-index: 6; pointer-events: none;
+    }
+    .dialog-layer {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(10, 11, 7, 0.92); display: flex; flex-direction: column;
+      justify
