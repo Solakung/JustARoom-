@@ -396,7 +396,7 @@
       font-family: monospace;
       font-size: 13px;
       letter-spacing: 1px;
-      z-index: 8;
+      z-index: 13;
       pointer-events: none;
       text-shadow: 0 0 4px #060;
       display: none;
@@ -410,7 +410,7 @@
       color: #ff8888;
       font-size: 11px;
       letter-spacing: 2px;
-      z-index: 7;
+      z-index: 13;
       pointer-events: none;
       text-shadow: 0 0 4px #900;
       display: none;
@@ -1597,7 +1597,9 @@
         isTouchDevice = true;
         document.getElementById('joy-base').style.display = 'block';
         document.getElementById('touch-look').style.display = 'block';
-        // ปุ่ม SPRINT / HIDE / FLASHLIGHT ยังไม่โผล่ก่อนไฟดับครั้งแรก กันหลุด hint ว่ามีอะไรผิดปกติ
+        // ไฟฉายมีแบตต้องคุมตั้งแต่ต้นเกม ปุ่มนี้เลยโผล่ได้ตั้งแต่แรก
+        // ส่วนปุ่ม SPRINT / HIDE ยังไม่โผล่ก่อนไฟดับครั้งแรก กันหลุด hint ว่ามีอะไรผิดปกติ
+        document.getElementById('flash-btn').style.display = 'flex';
       }
 
       buildProceduralLevel();
@@ -1846,7 +1848,7 @@
       }
       if (isTouchDevice) {
         document.getElementById('sprint-btn').style.display = 'none';
-        document.getElementById('flash-btn').style.display = 'none';
+        document.getElementById('flash-btn').style.display = 'flex';
         document.getElementById('hide-btn').style.display = 'none';
       }
 
@@ -2554,10 +2556,9 @@
               }
               ambientLight.color.setHex(BACKROOMS_AMBIENT_COLOR);
 
-              // ปุ่ม SPRINT / HIDE / FLASHLIGHT บนมือถือ เพิ่งโผล่ตอนนี้ที่เริ่มมีอะไรผิดปกติจริงๆ
+              // ปุ่ม SPRINT / HIDE บนมือถือ เพิ่งโผล่ตอนนี้ที่เริ่มมีอะไรผิดปกติจริงๆ (FLASHLIGHT โผล่ตั้งแต่ต้นเกมแล้ว)
               if (isTouchDevice) {
                 document.getElementById('sprint-btn').style.display = 'flex';
-                document.getElementById('flash-btn').style.display = 'flex';
                 document.getElementById('hide-btn').style.display = 'flex';
               }
 
