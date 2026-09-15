@@ -36,8 +36,8 @@
       height: 100%;
       pointer-events: none;
       z-index: 5;
-      background: radial-gradient(circle, rgba(0,0,0,0) 35%, rgba(18,20,8,0.7) 100%);
-      box-shadow: inset 0 0 90px rgba(0,0,0,0.8);
+      background: radial-gradient(circle, rgba(0,0,0,0) 46%, rgba(18,20,8,0.42) 100%);
+      box-shadow: inset 0 0 55px rgba(0,0,0,0.5);
     }
     .vhs::after {
       content: " ";
@@ -48,7 +48,7 @@
       background-size: 100% 4px;
       z-index: 6;
       pointer-events: none;
-      opacity: 0.45;
+      opacity: 0.22;
     }
 
     .hud {
@@ -245,6 +245,38 @@
       display: none;
       touch-action: none;
     }
+    #sprint-btn {
+      position: absolute;
+      bottom: 38px;
+      right: 32px;
+      width: 76px;
+      height: 76px;
+      border-radius: 50%;
+      background: rgba(180, 60, 40, 0.28);
+      border: 1.5px solid rgba(255, 160, 120, 0.55);
+      color: #ffe3c9;
+      font-family: monospace;
+      font-size: 11px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      z-index: 11;
+      touch-action: manipulation;
+      user-select: none;
+      transition: opacity 0.15s ease, filter 0.15s ease, transform 0.1s ease;
+    }
+    #sprint-btn:active {
+      transform: scale(0.94);
+      background: rgba(210, 80, 50, 0.4);
+    }
+    #sprint-btn.cooldown {
+      filter: grayscale(0.85);
+      opacity: 0.45;
+      pointer-events: none;
+    }
   </style>
 
   <script>
@@ -295,6 +327,7 @@
 
   <div id="joy-base"><div id="joy-handle"></div></div>
   <div id="touch-look"></div>
+  <div id="sprint-btn">SPRINT</div>
 
   <!-- Start Menu พรางตัว -->
   <div id="start-menu" class="dialog-layer" onpointerdown="doStartGame(event)" onclick="doStartGame(event)" ontouchend="doStartGame(event)">
@@ -392,6 +425,16 @@
     let playerSpawn = new THREE.Vector3(5, 1.5, 5);
     let exitPos = new THREE.Vector3(0, 0, 0);
 
+    // ระบบ Sprint แบบวิ่งพุ่งช่วงสั้นๆ ไว้หนี (ใช้ Energy/Sanity เป็นต้นทุน + มีคูลดาวน์)
+    let isSprintBoost = false;
+    let sprintBoostEndTime = 0;
+    let sprintCooldownEndTime = 0;
+    const SPRINT_DURATION = 2200;      // ms ที่วิ่งเร็วขึ้น
+    const SPRINT_COOLDOWN = 7000;      // ms ก่อนใช้ได้อีกครั้ง (นับจากตอนวิ่งจบ)
+    const SPRINT_SPEED_MULT = 1.85;
+    const SPRINT_ENERGY_COST = 8;      // หักตอนกดใช้ครั้งเดียว
+    const SPRINT_MIN_ENERGY = 6;       // ต่ำกว่านี้ห้ามกดวิ่ง (กันตายฟรี)
+
     const keys = { KeyW: false, KeyS: false, KeyA: false, KeyD: false };
     const joyVector = { x: 0, y: 0 };
     let cameraPitch = 0, cameraYaw = 0;
@@ -462,6 +505,23 @@
           if (midR < MAP_SIZE - 2 && midC < MAP_SIZE - 2) {
             if (Math.random() < 0.65) map[midR][midC] = 1;
             if (Math.random() < 0.35 && midR + 1 < MAP_SIZE - 1) map[midR + 1][midC] = 1;
+          }
+
+          // พาร์ทิชั่นคอกออฟฟิศสั้นๆ กระจายในห้อง เพิ่มความรกซับซ้อนแบบ Backrooms
+          // (ไม่กระทบทางเดินหลัก เพราะยังมี isPathReachable + carveGuaranteedCorridor เช็คซ้ำท้ายฟังก์ชัน)
+          const clutterCount = 2 + Math.floor(Math.random() * 3); // 2-4 ชิ้นต่อห้อง
+          for (let k = 0; k < clutterCount; k++) {
+            const baseC = startC + 1 + Math.floor(Math.random() * (sectorSize - 2));
+            const baseR = startR + 1 + Math.floor(Math.random() * (sectorSize - 2));
+            const horizontal = Math.random() < 0.5;
+            const segLen = 2 + Math.floor(Math.random() * 2); // ยาว 2-3 ช่อง
+            for (let s = 0; s < segLen; s++) {
+              const wr = horizontal ? baseR : baseR + s;
+              const wc = horizontal ? baseC + s : baseC;
+              if (wr > 0 && wr < MAP_SIZE - 1 && wc > 0 && wc < MAP_SIZE - 1 && Math.random() < 0.8) {
+                map[wr][wc] = 1;
+              }
+            }
           }
         }
       }
@@ -642,6 +702,22 @@
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
         osc.connect(gain); gain.connect(audioCtx.destination);
         osc.start(now); osc.stop(now + 0.35);
+      } catch(e) {}
+    }
+
+    function playSprintSound() {
+      if (!audioCtx || audioCtx.state !== 'running') return;
+      try {
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(220, now);
+        osc.frequency.exponentialRampToValueAtTime(90, now + 0.28);
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(now); osc.stop(now + 0.32);
       } catch(e) {}
     }
 
@@ -1035,6 +1111,7 @@
       if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
         document.getElementById('joy-base').style.display = 'block';
         document.getElementById('touch-look').style.display = 'block';
+        document.getElementById('sprint-btn').style.display = 'flex';
       }
 
       buildProceduralLevel();
@@ -1191,6 +1268,10 @@
       bacteriaNextCheatTime = restartNow + 20000 + Math.random() * 8000;
       dullerNextCheatTime = restartNow + 26000 + Math.random() * 8000;
 
+      isSprintBoost = false;
+      sprintBoostEndTime = 0;
+      sprintCooldownEndTime = 0;
+
       isJumpscareActive = false;
       jumpscareTargetRig = null;
 
@@ -1226,6 +1307,35 @@
     // -------------------------------------------------------------
     window.addEventListener('keydown', (e) => { if (keys.hasOwnProperty(e.code)) keys[e.code] = true; });
     window.addEventListener('keyup', (e) => { if (keys.hasOwnProperty(e.code)) keys[e.code] = false; });
+
+    function triggerSprint() {
+      if (!window.gameEngineStarted || isJumpscareActive) return;
+      const now = performance.now();
+      if (isSprintBoost || now < sprintCooldownEndTime) return; // ยังวิ่งอยู่ หรือยังคูลดาวน์ไม่หมด
+      if (playerEnergy < SPRINT_MIN_ENERGY) return; // Energy/Sanity ไม่พอ
+
+      isSprintBoost = true;
+      sprintBoostEndTime = now + SPRINT_DURATION;
+      sprintCooldownEndTime = sprintBoostEndTime + SPRINT_COOLDOWN;
+      playerEnergy = Math.max(0, playerEnergy - SPRINT_ENERGY_COST);
+      playSprintSound();
+    }
+
+    const sprintBtn = document.getElementById('sprint-btn');
+    sprintBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      triggerSprint();
+    }, { passive: false });
+    sprintBtn.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      triggerSprint();
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'Space') {
+        triggerSprint();
+      }
+    });
 
     document.body.addEventListener('click', (e) => {
       if (window.gameEngineStarted && !e.target.closest('.dialog-layer') && !isJumpscareActive) {
@@ -1446,7 +1556,18 @@
         moveSide += joyVector.x;
 
         const moveLen = Math.hypot(moveFwd, moveSide);
-        const playerSpeed = 4.0;
+
+        if (isSprintBoost && now > sprintBoostEndTime) {
+          isSprintBoost = false; // หมดช่วงวิ่งพุ่ง กลับความเร็วปกติ
+        }
+        const playerSpeed = isSprintBoost ? 4.0 * SPRINT_SPEED_MULT : 4.0;
+
+        // อัพเดตปุ่ม Sprint บนจอ (เทาลงระหว่างคูลดาวน์)
+        if (now < sprintCooldownEndTime) {
+          sprintBtn.classList.add('cooldown');
+        } else {
+          sprintBtn.classList.remove('cooldown');
+        }
 
         if (moveLen > 0.05) {
           const normFwd = moveFwd / Math.max(1, moveLen);
@@ -1477,7 +1598,7 @@
 
         let fovWarp = 0;
         if (playerEnergy < 50) {
-          fovWarp = Math.sin(now * 0.003) * ((50 - playerEnergy) * 0.25);
+          fovWarp = Math.sin(now * 0.003) * ((50 - playerEnergy) * 0.09);
           camera.fov = baseFov + fovWarp;
           camera.updateProjectionMatrix();
         }
@@ -1742,19 +1863,22 @@
           dullerLegs[2].rotation.x = -Math.sin(dullerCrawlCycle) * 0.7;
         }
 
-        // เสียงหัวใจเต้น
+        // เสียงหัวใจเต้น (คงระยะเดิมไว้ให้ยังรู้สึกได้ว่ามีอะไรเข้าใกล้)
         const closestDist = Math.min(distSmiler, distBacteria, distDuller);
         if (closestDist < 18) {
-          const glitchStrength = Math.pow(1 - closestDist / 18, 1.6);
-          staticCanvas.style.opacity = Math.min(0.65, glitchStrength * 0.65);
-          renderNoise();
-
           const heartRateInterval = Math.max(360, closestDist * 60);
           if (now > nextHeartbeatTime) {
             const hbVolume = Math.min(0.45, (1 - closestDist / 18) * 0.55);
             playHeartbeat(hbVolume);
             nextHeartbeatTime = now + heartRateInterval;
           }
+        }
+
+        // จอซ่า: ให้ขึ้นเฉพาะตอนใกล้จริงๆ (ไม่งั้นบังทางตอนพยายามหนี) และลดความจัดลงมาก
+        if (closestDist < 10) {
+          const glitchStrength = Math.pow(1 - closestDist / 10, 1.8);
+          staticCanvas.style.opacity = Math.min(0.28, glitchStrength * 0.28);
+          renderNoise();
         } else {
           staticCanvas.style.opacity = 0;
         }
