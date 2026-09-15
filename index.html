@@ -385,7 +385,7 @@
     // =============================================================
     
     // Entity 1: The Smiler (หัวลอย + ขากรรไกรอ้าหุบ 3D)
-    let smilerRig, smilerJawMesh, smilerEyesMesh, smilerLight;
+    let smilerRig, smilerJawMesh, smilerEyesMesh, smilerLight, smilerFaceAnchor;
     let smilerSpawn = new THREE.Vector3(90, 1.4, 90);
     let smilerSpeed = 1.2;
     let smilerState = 'PATROL'; // PATROL, ALERT, CHASE
@@ -393,7 +393,7 @@
     let smilerEnraged = false, smilerTimer = 0, smilerCooldown = 0;
 
     // Entity 2: The Bacteria (หุ่นกิ่งไม้ 3D ขยับแขนขาเดินจริง)
-    let bacteriaRig, bacteriaLeftLeg, bacteriaRightLeg, bacteriaLeftArm, bacteriaRightArm, bacteriaTorso, bacteriaLight;
+    let bacteriaRig, bacteriaLeftLeg, bacteriaRightLeg, bacteriaLeftArm, bacteriaRightArm, bacteriaTorso, bacteriaLight, bacteriaJawMesh, bacteriaFaceAnchor;
     let bacteriaSpawn = new THREE.Vector3(160, 0, 60);
     let bacteriaSpeed = 1.0;
     let bacteriaState = 'PATROL';
@@ -402,7 +402,7 @@
     let bacteriaEnraged = false, bacteriaTimer = 0, bacteriaCooldown = 0;
 
     // Entity 3: The Duller (สัตว์ประหลาดสี่ขา คลานติดพื้นจริง)
-    let dullerRig, dullerLegs = [], dullerTorso, dullerLight;
+    let dullerRig, dullerLegs = [], dullerTorso, dullerLight, dullerJawMesh, dullerFaceAnchor;
     let dullerSpawn = new THREE.Vector3(55, 0, 180);
     let dullerSpeed = 1.4;
     let dullerState = 'PATROL';
@@ -907,17 +907,35 @@
       spine.position.y = 0.7;
 
       // หัวเบี้ยว
-      const headGeo = new THREE.SphereGeometry(0.24, 8, 8);
+      const headGeo = new THREE.SphereGeometry(0.26, 8, 8);
       const head = new THREE.Mesh(headGeo, darkMat);
+      head.scale.set(0.9, 1.1, 1.0);
       head.position.y = 1.5;
       bacteriaTorso.add(head);
 
-      // ดวงตาสีแดงเรืองแสงดวงเดียว
-      const eyeGeo = new THREE.SphereGeometry(0.05, 6, 6);
-      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-      const eye = new THREE.Mesh(eyeGeo, eyeMat);
-      eye.position.set(0.08, 1.52, 0.22);
-      bacteriaTorso.add(eye);
+      // ดวงตาแดงเรืองแสง 2 ดวง ไม่เท่ากัน + ปากเป็นรอยแหว่งแคบยาว ให้เห็นเป็นหน้าจริงๆ เมื่อเข้าใกล้
+      const eyeGeo = new THREE.SphereGeometry(0.075, 8, 8);
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff2200 });
+      const lEye = new THREE.Mesh(eyeGeo, eyeMat);
+      lEye.position.set(-0.11, 1.53, 0.22);
+      lEye.scale.setScalar(0.9);
+      bacteriaTorso.add(lEye);
+      const rEye = new THREE.Mesh(eyeGeo, eyeMat);
+      rEye.position.set(0.1, 1.56, 0.23);
+      rEye.scale.setScalar(1.15);
+      bacteriaTorso.add(rEye);
+
+      const mouthMat = new THREE.MeshBasicMaterial({ color: 0x1a0000 });
+      const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.035, 0.05), mouthMat);
+      mouth.position.set(0, 1.42, 0.23);
+      mouth.rotation.z = 0.08;
+      bacteriaTorso.add(mouth);
+      bacteriaJawMesh = mouth;
+
+      // จุดยึดหน้าจริง (bacteria มีคอยาวมาก หัวอยู่สูงกว่าลำตัวมาก ต้องยึดจากตำแหน่งจริงของตา ไม่ใช่กะจากตัว rig)
+      bacteriaFaceAnchor = new THREE.Object3D();
+      bacteriaFaceAnchor.position.set(0, 1.48, 0.22);
+      bacteriaTorso.add(bacteriaFaceAnchor);
 
       rig.add(bacteriaTorso);
       bacteriaTorso.position.y = 1.3;
@@ -977,6 +995,26 @@
       head.position.set(0, 0.5, 0.85);
       rig.add(head);
 
+      // ตาขาวซีดไม่มีรูม่านตา (ว่างเปล่า/ไร้ความรู้สึก) + ปากแหว่งอ้ากว้างผิดสัดส่วน ให้มีหน้าที่จำได้เมื่อสบตาใกล้ๆ
+      const dullEyeMat = new THREE.MeshBasicMaterial({ color: 0xd8d0c0 });
+      const lEye = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 6), dullEyeMat);
+      lEye.position.set(-0.09, 0.53, 1.02);
+      rig.add(lEye);
+      const rEye = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 6), dullEyeMat);
+      rEye.position.set(0.09, 0.53, 1.02);
+      rig.add(rEye);
+
+      const dullMouthMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+      dullerJawMesh = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), dullMouthMat);
+      dullerJawMesh.scale.set(1.0, 0.6, 0.5);
+      dullerJawMesh.position.set(0, 0.4, 1.0);
+      rig.add(dullerJawMesh);
+
+      // จุดยึดหน้าจริง (duller เตี้ยและคลานติดพื้น หัวอยู่ต่ำมาก)
+      dullerFaceAnchor = new THREE.Object3D();
+      dullerFaceAnchor.position.set(0, 0.48, 0.95);
+      rig.add(dullerFaceAnchor);
+
       // 4 ขาคลาน
       const legGeo = new THREE.CylinderGeometry(0.05, 0.03, 0.7, 5);
       dullerLegs = [];
@@ -1006,40 +1044,75 @@
     // สร้าง The Smiler (หัวลอย + ขากรรไกร 3D อ้าหุบได้จริง)
     function createSmiler3DRig() {
       const rig = new THREE.Group();
-      const whiteMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const whiteMat = new THREE.MeshBasicMaterial({ color: 0xe8e2c8 });
       const darkMat = new THREE.MeshBasicMaterial({ color: 0x020202 });
+      const pupilMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+      const veinMat = new THREE.MeshBasicMaterial({ color: 0x5a0000 });
+      const voidMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
 
-      // กลุ่มกะโหลกท่อนบน + ดวงตา
+      // กลุ่มกะโหลกท่อนบน + ดวงตา (ยืดหัวเล็กน้อยให้ดูผิดรูปมากกว่าทรงกลมสวยๆ)
       const headGroup = new THREE.Group();
       const voidBg = new THREE.Mesh(new THREE.SphereGeometry(0.8, 12, 12), darkMat);
+      voidBg.scale.set(0.92, 1.15, 1.0);
       headGroup.add(voidBg);
 
-      // ตาโต 2 ข้าง
-      const eyeGeo = new THREE.SphereGeometry(0.16, 8, 8);
-      const lEye = new THREE.Mesh(eyeGeo, whiteMat);
-      lEye.position.set(-0.35, 0.2, 0.75);
-      const rEye = new THREE.Mesh(eyeGeo, whiteMat);
-      rEye.position.set(0.35, 0.2, 0.75);
-      headGroup.add(lEye);
-      headGroup.add(rEye);
+      // ตาโต 2 ข้าง เยื้องขนาด/ตำแหน่งไม่เท่ากันเล็กน้อย + รูม่านตาดำเยื้องศูนย์ + เส้นเลือดแดงรอบตา ให้ดูจ้องไม่โฟกัส
+      const eyeGeo = new THREE.SphereGeometry(0.19, 10, 10);
+      const pupilGeo = new THREE.SphereGeometry(0.075, 8, 8);
+      const veinGeo = new THREE.TorusGeometry(0.2, 0.025, 6, 12);
 
-      // ฟันบน
-      const toothGeo = new THREE.ConeGeometry(0.04, 0.16, 4);
+      const lEye = new THREE.Mesh(eyeGeo, whiteMat);
+      lEye.position.set(-0.35, 0.2, 0.78);
+      lEye.scale.set(1.0, 1.1, 0.6);
+      const lPupil = new THREE.Mesh(pupilGeo, pupilMat);
+      lPupil.position.set(-0.38, 0.16, 0.86);
+      const lVein = new THREE.Mesh(veinGeo, veinMat);
+      lVein.position.set(-0.35, 0.2, 0.8);
+
+      const rEye = new THREE.Mesh(eyeGeo, whiteMat);
+      rEye.position.set(0.35, 0.22, 0.78);
+      rEye.scale.set(1.15, 1.0, 0.6);
+      const rPupil = new THREE.Mesh(pupilGeo, pupilMat);
+      rPupil.position.set(0.31, 0.19, 0.87);
+      const rVein = new THREE.Mesh(veinGeo, veinMat);
+      rVein.position.set(0.35, 0.22, 0.8);
+
+      headGroup.add(lEye, lPupil, lVein, rEye, rPupil, rVein);
+
+      // จุดยึดหน้าจริง (อยู่กึ่งกลางตา-ปาก) ให้กล้อง jumpscare เล็งมาตรงนี้เป๊ะๆ แทนการเดาออฟเซ็ตคงที่
+      smilerFaceAnchor = new THREE.Object3D();
+      smilerFaceAnchor.position.set(0, 0.05, 0.8);
+      headGroup.add(smilerFaceAnchor);
+
+      // ช่องปากมืดลึกด้านหลังฟัน (ให้เห็นเป็นโพรงดำลึกตอนอ้าปาก ไม่ใช่แค่ซี่ฟันลอยๆ)
+      const mouthVoid = new THREE.Mesh(new THREE.SphereGeometry(0.34, 10, 10), voidMat);
+      mouthVoid.scale.set(1.0, 0.55, 0.5);
+      mouthVoid.position.set(0, -0.12, 0.7);
+      headGroup.add(mouthVoid);
+
+      // ฟันบน แถวไม่เท่ากัน ทิ่มเอียงสุ่ม ให้ดูแหลมคมไม่เป็นระเบียบ
+      const toothGeo = new THREE.ConeGeometry(0.045, 0.17, 4);
       toothGeo.rotateX(Math.PI);
       for (let i = -5; i <= 5; i++) {
         const t = new THREE.Mesh(toothGeo, whiteMat);
-        t.position.set(i * 0.1, -0.05, 0.8 - Math.abs(i) * 0.04);
+        const jitter = (Math.random() - 0.5) * 0.03;
+        t.position.set(i * 0.1, -0.03 + jitter, 0.8 - Math.abs(i) * 0.04);
+        t.rotation.z = (Math.random() - 0.5) * 0.35;
+        t.scale.setScalar(0.8 + Math.random() * 0.5);
         headGroup.add(t);
       }
 
       rig.add(headGroup);
 
-      // ขากรรไกรล่าง (อ้าหุบได้จริง)
+      // ขากรรไกรล่าง (อ้าหุบได้จริง) ฟันซี่ไม่เท่ากันเช่นกัน
       smilerJawMesh = new THREE.Group();
-      const jawToothGeo = new THREE.ConeGeometry(0.04, 0.18, 4);
+      const jawToothGeo = new THREE.ConeGeometry(0.04, 0.19, 4);
       for (let i = -5; i <= 5; i++) {
         const t = new THREE.Mesh(jawToothGeo, whiteMat);
-        t.position.set(i * 0.09, 0.05, 0.78 - Math.abs(i) * 0.04);
+        const jitter = (Math.random() - 0.5) * 0.03;
+        t.position.set(i * 0.09, 0.05 + jitter, 0.78 - Math.abs(i) * 0.04);
+        t.rotation.z = (Math.random() - 0.5) * 0.35;
+        t.scale.setScalar(0.8 + Math.random() * 0.5);
         smilerJawMesh.add(t);
       }
       smilerJawMesh.position.y = -0.3;
@@ -1052,6 +1125,7 @@
       rig.position.y = 1.5;
       return rig;
     }
+
 
     // -------------------------------------------------------------
     // 5. World Setup
@@ -1251,9 +1325,11 @@
       document.getElementById('hud-subtitle').innerText = 'BLDG-A: 4F // VAST UNMAPPED SECTOR';
       updateEnergyHUD();
 
-      if (smilerRig) smilerRig.position.copy(smilerSpawn);
-      if (bacteriaRig) bacteriaRig.position.copy(bacteriaSpawn);
-      if (dullerRig) dullerRig.position.copy(dullerSpawn);
+      if (smilerRig) { smilerRig.position.copy(smilerSpawn); smilerRig.rotation.z = 0; }
+      if (bacteriaRig) { bacteriaRig.position.copy(bacteriaSpawn); bacteriaTorso.rotation.z = 0; }
+      if (dullerRig) { dullerRig.position.copy(dullerSpawn); dullerRig.rotation.z = 0; dullerRig.rotation.x = 0; }
+      if (bacteriaJawMesh) bacteriaJawMesh.scale.y = 1;
+      if (dullerJawMesh) dullerJawMesh.scale.y = 0.6;
       
       for (let k in keys) keys[k] = false;
       joyVector.x = 0;
@@ -1503,7 +1579,19 @@
         // JUMPSCARE: ล็อกสบตาระยะ 1.35 เมตร (เห็นหน้าชัด ไม่จมทะลุจอ)
         // =========================================================
         if (isJumpscareActive && jumpscareTargetRig) {
-          camera.lookAt(jumpscareTargetRig.position.x, jumpscareTargetRig.position.y + 1.2, jumpscareTargetRig.position.z);
+          // เล็งกล้องไปที่ "จุดยึดหน้าจริง" ของ entity ตัวนั้นๆ (แต่ละตัวหัวอยู่คนละความสูงกันมาก
+          // ใช้ offset คงที่ตัวเดียวแบบเดิมเลยกลายเป็นเห็นหัวหรือคางแทนหน้า)
+          let faceAnchor = smilerFaceAnchor;
+          if (jumpscareTargetRig === bacteriaRig) faceAnchor = bacteriaFaceAnchor;
+          else if (jumpscareTargetRig === dullerRig) faceAnchor = dullerFaceAnchor;
+
+          const faceWorldPos = new THREE.Vector3();
+          if (faceAnchor) {
+            faceAnchor.getWorldPosition(faceWorldPos);
+          } else {
+            faceWorldPos.set(jumpscareTargetRig.position.x, jumpscareTargetRig.position.y + 1.2, jumpscareTargetRig.position.z);
+          }
+          camera.lookAt(faceWorldPos.x, faceWorldPos.y, faceWorldPos.z);
           
           // รักษาระยะห่าง 1.35 เมตร ไม่ให้ทับเลนส์กล้อง
           const targetDist = 1.35;
@@ -1521,13 +1609,21 @@
             bacteriaLeftArm.rotation.x = -1.2 + (Math.random() - 0.5) * 0.5;
             bacteriaRightArm.rotation.x = -1.2 + (Math.random() - 0.5) * 0.5;
             bacteriaTorso.rotation.z = (Math.random() - 0.5) * 0.2;
+            if (bacteriaJawMesh) bacteriaJawMesh.scale.y = 1 + Math.abs(Math.sin(now * 0.03)) * 6; // ปากฉีกอ้ากว้างขึ้นเรื่อยๆ
+          } else if (jumpscareTargetRig === dullerRig) {
+            dullerRig.rotation.z = (Math.random() - 0.5) * 0.3;
+            dullerRig.rotation.x = (Math.random() - 0.5) * 0.15;
+            if (dullerJawMesh) dullerJawMesh.scale.y = 0.6 + Math.abs(Math.sin(now * 0.035)) * 1.4; // อ้าปากขย้ำ
+            for (let li = 0; li < dullerLegs.length; li++) {
+              dullerLegs[li].rotation.x = (Math.random() - 0.5) * 0.6;
+            }
           }
 
-          camera.position.x += (Math.random() - 0.5) * 0.06;
-          camera.position.y += (Math.random() - 0.5) * 0.06;
+          camera.position.x += (Math.random() - 0.5) * 0.09;
+          camera.position.y += (Math.random() - 0.5) * 0.09;
 
           const strobe = document.getElementById('jumpscare-strobe');
-          strobe.style.display = (Math.random() < 0.4) ? 'block' : 'none';
+          strobe.style.display = (Math.random() < 0.55) ? 'block' : 'none';
 
           staticCanvas.style.opacity = 0.12;
           renderNoise();
