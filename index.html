@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>The Backrooms: Level 0</title>
+  
   <style>
     * {
       box-sizing: border-box;
@@ -25,7 +26,7 @@
       width: 100%;
       height: 100%;
       z-index: 1;
-      touch-action: none; /* เฉพาะฉาก 3D */
+      touch-action: none;
     }
     .vhs {
       position: absolute;
@@ -35,7 +36,7 @@
       height: 100%;
       pointer-events: none;
       z-index: 5;
-      background: radial-gradient(circle, rgba(0,0,0,0) 45%, rgba(12,14,6,0.7) 100%);
+      background: radial-gradient(circle, rgba(0,0,0,0) 40%, rgba(12,14,6,0.7) 100%);
       box-shadow: inset 0 0 90px rgba(0,0,0,0.85);
     }
     .hud {
@@ -67,23 +68,24 @@
       pointer-events: none;
     }
 
-    /* หน้าต่างเมนู Start / Game Over / Win */
+    /* เมนูเลเยอร์หน้าจอ (รองรับการแตะทั้งจอ) */
     .dialog-layer {
       position: absolute;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(10, 11, 7, 0.95);
+      background: rgba(10, 11, 7, 0.92);
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       color: #dfd89d;
-      z-index: 100; /* อยู่ชั้นบนสุดเสมอ */
+      z-index: 1000; /* อยู่บนสุดแน่นอน */
       padding: 24px;
       text-align: center;
-      touch-action: auto !important;
+      cursor: pointer;
+      touch-action: manipulation !important;
       pointer-events: auto !important;
     }
     .dialog-layer h1 {
@@ -91,6 +93,7 @@
       letter-spacing: 3px;
       margin-bottom: 12px;
       color: #e5cb5b;
+      pointer-events: none;
     }
     .dialog-layer p {
       font-size: 13px;
@@ -98,6 +101,7 @@
       line-height: 1.6;
       margin-bottom: 24px;
       color: #aaa580;
+      pointer-events: none;
     }
     .action-btn {
       background: #2b2f1c;
@@ -108,19 +112,24 @@
       font-family: inherit;
       letter-spacing: 2px;
       font-weight: bold;
-      cursor: pointer;
       border-radius: 6px;
-      box-shadow: 0 0 12px rgba(140, 134, 77, 0.4);
+      box-shadow: 0 0 14px rgba(140, 134, 77, 0.5);
       touch-action: manipulation !important;
       pointer-events: auto !important;
-      -webkit-user-select: none;
-      user-select: none;
     }
     .action-btn:active {
       background: #4e532b;
       color: #ffffff;
       transform: scale(0.97);
     }
+    .hint-text {
+      margin-top: 14px;
+      font-size: 12px;
+      color: #857e4e;
+      letter-spacing: 1px;
+      pointer-events: none;
+    }
+
     #noise-canvas {
       position: absolute;
       top: 0;
@@ -135,8 +144,8 @@
     /* Touch Controls */
     #joy-base {
       position: absolute;
-      bottom: 30px;
-      left: 30px;
+      bottom: 32px;
+      left: 32px;
       width: 120px;
       height: 120px;
       border-radius: 50%;
@@ -168,11 +177,62 @@
       display: none;
       touch-action: none;
     }
+    #error-banner {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      background: #881111;
+      color: #fff;
+      font-size: 11px;
+      padding: 6px;
+      z-index: 9999;
+      display: none;
+      text-align: center;
+    }
   </style>
-  <!-- ใช้ CDN jsDelivr ที่เสถียรและเร็วที่สุดบนเครือข่ายมือถือ -->
+
+  <!-- ประกาศคำสั่งเริ่มเกมทันทีใน HEAD -->
+  <script>
+    window.gameEngineStarted = false;
+    window.doStartGame = function(e) {
+      if (e) {
+        e.stopPropagation();
+      }
+      const menu = document.getElementById('start-menu');
+      if (menu) menu.style.display = 'none';
+
+      if (window.initAudioContextSafely) {
+        window.initAudioContextSafely();
+      }
+      window.gameEngineStarted = true;
+    };
+
+    window.doRestartGame = function(e) {
+      if (e) e.stopPropagation();
+      document.getElementById('over-menu').style.display = 'none';
+      document.getElementById('win-menu').style.display = 'none';
+      if (window.resetBackroomsPlayer) {
+        window.resetBackroomsPlayer();
+      }
+      window.gameEngineStarted = true;
+    };
+
+    // ตัวดัก Error แสดงผลบนจอ
+    window.onerror = function(msg, url, line) {
+      const b = document.getElementById('error-banner');
+      if (b) {
+        b.style.display = 'block';
+        b.innerText = 'Error: ' + msg + ' (Line ' + line + ')';
+      }
+    };
+  </script>
+
+  <!-- Three.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 </head>
 <body>
+  <div id="error-banner"></div>
   <div id="viewport"></div>
   <div class="vhs"></div>
   <canvas id="noise-canvas"></canvas>
@@ -187,8 +247,8 @@
   <div id="joy-base"><div id="joy-handle"></div></div>
   <div id="touch-look"></div>
 
-  <!-- Menus พร้อม Event Handler ตรงบนปุ่ม -->
-  <div id="start-menu" class="dialog-layer">
+  <!-- Start Menu (แตะตรงปุ่ม หรือแตะที่ใดก็ได้บนจอเพื่อเข้าเกม) -->
+  <div id="start-menu" class="dialog-layer" onpointerdown="doStartGame(event)" onclick="doStartGame(event)" ontouchend="doStartGame(event)">
     <h1>THE BACKROOMS</h1>
     <p>
       <b>Level 0: The Lobby</b><br>
@@ -198,36 +258,25 @@
       • <b>PC:</b> W, A, S, D เดิน | คลิกเมาส์เพื่อหันมุมมอง<br><br>
       <i>เป้าหมาย: หาทางออกฉุกเฉินสีแดง (EXIT) และหนี Entity</i>
     </p>
-    <button id="start-btn" class="action-btn" onpointerdown="triggerStartGame(event)" onclick="triggerStartGame(event)">TAP TO ENTER</button>
+    <button id="start-btn" class="action-btn">TAP TO ENTER</button>
+    <div class="hint-text">[ แตะที่ปุ่มหรือแตะที่ใดก็ได้บนจอเพื่อเริ่ม ]</div>
   </div>
 
-  <div id="over-menu" class="dialog-layer" style="display: none;">
+  <div id="over-menu" class="dialog-layer" style="display: none;" onpointerdown="doRestartGame(event)" onclick="doRestartGame(event)">
     <h1 style="color: #ff4a4a; text-shadow: 0 0 15px #f00;">SIGNAL LOST</h1>
     <p>คุณถูก Entity ในเงามืดเข้าประชิดตัว...</p>
-    <button id="retry-btn" class="action-btn" onpointerdown="triggerRestartGame(event)" onclick="triggerRestartGame(event)">TRY AGAIN</button>
+    <button id="retry-btn" class="action-btn">TRY AGAIN</button>
+    <div class="hint-text">[ แตะที่ใดก็ได้เพื่อเล่นใหม่ ]</div>
   </div>
 
-  <div id="win-menu" class="dialog-layer" style="display: none;">
+  <div id="win-menu" class="dialog-layer" style="display: none;" onpointerdown="doRestartGame(event)" onclick="doRestartGame(event)">
     <h1 style="color: #6ed66e; text-shadow: 0 0 15px #0f0;">YOU ESCAPED</h1>
     <p>คุณก้าวขึ้นบันไดทางออกและหนีพ้นจาก Level 0 ได้สำเร็จ!</p>
-    <button id="replay-btn" class="action-btn" onpointerdown="triggerRestartGame(event)" onclick="triggerRestartGame(event)">ENTER AGAIN</button>
+    <button id="replay-btn" class="action-btn">ENTER AGAIN</button>
+    <div class="hint-text">[ แตะที่ใดก็ได้เพื่อเริ่มอีกครั้ง ]</div>
   </div>
 
   <script>
-    // -------------------------------------------------------------
-    // Global Game State & Trigger Controls (เรียกได้ทันที)
-    // -------------------------------------------------------------
-    let gameState = 'START';
-    let audioCtx = null, humGain = null, alarmGain = null, alarmOsc = null;
-    let camera, scene, renderer, entity;
-    const flickerLights = [];
-    let playerSpawn = null;
-    let exitPos = null;
-    let entitySpawn = null;
-    const keys = { KeyW: false, KeyS: false, KeyA: false, KeyD: false };
-    const joyVector = { x: 0, y: 0 };
-    let cameraPitch = 0, cameraYaw = 0;
-
     const GRID = [
       [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
       [1,2,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,1],
@@ -251,35 +300,18 @@
     const CELL = 4;
     const HEIGHT = 3.6;
 
-    // ฟังก์ชันเริ่มเกมที่ถูกเรียกโดยตรงจากปุ่ม
-    window.triggerStartGame = function(e) {
-      if (e) {
-        e.stopPropagation();
-      }
-      if (gameState === 'PLAYING') return;
+    let audioCtx = null, humGain = null, alarmGain = null, alarmOsc = null;
+    let camera, scene, renderer, entity;
+    const flickerLights = [];
+    let playerSpawn = new THREE.Vector3(6, 1.6, 6);
+    let exitPos = new THREE.Vector3(0, 0, 0);
+    let entitySpawn = new THREE.Vector3(20, 1.5, 20);
 
-      // ซ่อนหน้าจอเมนูทันที
-      const startMenu = document.getElementById('start-menu');
-      if (startMenu) startMenu.style.display = 'none';
+    const keys = { KeyW: false, KeyS: false, KeyA: false, KeyD: false };
+    const joyVector = { x: 0, y: 0 };
+    let cameraPitch = 0, cameraYaw = 0;
 
-      // เริ่มเสียง
-      setupAudio();
-
-      // รีเซ็ตตำแหน่งและเริ่มเกม
-      resetGame();
-      gameState = 'PLAYING';
-    };
-
-    window.triggerRestartGame = function(e) {
-      if (e) e.stopPropagation();
-      document.getElementById('over-menu').style.display = 'none';
-      document.getElementById('win-menu').style.display = 'none';
-      setupAudio();
-      resetGame();
-      gameState = 'PLAYING';
-    };
-
-    function setupAudio() {
+    window.initAudioContextSafely = function() {
       try {
         const AudioClass = window.AudioContext || window.webkitAudioContext;
         if (!AudioClass) return;
@@ -313,10 +345,8 @@
           alarmGain.connect(audioCtx.destination);
           alarmOsc.start();
         }
-      } catch (err) {
-        console.warn('Audio note:', err);
-      }
-    }
+      } catch (err) {}
+    };
 
     function playFootstep() {
       if (!audioCtx || audioCtx.state !== 'running') return;
@@ -347,12 +377,420 @@
       } catch(e) {}
     }
 
-    // -------------------------------------------------------------
-    // Procedural Textures
-    // -------------------------------------------------------------
     function genWallTex() {
       const c = document.createElement('canvas');
       c.width = 256; c.height = 256;
       const ctx = c.getContext('2d');
-      ctx.fillStyle = '#b7
-        
+      ctx.fillStyle = '#b79e54'; ctx.fillRect(0, 0, 256, 256);
+      ctx.strokeStyle = '#9c8442'; ctx.lineWidth = 1.5;
+      for (let x = 0; x < 256; x += 16) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 256); ctx.stroke();
+      }
+      ctx.fillStyle = 'rgba(0,0,0,0.06)';
+      for (let y = 0; y < 256; y += 32) ctx.fillRect(0, y, 256, 2);
+      const t = new THREE.CanvasTexture(c);
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      return t;
+    }
+
+    function genCarpetTex() {
+      const c = document.createElement('canvas');
+      c.width = 128; c.height = 128;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#615a3a'; ctx.fillRect(0, 0, 128, 128);
+      ctx.fillStyle = 'rgba(0,0,0,0.12)';
+      for (let x = 0; x < 128; x += 4) {
+        for (let y = 0; y < 128; y += 4) {
+          if ((x + y) % 8 === 0) ctx.fillRect(x, y, 2, 2);
+        }
+      }
+      const t = new THREE.CanvasTexture(c);
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(18, 18);
+      return t;
+    }
+
+    function genCeilingTex() {
+      const c = document.createElement('canvas');
+      c.width = 128; c.height = 128;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#d5ceb6'; ctx.fillRect(0, 0, 128, 128);
+      ctx.strokeStyle = '#857e6a'; ctx.lineWidth = 2;
+      ctx.strokeRect(0, 0, 128, 128);
+      const t = new THREE.CanvasTexture(c);
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(18, 18);
+      return t;
+    }
+
+    function genSmilerTex() {
+      const c = document.createElement('canvas');
+      c.width = 256; c.height = 256;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = 'rgba(0,0,0,0)'; ctx.fillRect(0, 0, 256, 256);
+      ctx.fillStyle = '#ffffff'; ctx.shadowColor = '#ffff99'; ctx.shadowBlur = 16;
+      ctx.beginPath();
+      ctx.arc(85, 95, 14, 0, Math.PI * 2);
+      ctx.arc(171, 95, 14, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(128, 120, 68, 0.15 * Math.PI, 0.85 * Math.PI, false);
+      ctx.lineWidth = 14; ctx.strokeStyle = '#ffffff'; ctx.stroke();
+
+      ctx.lineWidth = 3;
+      for (let tx = 80; tx <= 176; tx += 12) {
+        ctx.beginPath(); ctx.moveTo(tx, 160); ctx.lineTo(tx, 178); ctx.stroke();
+      }
+      return new THREE.CanvasTexture(c);
+    }
+
+    // -------------------------------------------------------------
+    // เริ่มสร้าง Scene & World 3D
+    // -------------------------------------------------------------
+    function setupWorld() {
+      const container = document.getElementById('viewport');
+      const w = window.innerWidth || 360;
+      const h = window.innerHeight || 640;
+
+      scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x232213, 0.075);
+
+      camera = new THREE.PerspectiveCamera(72, w / h, 0.1, 80);
+      renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'default' });
+      renderer.setSize(w, h);
+      renderer.setClearColor(0x232213);
+      container.appendChild(renderer.domElement);
+
+      const ambientLight = new THREE.AmbientLight(0xd9c87d, 0.45);
+      scene.add(ambientLight);
+
+      const wallMat = new THREE.MeshLambertMaterial({ map: genWallTex() });
+      const floorMat = new THREE.MeshLambertMaterial({ map: genCarpetTex() });
+      const ceilingMat = new THREE.MeshLambertMaterial({ map: genCeilingTex() });
+
+      const mapW = GRID[0].length * CELL;
+      const mapH = GRID.length * CELL;
+
+      const planeGeo = new THREE.PlaneGeometry(mapW, mapH);
+      const floor = new THREE.Mesh(planeGeo, floorMat);
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.set(mapW / 2, 0, mapH / 2);
+      scene.add(floor);
+
+      const ceiling = new THREE.Mesh(planeGeo, ceilingMat);
+      ceiling.rotation.x = Math.PI / 2;
+      ceiling.position.set(mapW / 2, HEIGHT, mapH / 2);
+      scene.add(ceiling);
+
+      const boxGeo = new THREE.BoxGeometry(CELL, HEIGHT, CELL);
+
+      for (let r = 0; r < GRID.length; r++) {
+        for (let c = 0; c < GRID[r].length; c++) {
+          const val = GRID[r][c];
+          const wx = c * CELL + CELL / 2;
+          const wz = r * CELL + CELL / 2;
+
+          if (val === 1) {
+            const wall = new THREE.Mesh(boxGeo, wallMat);
+            wall.position.set(wx, HEIGHT / 2, wz);
+            scene.add(wall);
+          } else {
+            if ((r % 3 === 1) && (c % 3 === 1)) {
+              const light = new THREE.PointLight(0xffecc0, 0.75, 12, 1.8);
+              light.position.set(wx, HEIGHT - 0.2, wz);
+              scene.add(light);
+              flickerLights.push(light);
+
+              const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 0.4), new THREE.MeshBasicMaterial({ color: 0xfff6cf }));
+              lamp.position.set(wx, HEIGHT - 0.05, wz);
+              scene.add(lamp);
+            }
+
+            if (val === 2) playerSpawn.set(wx, 1.6, wz);
+            if (val === 3) {
+              exitPos.set(wx, 0.5, wz);
+              const exitLight = new THREE.PointLight(0xff2222, 1.5, 9);
+              exitLight.position.set(wx, 1.8, wz);
+              scene.add(exitLight);
+
+              const stairMat = new THREE.MeshLambertMaterial({ color: 0x3d1111 });
+              for (let s = 0; s < 4; s++) {
+                const step = new THREE.Mesh(new THREE.BoxGeometry(2, 0.25, 0.5), stairMat);
+                step.position.set(wx, 0.125 + s * 0.25, wz - 1 + s * 0.5);
+                scene.add(step);
+              }
+              const sign = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.4, 0.1), new THREE.MeshBasicMaterial({ color: 0xff3333 }));
+              sign.position.set(wx, 2.5, wz);
+              scene.add(sign);
+            }
+            if (val === 4) entitySpawn.set(wx, 1.5, wz);
+          }
+        }
+      }
+
+      // Entity Smiler
+      const smilerMat = new THREE.SpriteMaterial({
+        map: genSmilerTex(),
+        color: 0xffffff,
+        transparent: true,
+        blending: THREE.AdditiveBlending
+      });
+      entity = new THREE.Sprite(smilerMat);
+      entity.scale.set(2.4, 2.4, 1);
+      entity.position.copy(entitySpawn);
+      scene.add(entity);
+
+      // เปิด Touch Controls บนมือถือ
+      if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+        document.getElementById('joy-base').style.display = 'block';
+        document.getElementById('touch-look').style.display = 'block';
+      }
+
+      window.resetBackroomsPlayer();
+      requestAnimationFrame(renderLoop);
+    }
+
+    window.resetBackroomsPlayer = function() {
+      if (!camera) return;
+      camera.position.copy(playerSpawn);
+      cameraYaw = 0;
+      cameraPitch = 0;
+      if (entity) entity.position.copy(entitySpawn);
+      document.getElementById('noise-canvas').style.display = 'none';
+      if (alarmGain && audioCtx) alarmGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+    };
+
+    // -------------------------------------------------------------
+    // Joystick & Controls
+    // -------------------------------------------------------------
+    window.addEventListener('keydown', (e) => { if (keys.hasOwnProperty(e.code)) keys[e.code] = true; });
+    window.addEventListener('keyup', (e) => { if (keys.hasOwnProperty(e.code)) keys[e.code] = false; });
+
+    document.body.addEventListener('click', (e) => {
+      if (window.gameEngineStarted && !e.target.closest('.dialog-layer')) {
+        try { document.body.requestPointerLock(); } catch(err) {}
+      }
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (document.pointerLockElement === document.body && window.gameEngineStarted) {
+        cameraYaw -= e.movementX * 0.0024;
+        cameraPitch -= e.movementY * 0.0024;
+        cameraPitch = Math.max(-1.4, Math.min(1.4, cameraPitch));
+      }
+    });
+
+    const joyBase = document.getElementById('joy-base');
+    const joyHandle = document.getElementById('joy-handle');
+    let joyTouchId = null;
+    let joyCenter = { x: 0, y: 0 };
+
+    joyBase.addEventListener('touchstart', (e) => {
+      const touch = e.changedTouches[0];
+      joyTouchId = touch.identifier;
+      const rect = joyBase.getBoundingClientRect();
+      joyCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+      updateJoy(touch.clientX, touch.clientY);
+    }, { passive: false });
+
+    window.addEventListener('touchmove', (e) => {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        if (touch.identifier === joyTouchId) updateJoy(touch.clientX, touch.clientY);
+      }
+    }, { passive: false });
+
+    const resetJoy = () => {
+      joyTouchId = null;
+      joyVector.x = 0;
+      joyVector.y = 0;
+      joyHandle.style.transform = `translate(-50%, -50%)`;
+    };
+    window.addEventListener('touchend', (e) => {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === joyTouchId) resetJoy();
+      }
+    });
+    window.addEventListener('touchcancel', resetJoy);
+
+    function updateJoy(cx, cy) {
+      const dx = cx - joyCenter.x;
+      const dy = cy - joyCenter.y;
+      const dist = Math.hypot(dx, dy);
+      const maxR = 46;
+      const angle = Math.atan2(dy, dx);
+      const clampedDist = Math.min(dist, maxR);
+      const hx = Math.cos(angle) * clampedDist;
+      const hy = Math.sin(angle) * clampedDist;
+      joyHandle.style.transform = `translate(calc(-50% + ${hx}px), calc(-50% + ${hy}px))`;
+      joyVector.x = hx / maxR;
+      joyVector.y = hy / maxR;
+    }
+
+    const touchLook = document.getElementById('touch-look');
+    let lookTouchId = null;
+    let lastLookX = 0, lastLookY = 0;
+
+    touchLook.addEventListener('touchstart', (e) => {
+      const touch = e.changedTouches[0];
+      lookTouchId = touch.identifier;
+      lastLookX = touch.clientX;
+      lastLookY = touch.clientY;
+    }, { passive: false });
+
+    touchLook.addEventListener('touchmove', (e) => {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        if (touch.identifier === lookTouchId) {
+          const dx = touch.clientX - lastLookX;
+          const dy = touch.clientY - lastLookY;
+          lastLookX = touch.clientX;
+          lastLookY = touch.clientY;
+          cameraYaw -= dx * 0.005;
+          cameraPitch -= dy * 0.005;
+          cameraPitch = Math.max(-1.4, Math.min(1.4, cameraPitch));
+        }
+      }
+    }, { passive: false });
+
+    touchLook.addEventListener('touchend', () => { lookTouchId = null; });
+
+    function isWall(x, z, r = 0.42) {
+      const points = [
+        [x - r, z - r], [x + r, z - r],
+        [x - r, z + r], [x + r, z + r]
+      ];
+      for (let i = 0; i < points.length; i++) {
+        const col = Math.floor(points[i][0] / CELL);
+        const row = Math.floor(points[i][1] / CELL);
+        if (row < 0 || row >= GRID.length || col < 0 || col >= GRID[0].length) return true;
+        if (GRID[row][col] === 1) return true;
+      }
+      return false;
+    }
+
+    let lastTime = performance.now();
+    let footstepDist = 0;
+    const staticCanvas = document.getElementById('noise-canvas');
+    const staticCtx = staticCanvas.getContext('2d');
+    staticCanvas.width = 160; staticCanvas.height = 120;
+
+    function renderNoise() {
+      const imgData = staticCtx.createImageData(160, 120);
+      const buf = new Uint32Array(imgData.data.buffer);
+      for (let i = 0; i < buf.length; i++) buf[i] = Math.random() > 0.5 ? 0xffffffff : 0xff111111;
+      staticCtx.putImageData(imgData, 0, 0);
+    }
+
+    function renderLoop() {
+      requestAnimationFrame(renderLoop);
+      if (!renderer || !scene || !camera) return;
+
+      const now = performance.now();
+      const dt = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
+
+      if (window.gameEngineStarted) {
+        camera.rotation.order = 'YXZ';
+        camera.rotation.y = cameraYaw;
+        camera.rotation.x = cameraPitch;
+
+        let moveFwd = 0, moveSide = 0;
+        if (keys.KeyW) moveFwd += 1;
+        if (keys.KeyS) moveFwd -= 1;
+        if (keys.KeyA) moveSide -= 1;
+        if (keys.KeyD) moveSide += 1;
+
+        moveFwd -= joyVector.y;
+        moveSide += joyVector.x;
+
+        const moveLen = Math.hypot(moveFwd, moveSide);
+        if (moveLen > 0.05) {
+          const normFwd = moveFwd / Math.max(1, moveLen);
+          const normSide = moveSide / Math.max(1, moveLen);
+          const speed = 4.2;
+
+          const cosY = Math.cos(cameraYaw);
+          const sinY = Math.sin(cameraYaw);
+          const vx = (-sinY * normFwd + cosY * normSide) * speed * dt;
+          const vz = (-cosY * normFwd - sinY * normSide) * speed * dt;
+
+          if (!isWall(camera.position.x + vx, camera.position.z)) camera.position.x += vx;
+          if (!isWall(camera.position.x, camera.position.z + vz)) camera.position.z += vz;
+
+          footstepDist += Math.hypot(vx, vz);
+          if (footstepDist > 1.8) {
+            footstepDist = 0;
+            playFootstep();
+          }
+        }
+
+        if (Math.random() < 0.04 && flickerLights.length > 0) {
+          const l = flickerLights[Math.floor(Math.random() * flickerLights.length)];
+          l.intensity = Math.random() < 0.5 ? 0.1 : 0.8;
+        }
+
+        const distToPlayer = entity.position.distanceTo(camera.position);
+        if (distToPlayer < 14) {
+          if (alarmGain && audioCtx && audioCtx.state === 'running') {
+            const vol = (1 - distToPlayer / 14) * 0.18;
+            alarmGain.gain.setValueAtTime(vol, audioCtx.currentTime);
+            alarmOsc.frequency.setValueAtTime(450 + (14 - distToPlayer) * 35, audioCtx.currentTime);
+          }
+
+          const dir = new THREE.Vector3().subVectors(camera.position, entity.position).normalize();
+          entity.position.x += dir.x * 2.2 * dt;
+          entity.position.z += dir.z * 2.2 * dt;
+          entity.position.y = 1.4 + Math.sin(now * 0.005) * 0.15;
+
+          if (distToPlayer < 1.1) {
+            window.gameEngineStarted = false;
+            staticCanvas.style.display = 'block';
+            playStaticSound();
+            if (document.exitPointerLock) document.exitPointerLock();
+            setTimeout(() => {
+              document.getElementById('over-menu').style.display = 'flex';
+            }, 600);
+          }
+        } else {
+          if (alarmGain && audioCtx && audioCtx.state === 'running') {
+            alarmGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+          }
+        }
+
+        if (camera.position.distanceTo(exitPos) < 2.0) {
+          window.gameEngineStarted = false;
+          if (document.exitPointerLock) document.exitPointerLock();
+          document.getElementById('win-menu').style.display = 'flex';
+        }
+      } else {
+        if (document.getElementById('over-menu').style.display === 'flex') {
+          renderNoise();
+        }
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+      if (!camera || !renderer) return;
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    });
+
+    // เริ่มต้นระบบ
+    function startInitLoop() {
+      if (typeof THREE !== 'undefined') {
+        setupWorld();
+      } else {
+        setTimeout(startInitLoop, 100);
+      }
+    }
+    startInitLoop();
+  </script>
+</body>
+</html>
