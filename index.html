@@ -277,6 +277,85 @@
       opacity: 0.45;
       pointer-events: none;
     }
+
+    #flash-btn {
+      position: absolute;
+      bottom: 38px;
+      right: 122px;
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: rgba(200, 180, 100, 0.22);
+      border: 1.5px solid rgba(230, 220, 160, 0.5);
+      color: #fff3cf;
+      font-family: monospace;
+      font-size: 9px;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      line-height: 1.2;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      z-index: 11;
+      touch-action: manipulation;
+      user-select: none;
+      transition: opacity 0.15s ease, filter 0.15s ease;
+    }
+    #flash-btn.off {
+      filter: grayscale(0.9);
+      opacity: 0.5;
+    }
+
+    #flashlight-indicator {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #ff8888;
+      font-size: 11px;
+      letter-spacing: 2px;
+      z-index: 7;
+      pointer-events: none;
+      text-shadow: 0 0 4px #900;
+      display: none;
+    }
+
+    #note-overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 12;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      padding-bottom: 150px;
+      pointer-events: none;
+    }
+    .note-card {
+      background: rgba(28, 26, 14, 0.92);
+      border: 1px solid #a89454;
+      color: #f0e6c8;
+      max-width: 82%;
+      padding: 14px 18px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      line-height: 1.6;
+      text-align: left;
+      box-shadow: 0 0 18px rgba(0,0,0,0.6);
+    }
+    .note-title {
+      font-size: 11px;
+      color: #e5cb5b;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+    .note-count {
+      margin-top: 8px;
+      font-size: 10px;
+      color: #8fad58;
+      letter-spacing: 1px;
+    }
   </style>
 
   <script>
@@ -324,10 +403,20 @@
     </div>
   </div>
   <div id="crosshair"></div>
+  <div id="flashlight-indicator">FLASHLIGHT OFF</div>
+
+  <div id="note-overlay">
+    <div class="note-card">
+      <div class="note-title">📄 เอกสารที่พบ</div>
+      <div class="note-body"></div>
+      <div class="note-count"></div>
+    </div>
+  </div>
 
   <div id="joy-base"><div id="joy-handle"></div></div>
   <div id="touch-look"></div>
   <div id="sprint-btn">SPRINT</div>
+  <div id="flash-btn">FLASH<br>LIGHT</div>
 
   <!-- Start Menu พรางตัว -->
   <div id="start-menu" class="dialog-layer" onpointerdown="doStartGame(event)" onclick="doStartGame(event)" ontouchend="doStartGame(event)">
@@ -336,10 +425,12 @@
       <b>ภารกิจ: หาทางออกจากอาคารหลังเลิกงาน</b><br>
       คุณทำงานล่วงเวลาจนดึก ทุกคนกลับบ้านหมดแล้วและอาคารปิดระบบหลัก<br>
       • เดินสำรวจตามชั้นเพื่อค้นหา <b>บันไดหนีไฟสีแดง (EXIT)</b> เพื่อกลับบ้าน<br>
-      • หากรู้สึกเหนื่อยล้าคอแห้ง ให้เก็บกระป๋องเครื่องดื่มตามทางมาดื่มเพื่อเติม <b>พลังงาน (Energy)</b><br><br>
+      • หากรู้สึกเหนื่อยล้าคอแห้ง ให้เก็บกระป๋องเครื่องดื่มตามทางมาดื่มเพื่อเติม <b>พลังงาน (Energy)</b><br>
+      • เก็บ <b>เอกสาร/โน้ต</b> ที่กระจายอยู่ทั่วตึกเพื่ออ่านเรื่องราวที่เกิดขึ้น<br>
+      • <b>ปิดไฟฉาย</b> ได้เพื่อลดโอกาสถูกสิ่งมีชีวิตสังเกตเห็น แต่จะมองทางได้แย่ลง<br><br>
       <b>การควบคุม:</b><br>
-      • <b>มือถือ:</b> จอยสติ๊กซ้ายเดิน | ปัดนิ้วฝั่งขวาหันมอง<br>
-      • <b>PC:</b> W, A, S, D เดิน | คลิกเมาส์เพื่อหันมุมมอง
+      • <b>มือถือ:</b> จอยสติ๊กซ้ายเดิน | ปัดนิ้วฝั่งขวาหันมอง | ปุ่ม FLASHLIGHT ปิด/เปิดไฟฉาย<br>
+      • <b>PC:</b> W, A, S, D เดิน | คลิกเมาส์เพื่อหันมุมมอง | กด F ปิด/เปิดไฟฉาย
     </p>
     <button id="start-btn" class="action-btn">START GAME</button>
     <div class="hint-text">[ แตะที่ปุ่มหรือแตะตรงไหนก็ได้บนจอเพื่อเริ่ม ]</div>
@@ -457,6 +548,36 @@
     const CHEAT_MAX_DIST = 19;
 
     let wallMat, floorMat, ceilingMat, boxGeo;
+
+    // -------------------------------------------------------------
+    // Lore Notes (เอกสารเก็บได้ เล่าเรื่องราวของออฟฟิศ)
+    // -------------------------------------------------------------
+    let loreNotes = [];
+    let notesCollected = 0;
+    const LORE_TEXTS = [
+      "บันทึกประจำวัน: ทุกคนกลับบ้านหมดแล้วตั้งแต่สามทุ่ม... แต่ทำไมลิฟต์ยังขึ้นๆลงๆ เองอยู่เลย",
+      "ป้ายประกาศ: 'พนักงานที่ทำงานล่วงเวลาเกิน 22:00 น. กรุณาอย่าเดินออกนอกเส้นทางที่กำหนด'",
+      "โน้ตติดผนัง: ฉันได้ยินเสียงเคาะประตูห้องประชุมมาสามคืนติดแล้ว แต่ไม่มีใครอยู่ในนั้นเลย",
+      "อีเมลพิมพ์ออกมา: 'เรื่อง: ห้ามเข้าชั้น 4 ฝั่งตะวันออกหลัง 20:00 น. โดยเด็ดขาด'",
+      "หน้าไดอารี่ขาดๆ: มันยิ้มให้ฉัน... ฉันไม่แน่ใจว่ามันมีปากจริงๆ หรือฉันคิดไปเอง",
+      "กระดาษโน้ตกาว: อย่าปิดไฟฉาย ถ้าเห็นอะไรยืนนิ่งอยู่ปลายทางเดิน",
+      "รายงานซ่อมบำรุง: ระบบไฟดับเป็นช่วงๆ ทีมช่างแจ้งว่า 'หาสาเหตุไม่เจอ สายไฟไม่ได้ขาด'",
+      "ข้อความบนกระดานไวท์บอร์ด: TURN BACK. THIS IS NOT THE LOBBY ANYMORE.",
+      "ใบลาออกที่ไม่ได้ส่ง: ฉันจะไม่ทำงานล่วงเวลาที่นี่อีกแล้ว ถ้าฉันออกไปได้นะ",
+      "โน้ตในลิ้นชัก: นับก้าวเดินของตัวเองไว้เสมอ ถ้าตัวเลขไม่ตรงกับที่จำได้ แปลว่าห้องเปลี่ยนไปแล้ว",
+      "สติกเกอร์ติดตู้เย็น: ใครเอานมอัลมอนด์ของฉันไปวางเกลื่อนทั้งตึกเนี่ย",
+      "หน้ากระดาษไหม้เกรียม: ...มันไม่ใช่สำนักงาน... มันไม่เคยเป็นสำนักงาน..."
+    ];
+
+    // -------------------------------------------------------------
+    // Ambient Dread Events (เหตุการณ์หลอนที่ไม่ทำร้ายผู้เล่นโดยตรง)
+    // -------------------------------------------------------------
+    let nextAmbientEventTime = performance.now() + 9000 + Math.random() * 6000;
+
+    // -------------------------------------------------------------
+    // Flashlight Toggle (ปิดไฟฉายเพื่อลดโอกาสถูกสังเกตเห็น แลกกับมองเห็นน้อยลง)
+    // -------------------------------------------------------------
+    let flashlightOn = true;
 
     // -------------------------------------------------------------
     // 1. Procedural 70x70 Map Generator
@@ -889,6 +1010,33 @@
       return new THREE.CanvasTexture(c);
     }
 
+    function genNoteTex() {
+      const c = document.createElement('canvas');
+      c.width = 96; c.height = 120;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = 'rgba(0,0,0,0)'; ctx.fillRect(0, 0, 96, 120);
+
+      ctx.save();
+      ctx.translate(48, 60);
+      ctx.rotate(-0.05);
+      ctx.fillStyle = '#e8dfc0';
+      ctx.shadowColor = '#fff8dd';
+      ctx.shadowBlur = 14;
+      ctx.fillRect(-34, -44, 68, 88);
+      ctx.restore();
+
+      ctx.strokeStyle = 'rgba(90, 70, 30, 0.55)';
+      ctx.lineWidth = 1.5;
+      for (let y = -30; y <= 34; y += 11) {
+        ctx.beginPath();
+        ctx.moveTo(15, 22 + y * 0.98);
+        ctx.lineTo(78, 20 + y * 0.98);
+        ctx.stroke();
+      }
+
+      return new THREE.CanvasTexture(c);
+    }
+
     // -------------------------------------------------------------
     // 4. สร้าง 3D Rig มอนสเตอร์ (ขยับแขนขาได้จริง)
     // -------------------------------------------------------------
@@ -1186,6 +1334,7 @@
         document.getElementById('joy-base').style.display = 'block';
         document.getElementById('touch-look').style.display = 'block';
         document.getElementById('sprint-btn').style.display = 'flex';
+        document.getElementById('flash-btn').style.display = 'flex';
       }
 
       buildProceduralLevel();
@@ -1203,6 +1352,10 @@
 
       for (const b of almondBottles) scene.remove(b.mesh);
       almondBottles = [];
+
+      for (const n of loreNotes) scene.remove(n.mesh);
+      loreNotes = [];
+      notesCollected = 0;
 
       GRID = generateSolvableOfficeMap();
 
@@ -1304,6 +1457,23 @@
         almondBottles.push({ mesh: bottle, active: true, x: wx, z: wz });
       }
 
+      // กระจายโน้ต/เอกสารเล่าเรื่อง ทั่วแมป (ต่อจากตำแหน่งขวดนม กันไม่ให้ซ้อนกัน)
+      const noteMat = new THREE.SpriteMaterial({ map: genNoteTex(), transparent: true });
+      const shuffledLore = LORE_TEXTS.slice();
+      for (let i = shuffledLore.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffledLore[i], shuffledLore[j]] = [shuffledLore[j], shuffledLore[i]];
+      }
+      const noteCount = Math.min(shuffledLore.length, floorCellsForBottles.length - bottleTarget);
+      for (let i = 0; i < noteCount; i++) {
+        const { wx, wz } = floorCellsForBottles[bottleTarget + i];
+        const note = new THREE.Sprite(noteMat);
+        note.scale.set(0.5, 0.62, 1);
+        note.position.set(wx, 0.9, wz);
+        scene.add(note);
+        loreNotes.push({ mesh: note, active: true, x: wx, z: wz, text: shuffledLore[i] });
+      }
+
       window.resetBackroomsPlayer();
     }
 
@@ -1359,6 +1529,11 @@
 
       isBlackout = false;
       nextBlackoutTime = performance.now() + 25000;
+
+      nextAmbientEventTime = performance.now() + 9000 + Math.random() * 6000;
+      setFlashlight(true);
+      const noteOverlay = document.getElementById('note-overlay');
+      if (noteOverlay) noteOverlay.style.display = 'none';
     };
 
     function updateEnergyHUD() {
@@ -1379,10 +1554,102 @@
     }
 
     // -------------------------------------------------------------
+    // Note Overlay (แสดงข้อความโน้ตที่เก็บได้ ค้างจอนานกว่า item-notification ปกติ)
+    // -------------------------------------------------------------
+    let noteOverlayTimer = null;
+    function showNoteOverlay(text) {
+      const el = document.getElementById('note-overlay');
+      if (!el) return;
+      el.querySelector('.note-body').innerText = text;
+      el.querySelector('.note-count').innerText = `เอกสารที่พบ: ${notesCollected}/${LORE_TEXTS.length}`;
+      el.style.display = 'flex';
+      if (noteOverlayTimer) clearTimeout(noteOverlayTimer);
+      noteOverlayTimer = setTimeout(() => { el.style.display = 'none'; }, 5200);
+    }
+
+    // -------------------------------------------------------------
+    // Ambient Dread Events (เสียง/ไฟกระพริบไกลๆ ไม่ทำร้ายผู้เล่น แค่สร้างความระแวง)
+    // -------------------------------------------------------------
+    function playDistantKnock() {
+      if (!audioCtx || audioCtx.state !== 'running') return;
+      try {
+        const now = audioCtx.currentTime;
+        for (let i = 0; i < 3; i++) {
+          const t = now + i * 0.22;
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(60, t);
+          gain.gain.setValueAtTime(0.05, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+          osc.connect(gain); gain.connect(audioCtx.destination);
+          osc.start(t); osc.stop(t + 0.1);
+        }
+      } catch(e) {}
+    }
+
+    function playDistantWhisper() {
+      if (!audioCtx || audioCtx.state !== 'running') return;
+      try {
+        const now = audioCtx.currentTime;
+        const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.6, audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * 0.06;
+        const noise = audioCtx.createBufferSource();
+        noise.buffer = buffer;
+        const f = audioCtx.createBiquadFilter();
+        f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 1.2;
+        const g = audioCtx.createGain();
+        g.gain.setValueAtTime(0.001, now);
+        g.gain.linearRampToValueAtTime(0.25, now + 0.15);
+        g.gain.linearRampToValueAtTime(0.001, now + 0.55);
+        noise.connect(f); f.connect(g); g.connect(audioCtx.destination);
+        noise.start(now); noise.stop(now + 0.6);
+      } catch(e) {}
+    }
+
+    function triggerAmbientDreadEvent() {
+      // สุ่มเลือกไฟเพดานดวงหนึ่งให้กระพริบ (ถ้ามี) โดยไม่สนใจว่าใกล้ผู้เล่นหรือไม่
+      // เพื่อให้ผู้เล่นได้ยิน/เห็นความผิดปกติแว่วมาจากที่ไกลๆ
+      if (ceilingLights.length > 0 && !isBlackout) {
+        const light = ceilingLights[Math.floor(Math.random() * ceilingLights.length)];
+        const originalIntensity = light.intensity;
+        let flickers = 0;
+        const flickerStep = () => {
+          light.intensity = (flickers % 2 === 0) ? 0 : originalIntensity;
+          flickers++;
+          if (flickers < 5) setTimeout(flickerStep, 110);
+          else light.intensity = originalIntensity;
+        };
+        flickerStep();
+      }
+      if (Math.random() < 0.5) playDistantKnock(); else playDistantWhisper();
+    }
+
+    // -------------------------------------------------------------
+    // Flashlight Toggle (ปิดไฟฉายลดโอกาสถูกสังเกตเห็น แลกกับมองเห็นทางน้อยลง)
+    // -------------------------------------------------------------
+    function setFlashlight(on) {
+      flashlightOn = on;
+      if (flashlight) flashlight.intensity = on ? 1.2 : 0;
+      const indicator = document.getElementById('flashlight-indicator');
+      if (indicator) indicator.style.display = on ? 'none' : 'block';
+      const btn = document.getElementById('flash-btn');
+      if (btn) btn.classList.toggle('off', !on);
+    }
+    function toggleFlashlight() {
+      if (!window.gameEngineStarted || isJumpscareActive) return;
+      setFlashlight(!flashlightOn);
+    }
+
+    // -------------------------------------------------------------
     // Controls
     // -------------------------------------------------------------
     window.addEventListener('keydown', (e) => { if (keys.hasOwnProperty(e.code)) keys[e.code] = true; });
     window.addEventListener('keyup', (e) => { if (keys.hasOwnProperty(e.code)) keys[e.code] = false; });
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'KeyF') toggleFlashlight();
+    });
 
     function triggerSprint() {
       if (!window.gameEngineStarted || isJumpscareActive) return;
@@ -1411,6 +1678,16 @@
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'Space') {
         triggerSprint();
       }
+    });
+
+    const flashBtn = document.getElementById('flash-btn');
+    flashBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      toggleFlashlight();
+    }, { passive: false });
+    flashBtn.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      toggleFlashlight();
     });
 
     document.body.addEventListener('click', (e) => {
@@ -1727,6 +2004,21 @@
           }
         }
 
+        // เก็บโน้ต/เอกสารเล่าเรื่อง
+        for (let i = 0; i < loreNotes.length; i++) {
+          const n = loreNotes[i];
+          if (n.active) {
+            const distN = Math.hypot(camera.position.x - n.x, camera.position.z - n.z);
+            if (distN < 1.4) {
+              n.active = false;
+              scene.remove(n.mesh);
+              notesCollected++;
+              playDrinkSound();
+              showNoteOverlay(n.text);
+            }
+          }
+        }
+
         // Head Bobbing & Breathing
         let bobY = 0, bobZ = 0;
         if (moveLen > 0.05) {
@@ -1768,12 +2060,19 @@
           }
         }
 
+        // เหตุการณ์หลอนแบบ ambient (ไฟกระพริบ/เสียงไกลๆ) ไม่ผูกกับระยะห่างจาก entity
+        if (now > nextAmbientEventTime) {
+          triggerAmbientDreadEvent();
+          nextAmbientEventTime = now + 16000 + Math.random() * 14000;
+        }
+
         // =========================================================
         // AI 1: The Smiler (ลอยเคว้งส่าย + อ้าขากรรไกร 3D)
         // =========================================================
         const distSmiler = smilerRig.position.distanceTo(camera.position);
 
-        if (distSmiler < 20) {
+        const detectMult = flashlightOn ? 1.0 : 0.62; // ปิดไฟฉาย = ระยะที่ entity สังเกตเห็นผู้เล่นลดลง
+        if (distSmiler < 20 * detectMult) {
           smilerState = 'CHASE';
           playerEnergy = Math.max(0, playerEnergy - 1.2 * dt);
           smilerSpeed = (distSmiler < 9.0) ? 4.45 : (isBlackout ? 3.4 : 2.3);
@@ -1836,7 +2135,7 @@
         // =========================================================
         const distBacteria = bacteriaRig.position.distanceTo(camera.position);
 
-        if (distBacteria < 22) {
+        if (distBacteria < 22 * detectMult) {
           bacteriaState = 'CHASE';
           playerEnergy = Math.max(0, playerEnergy - 1.0 * dt);
           bacteriaSpeed = (distBacteria < 9.5) ? 4.25 : (isBlackout ? 3.0 : 2.1);
@@ -1900,7 +2199,7 @@
         // =========================================================
         const distDuller = dullerRig.position.distanceTo(camera.position);
 
-        if (distDuller < 18) {
+        if (distDuller < 18 * detectMult) {
           dullerState = 'CHASE';
           playerEnergy = Math.max(0, playerEnergy - 0.9 * dt);
           dullerSpeed = (distDuller < 8.0) ? 4.3 : 2.2;
