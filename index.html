@@ -307,6 +307,54 @@
       opacity: 0.5;
     }
 
+    #hide-btn {
+      position: absolute;
+      bottom: 118px;
+      right: 32px;
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: rgba(70, 90, 60, 0.28);
+      border: 1.5px solid rgba(150, 220, 150, 0.5);
+      color: #daffda;
+      font-family: monospace;
+      font-size: 10px;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      line-height: 1.2;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      z-index: 11;
+      touch-action: manipulation;
+      user-select: none;
+      transition: opacity 0.15s ease, filter 0.15s ease, transform 0.1s ease, background 0.15s ease;
+    }
+    #hide-btn.active {
+      background: rgba(80, 190, 100, 0.5);
+      transform: scale(0.94);
+    }
+    #hide-btn.disabled {
+      filter: grayscale(0.85);
+      opacity: 0.35;
+    }
+
+    #hide-prompt {
+      position: absolute;
+      bottom: 110px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #cdf7cd;
+      font-family: monospace;
+      font-size: 13px;
+      letter-spacing: 1px;
+      z-index: 8;
+      pointer-events: none;
+      text-shadow: 0 0 4px #060;
+      display: none;
+    }
+
     #flashlight-indicator {
       position: absolute;
       bottom: 16px;
@@ -393,7 +441,8 @@
 
   <div class="hud">
     <div><span class="rec">● CAM-04</span> [LIVE] 22:48:12</div>
-    <div id="hud-subtitle" style="font-size: 11px; margin-top: 3px; opacity: 0.7;">BLDG-A: 4F // VAST UNMAPPED SECTOR</div>
+    <div id="hud-subtitle" style="font-size: 11px; margin-top: 3px; opacity: 0.7;">BLDG-A: 4F // OFFICE FLOOR</div>
+    <div id="objective-text" style="font-size: 11px; margin-top: 3px; color: #8fc4ff;">บัตรผ่าน: 0/3</div>
     <div class="energy-container">
       <span id="meter-label">ENERGY:</span>
       <div class="energy-bar-bg">
@@ -417,20 +466,23 @@
   <div id="touch-look"></div>
   <div id="sprint-btn">SPRINT</div>
   <div id="flash-btn">FLASH<br>LIGHT</div>
+  <div id="hide-btn">HIDE</div>
+  <div id="hide-prompt">[ กด E เพื่อซ่อนตัว ]</div>
 
   <!-- Start Menu พรางตัว -->
   <div id="start-menu" class="dialog-layer" onpointerdown="doStartGame(event)" onclick="doStartGame(event)" ontouchend="doStartGame(event)">
     <h1>OFFICE ESCAPE 3D</h1>
     <p>
-      <b>ภารกิจ: หาทางออกจากอาคารหลังเลิกงาน</b><br>
-      คุณทำงานล่วงเวลาจนดึก ทุกคนกลับบ้านหมดแล้วและอาคารปิดระบบหลัก<br>
-      • เดินสำรวจตามชั้นเพื่อค้นหา <b>บันไดหนีไฟสีแดง (EXIT)</b> เพื่อกลับบ้าน<br>
-      • หากรู้สึกเหนื่อยล้าคอแห้ง ให้เก็บกระป๋องเครื่องดื่มตามทางมาดื่มเพื่อเติม <b>พลังงาน (Energy)</b><br>
-      • เก็บ <b>เอกสาร/โน้ต</b> ที่กระจายอยู่ทั่วตึกเพื่ออ่านเรื่องราวที่เกิดขึ้น<br>
-      • <b>ปิดไฟฉาย</b> ได้เพื่อลดโอกาสถูกสิ่งมีชีวิตสังเกตเห็น แต่จะมองทางได้แย่ลง<br><br>
+      <b>ภารกิจ: หาทางออกจากตึกสำนักงานหลังเลิกงาน</b><br>
+      คุณทำงานล่วงเวลาจนดึก เพื่อนร่วมงานกลับบ้านกันหมดแล้ว และตึกก็เข้าสู่โหมดปิดไฟประหยัดพลังงาน<br>
+      • สำรวจตึกเพื่อหาทาง <b>บันไดหนีไฟ (EXIT)</b> แล้วกลับบ้าน<br>
+      • ประตู EXIT ถูกล็อกไว้ ต้องเก็บ <b>บัตรผ่าน (Keycard) ให้ครบ 3 ใบ</b> ก่อนถึงจะออกได้<br>
+      • ถ้าเริ่มเหนื่อยล้า ให้แวะเก็บเครื่องดื่มตามทางเพื่อเติม <b>พลังงาน</b><br>
+      • ระหว่างทางมีเอกสาร/โน้ตของเพื่อนร่วมงานวางทิ้งไว้ เก็บอ่านเล่นได้<br>
+      • ใช้ <b>ไฟฉาย</b> ช่วยให้มองเห็นทางเดินได้ชัดขึ้นในจุดที่แสงไม่พอ<br><br>
       <b>การควบคุม:</b><br>
-      • <b>มือถือ:</b> จอยสติ๊กซ้ายเดิน | ปัดนิ้วฝั่งขวาหันมอง | ปุ่ม FLASHLIGHT ปิด/เปิดไฟฉาย<br>
-      • <b>PC:</b> W, A, S, D เดิน | คลิกเมาส์เพื่อหันมุมมอง | กด F ปิด/เปิดไฟฉาย
+      • <b>มือถือ:</b> จอยสติ๊กซ้ายเดิน | ปัดนิ้วฝั่งขวาหันมอง | ปุ่ม FLASHLIGHT ปิด/เปิดไฟฉาย | ปุ่ม HIDE แวะพักที่ตู้เอกสารระหว่างทาง<br>
+      • <b>PC:</b> W, A, S, D เดิน | คลิกเมาส์เพื่อหันมุมมอง | กด F ปิด/เปิดไฟฉาย | กด E แวะพักที่ตู้เอกสารระหว่างทาง
     </p>
     <button id="start-btn" class="action-btn">START GAME</button>
     <div class="hint-text">[ แตะที่ปุ่มหรือแตะตรงไหนก็ได้บนจอเพื่อเริ่ม ]</div>
@@ -536,6 +588,8 @@
     let isBlackout = false;
     let nextBlackoutTime = performance.now() + 25000;
     let blackoutEndTime = 0;
+    // ก่อนไฟดับครั้งแรก entity ทั้ง 3 ตัวยังไม่ปรากฏตัวหรือขยับเลย — เริ่มทำงานหลังไฟกลับมาติดครั้งแรก
+    let firstBlackoutOccurred = false;
 
     // "โกง" ให้ entity วาปมาป้วนเปี้ยนใกล้ผู้เล่นเป็นระยะ ระหว่างที่มันแค่ PATROL อยู่ไกลๆ
     // (สุ่มเวลาถัดไปของแต่ละตัวไม่พร้อมกัน กันไม่ให้โผล่มาพร้อมกันทั้ง 3 ตัว)
@@ -548,10 +602,22 @@
     const CHEAT_MAX_DIST = 19;
 
     let wallMat, floorMat, ceilingMat, boxGeo;
+    let officeWallTex, backroomsWallTex;
+    let isTouchDevice = false;
+    const OFFICE_AMBIENT_COLOR = 0xf3f0e6;
+    const BACKROOMS_AMBIENT_COLOR = 0xd4c278;
 
     // -------------------------------------------------------------
     // Lore Notes (เอกสารเก็บได้ เล่าเรื่องราวของออฟฟิศ)
     // -------------------------------------------------------------
+    // -------------------------------------------------------------
+    // Keycards (เป้าหมายย่อย: ต้องเก็บให้ครบก่อนถึงจะออกทาง EXIT ได้)
+    // -------------------------------------------------------------
+    let keycards = [];
+    let keycardsCollected = 0;
+    const KEYCARDS_REQUIRED = 3;
+    let lastExitLockedNoticeTime = 0;
+
     let loreNotes = [];
     let notesCollected = 0;
     const LORE_TEXTS = [
@@ -578,6 +644,14 @@
     // Flashlight Toggle (ปิดไฟฉายเพื่อลดโอกาสถูกสังเกตเห็น แลกกับมองเห็นน้อยลง)
     // -------------------------------------------------------------
     let flashlightOn = true;
+
+    // -------------------------------------------------------------
+    // Safe-zone / จุดซ่อนตัว (ตู้เอกสาร) — กด/แตะเพื่อหลบ ลดโอกาสถูกสังเกตเห็นเกือบเป็นศูนย์
+    // -------------------------------------------------------------
+    let hidingSpots = [];
+    let isHiding = false;
+    const HIDE_INTERACT_DIST = 1.8;
+    const HIDING_SPOTS_COUNT = 9;
 
     // -------------------------------------------------------------
     // 1. Procedural 70x70 Map Generator
@@ -934,6 +1008,38 @@
       return t;
     }
 
+    // ผนังสีออฟฟิศปกติ (ทาสีเรียบ + รอยต่อแผ่นยิปซัม) — ใช้ก่อนไฟดับครั้งแรก ยังไม่มีลาย Backrooms
+    function genOfficeWallTex() {
+      const c = document.createElement('canvas');
+      c.width = 512; c.height = 512;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#dad5c8'; ctx.fillRect(0, 0, 512, 512);
+
+      // รอยต่อแผ่นผนังจางๆ แนวตั้ง
+      ctx.strokeStyle = 'rgba(150, 143, 122, 0.35)'; ctx.lineWidth = 1.5;
+      for (let x = 0; x < 512; x += 128) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 512); ctx.stroke();
+      }
+
+      // เนื้อสีทาผนังไม่เรียบเนียนจนเกินไป
+      ctx.fillStyle = 'rgba(120, 112, 92, 0.05)';
+      for (let i = 0; i < 260; i++) {
+        const sx = Math.random() * 512, sy = Math.random() * 512;
+        ctx.fillRect(sx, sy, 2, 2);
+      }
+
+      // ขอบบัว (chair rail) กลางผนัง
+      ctx.fillStyle = '#c7c0ac'; ctx.fillRect(0, 220, 512, 8);
+
+      const baseH = 40;
+      ctx.fillStyle = '#8f8873'; ctx.fillRect(0, 512 - baseH, 512, baseH);
+      ctx.fillStyle = '#726c5a'; ctx.fillRect(0, 512 - baseH, 512, 4);
+
+      const t = new THREE.CanvasTexture(c);
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      return t;
+    }
+
     function genAuthenticCarpetTex() {
       const c = document.createElement('canvas');
       c.width = 256; c.height = 256;
@@ -1033,6 +1139,27 @@
         ctx.lineTo(78, 20 + y * 0.98);
         ctx.stroke();
       }
+
+      return new THREE.CanvasTexture(c);
+    }
+
+    function genKeycardTex() {
+      const c = document.createElement('canvas');
+      c.width = 96; c.height = 60;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = 'rgba(0,0,0,0)'; ctx.fillRect(0, 0, 96, 60);
+
+      ctx.fillStyle = '#3a6ea5';
+      ctx.shadowColor = '#8fd0ff';
+      ctx.shadowBlur = 16;
+      ctx.beginPath();
+      ctx.roundRect(8, 8, 80, 44, 6);
+      ctx.fill();
+
+      ctx.fillStyle = '#e8f4ff';
+      ctx.fillRect(14, 16, 68, 8);
+      ctx.fillStyle = '#ffcf3f';
+      ctx.fillRect(14, 32, 24, 14);
 
       return new THREE.CanvasTexture(c);
     }
@@ -1292,7 +1419,7 @@
       renderer.setClearColor(0x8a7b3c);
       container.appendChild(renderer.domElement);
 
-      ambientLight = new THREE.AmbientLight(0xd4c278, 0.82);
+      ambientLight = new THREE.AmbientLight(OFFICE_AMBIENT_COLOR, 0.9);
       scene.add(ambientLight);
 
       flashlight = new THREE.SpotLight(0xfff8e7, 1.2, 26, Math.PI * 0.25, 0.6, 1.1);
@@ -1301,10 +1428,22 @@
       flashlight.target = camera;
       scene.add(camera);
 
-      wallMat = new THREE.MeshLambertMaterial({ map: genAuthenticWallTex() });
+      officeWallTex = genOfficeWallTex();
+      backroomsWallTex = genAuthenticWallTex();
+      wallMat = new THREE.MeshLambertMaterial({ map: officeWallTex });
       floorMat = new THREE.MeshLambertMaterial({ map: genAuthenticCarpetTex() });
       ceilingMat = new THREE.MeshLambertMaterial({ map: genAuthenticCeilingTex() });
       boxGeo = new THREE.BoxGeometry(CELL, HEIGHT, CELL);
+
+      // วอร์มอัพเทกซ์เจอร์ผนัง Backrooms ขึ้น GPU ล่วงหน้าตั้งแต่ตอนโหลดเกม
+      // กันไม่ให้กระตุกตอนสลับผนังตอนไฟดับครั้งแรก (การอัปโหลดเทกซ์เจอร์ใหม่ครั้งแรกกินเฟรมพอสมควร)
+      const wallTexWarmup = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.01, 0.01),
+        new THREE.MeshBasicMaterial({ map: backroomsWallTex })
+      );
+      wallTexWarmup.frustumCulled = false;
+      wallTexWarmup.position.set(0, -500, 0);
+      scene.add(wallTexWarmup);
 
       const mapW = MAP_SIZE * CELL;
       const mapH = MAP_SIZE * CELL;
@@ -1331,10 +1470,10 @@
       scene.add(dullerRig);
 
       if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+        isTouchDevice = true;
         document.getElementById('joy-base').style.display = 'block';
         document.getElementById('touch-look').style.display = 'block';
-        document.getElementById('sprint-btn').style.display = 'flex';
-        document.getElementById('flash-btn').style.display = 'flex';
+        // ปุ่ม SPRINT / HIDE / FLASHLIGHT ยังไม่โผล่ก่อนไฟดับครั้งแรก กันหลุด hint ว่ามีอะไรผิดปกติ
       }
 
       buildProceduralLevel();
@@ -1356,6 +1495,17 @@
       for (const n of loreNotes) scene.remove(n.mesh);
       loreNotes = [];
       notesCollected = 0;
+
+      for (const k of keycards) scene.remove(k.mesh);
+      keycards = [];
+      keycardsCollected = 0;
+      updateObjectiveHUD();
+
+      for (const h of hidingSpots) scene.remove(h.mesh);
+      hidingSpots = [];
+      isHiding = false;
+      document.getElementById('hide-prompt').style.display = 'none';
+      document.getElementById('hide-btn').classList.remove('active');
 
       GRID = generateSolvableOfficeMap();
 
@@ -1474,6 +1624,32 @@
         loreNotes.push({ mesh: note, active: true, x: wx, z: wz, text: shuffledLore[i] });
       }
 
+      // วางบัตรผ่าน (Keycard) ต่อจากตำแหน่งโน้ต — ต้องเก็บให้ครบก่อนถึงจะออกทาง EXIT ได้
+      const keycardMat = new THREE.SpriteMaterial({ map: genKeycardTex(), transparent: true });
+      const keycardStart = bottleTarget + noteCount;
+      for (let i = 0; i < KEYCARDS_REQUIRED && keycardStart + i < floorCellsForBottles.length; i++) {
+        const { wx, wz } = floorCellsForBottles[keycardStart + i];
+        const card = new THREE.Sprite(keycardMat);
+        card.scale.set(0.55, 0.35, 1);
+        card.position.set(wx, 0.85, wz);
+        scene.add(card);
+        keycards.push({ mesh: card, active: true, x: wx, z: wz });
+      }
+      updateObjectiveHUD();
+
+      // กระจายจุดซ่อนตัว (ตู้เอกสาร) ต่อจากตำแหน่งบัตรผ่าน
+      const hideCabinetMat = new THREE.MeshLambertMaterial({ color: 0x3a352c });
+      const hideCabinetGeo = new THREE.BoxGeometry(1.1, 1.9, 0.6);
+      const hideStart = keycardStart + KEYCARDS_REQUIRED;
+      const hideTarget = Math.min(HIDING_SPOTS_COUNT, Math.max(0, floorCellsForBottles.length - hideStart));
+      for (let i = 0; i < hideTarget; i++) {
+        const { wx, wz } = floorCellsForBottles[hideStart + i];
+        const cabinet = new THREE.Mesh(hideCabinetGeo, hideCabinetMat);
+        cabinet.position.set(wx, 0.95, wz);
+        scene.add(cabinet);
+        hidingSpots.push({ mesh: cabinet, x: wx, z: wz });
+      }
+
       window.resetBackroomsPlayer();
     }
 
@@ -1492,7 +1668,7 @@
 
       document.getElementById('meter-label').innerText = 'ENERGY:';
       document.getElementById('meter-label').style.color = '#9cb873';
-      document.getElementById('hud-subtitle').innerText = 'BLDG-A: 4F // VAST UNMAPPED SECTOR';
+      document.getElementById('hud-subtitle').innerText = 'BLDG-A: 4F // OFFICE FLOOR';
       updateEnergyHUD();
 
       if (smilerRig) { smilerRig.position.copy(smilerSpawn); smilerRig.rotation.z = 0; }
@@ -1504,6 +1680,10 @@
       for (let k in keys) keys[k] = false;
       joyVector.x = 0;
       joyVector.y = 0;
+
+      isHiding = false;
+      document.getElementById('hide-prompt').style.display = 'none';
+      document.getElementById('hide-btn').classList.remove('active');
 
       smilerSpeed = 1.4; smilerState = 'PATROL'; smilerWaypoint = null;
       bacteriaSpeed = 1.2; bacteriaState = 'PATROL'; bacteriaWaypoint = null;
@@ -1529,11 +1709,27 @@
 
       isBlackout = false;
       nextBlackoutTime = performance.now() + 25000;
+      firstBlackoutOccurred = false;
+
+      if (wallMat && officeWallTex) {
+        wallMat.map = officeWallTex;
+        wallMat.needsUpdate = true;
+      }
+      if (ambientLight) {
+        ambientLight.color.setHex(OFFICE_AMBIENT_COLOR);
+        ambientLight.intensity = 0.9;
+      }
+      if (isTouchDevice) {
+        document.getElementById('sprint-btn').style.display = 'none';
+        document.getElementById('flash-btn').style.display = 'none';
+        document.getElementById('hide-btn').style.display = 'none';
+      }
 
       nextAmbientEventTime = performance.now() + 9000 + Math.random() * 6000;
       setFlashlight(true);
       const noteOverlay = document.getElementById('note-overlay');
       if (noteOverlay) noteOverlay.style.display = 'none';
+      lastExitLockedNoticeTime = 0;
     };
 
     function updateEnergyHUD() {
@@ -1556,6 +1752,10 @@
     // -------------------------------------------------------------
     // Note Overlay (แสดงข้อความโน้ตที่เก็บได้ ค้างจอนานกว่า item-notification ปกติ)
     // -------------------------------------------------------------
+    function updateObjectiveHUD() {
+      const el = document.getElementById('objective-text');
+      if (el) el.innerText = `บัตรผ่าน: ${keycardsCollected}/${KEYCARDS_REQUIRED}`;
+    }
     let noteOverlayTimer = null;
     function showNoteOverlay(text) {
       const el = document.getElementById('note-overlay');
@@ -1638,8 +1838,28 @@
       if (btn) btn.classList.toggle('off', !on);
     }
     function toggleFlashlight() {
-      if (!window.gameEngineStarted || isJumpscareActive) return;
+      if (!window.gameEngineStarted || isJumpscareActive || isHiding) return;
       setFlashlight(!flashlightOn);
+    }
+
+    function getNearestHidingDist() {
+      let best = Infinity;
+      for (const h of hidingSpots) {
+        const d = Math.hypot(camera.position.x - h.x, camera.position.z - h.z);
+        if (d < best) best = d;
+      }
+      return best;
+    }
+
+    function toggleHiding() {
+      if (!window.gameEngineStarted || isJumpscareActive) return;
+      if (isHiding) {
+        isHiding = false;
+        return;
+      }
+      if (getNearestHidingDist() <= HIDE_INTERACT_DIST) {
+        isHiding = true;
+      }
     }
 
     // -------------------------------------------------------------
@@ -1649,10 +1869,21 @@
     window.addEventListener('keyup', (e) => { if (keys.hasOwnProperty(e.code)) keys[e.code] = false; });
     window.addEventListener('keydown', (e) => {
       if (e.code === 'KeyF') toggleFlashlight();
+      if (e.code === 'KeyE') toggleHiding();
+    });
+
+    const hideBtn = document.getElementById('hide-btn');
+    hideBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      toggleHiding();
+    }, { passive: false });
+    hideBtn.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      toggleHiding();
     });
 
     function triggerSprint() {
-      if (!window.gameEngineStarted || isJumpscareActive) return;
+      if (!window.gameEngineStarted || isJumpscareActive || isHiding) return;
       const now = performance.now();
       if (isSprintBoost || now < sprintCooldownEndTime) return; // ยังวิ่งอยู่ หรือยังคูลดาวน์ไม่หมด
       if (playerEnergy < SPRINT_MIN_ENERGY) return; // Energy/Sanity ไม่พอ
@@ -1900,12 +2131,22 @@
           camera.position.y += (Math.random() - 0.5) * 0.09;
 
           const strobe = document.getElementById('jumpscare-strobe');
-          strobe.style.display = (Math.random() < 0.55) ? 'block' : 'none';
+          const jsElapsed = now - jumpscareStartTime;
+          if (jsElapsed < 90) {
+            // เฟรมแรกแฟลชขาวจ้าเต็มจอทันทีที่โดนจับตัว (สไตล์ jump scare แบบ FNAF)
+            strobe.style.background = '#ffffff';
+            strobe.style.opacity = '1';
+            strobe.style.display = 'block';
+          } else {
+            strobe.style.background = '#4a0000';
+            strobe.style.opacity = '0.35';
+            strobe.style.display = (Math.random() < 0.55) ? 'block' : 'none';
+          }
 
-          staticCanvas.style.opacity = 0.12;
+          staticCanvas.style.opacity = Math.min(0.85, 0.12 + (jsElapsed / 1350) * 0.5);
           renderNoise();
 
-          if (now - jumpscareStartTime > 1350) {
+          if (jsElapsed > 1350) {
             isJumpscareActive = false;
             window.gameEngineStarted = false;
             strobe.style.display = 'none';
@@ -1918,15 +2159,17 @@
           return;
         }
 
-        // การเดินของผู้เล่น
+        // การเดินของผู้เล่น (ล็อกการเดินไว้ทั้งหมดระหว่างซ่อนตัว)
         let moveFwd = 0, moveSide = 0;
-        if (keys.KeyW) moveFwd += 1;
-        if (keys.KeyS) moveFwd -= 1;
-        if (keys.KeyA) moveSide -= 1;
-        if (keys.KeyD) moveSide += 1;
+        if (!isHiding) {
+          if (keys.KeyW) moveFwd += 1;
+          if (keys.KeyS) moveFwd -= 1;
+          if (keys.KeyA) moveSide -= 1;
+          if (keys.KeyD) moveSide += 1;
 
-        moveFwd -= joyVector.y;
-        moveSide += joyVector.x;
+          moveFwd -= joyVector.y;
+          moveSide += joyVector.x;
+        }
 
         const moveLen = Math.hypot(moveFwd, moveSide);
 
@@ -1961,6 +2204,24 @@
           }
 
           headBobTimer += dt * 9.5;
+        }
+
+        // อัพเดต UI ของจุดซ่อนตัว (prompt + ปุ่มมือถือ)
+        const hidePromptEl = document.getElementById('hide-prompt');
+        const nearestHideDist = getNearestHidingDist();
+        if (isHiding) {
+          hidePromptEl.style.display = 'block';
+          hidePromptEl.innerText = '[ กำลังซ่อนตัว — กด E เพื่อออกมา ]';
+          hideBtn.classList.add('active');
+          hideBtn.classList.remove('disabled');
+        } else if (nearestHideDist <= HIDE_INTERACT_DIST) {
+          hidePromptEl.style.display = 'block';
+          hidePromptEl.innerText = '[ กด E เพื่อซ่อนตัว ]';
+          hideBtn.classList.remove('active', 'disabled');
+        } else {
+          hidePromptEl.style.display = 'none';
+          hideBtn.classList.remove('active');
+          hideBtn.classList.add('disabled');
         }
 
         // ระบบลดค่า Energy / Sanity
@@ -2019,6 +2280,26 @@
           }
         }
 
+        // เก็บบัตรผ่าน (Keycard)
+        for (let i = 0; i < keycards.length; i++) {
+          const k = keycards[i];
+          if (k.active) {
+            const distK = Math.hypot(camera.position.x - k.x, camera.position.z - k.z);
+            if (distK < 1.4) {
+              k.active = false;
+              scene.remove(k.mesh);
+              keycardsCollected++;
+              updateObjectiveHUD();
+              playGlitchShiftSound();
+
+              const notif = document.getElementById('item-notification');
+              notif.innerText = `บัตรผ่าน ${keycardsCollected}/${KEYCARDS_REQUIRED}`;
+              notif.style.display = 'block';
+              setTimeout(() => { notif.style.display = 'none'; }, 2200);
+            }
+          }
+        }
+
         // Head Bobbing & Breathing
         let bobY = 0, bobZ = 0;
         if (moveLen > 0.05) {
@@ -2057,21 +2338,52 @@
             ambientLight.intensity = 0.82;
             if (humGain && audioCtx) humGain.gain.setValueAtTime(0.18, audioCtx.currentTime);
             for (let i = 0; i < ceilingLights.length; i++) ceilingLights[i].intensity = 0.85;
+
+            if (!firstBlackoutOccurred) {
+              firstBlackoutOccurred = true; // ไฟกลับมาติดครั้งแรก — entity เริ่มปรากฏและทำงานตามปกติ
+              nextAmbientEventTime = now + 8000 + Math.random() * 6000;
+
+              // เปลี่ยนผนังจากสีออฟฟิศปกติเป็นลาย Backrooms + โทนไฟอุ่นวาบๆ
+              if (wallMat && backroomsWallTex) {
+                wallMat.map = backroomsWallTex;
+                wallMat.needsUpdate = true;
+              }
+              ambientLight.color.setHex(BACKROOMS_AMBIENT_COLOR);
+
+              // ปุ่ม SPRINT / HIDE / FLASHLIGHT บนมือถือ เพิ่งโผล่ตอนนี้ที่เริ่มมีอะไรผิดปกติจริงๆ
+              if (isTouchDevice) {
+                document.getElementById('sprint-btn').style.display = 'flex';
+                document.getElementById('flash-btn').style.display = 'flex';
+                document.getElementById('hide-btn').style.display = 'flex';
+              }
+            }
           }
         }
 
-        // เหตุการณ์หลอนแบบ ambient (ไฟกระพริบ/เสียงไกลๆ) ไม่ผูกกับระยะห่างจาก entity
-        if (now > nextAmbientEventTime) {
+        // เหตุการณ์หลอนแบบ ambient (ไฟกระพริบ/เสียงไกลๆ) ไม่ผูกกับระยะห่างจาก entity — เริ่มหลังไฟกลับมาติดครั้งแรกเท่านั้น
+        if (firstBlackoutOccurred && now > nextAmbientEventTime) {
           triggerAmbientDreadEvent();
           nextAmbientEventTime = now + 16000 + Math.random() * 14000;
         }
+
+        // ก่อนไฟดับครั้งแรก entity ยังไม่ปรากฏตัวและไม่ขยับเลย
+        if (!firstBlackoutOccurred) {
+          if (smilerRig) smilerRig.visible = false;
+          if (bacteriaRig) bacteriaRig.visible = false;
+          if (dullerRig) dullerRig.visible = false;
+          staticCanvas.style.opacity = 0;
+        } else {
+        if (smilerRig) smilerRig.visible = true;
+        if (bacteriaRig) bacteriaRig.visible = true;
+        if (dullerRig) dullerRig.visible = true;
 
         // =========================================================
         // AI 1: The Smiler (ลอยเคว้งส่าย + อ้าขากรรไกร 3D)
         // =========================================================
         const distSmiler = smilerRig.position.distanceTo(camera.position);
 
-        const detectMult = flashlightOn ? 1.0 : 0.62; // ปิดไฟฉาย = ระยะที่ entity สังเกตเห็นผู้เล่นลดลง
+        // ปิดไฟฉาย = ระยะที่ entity สังเกตเห็นผู้เล่นลดลง / ซ่อนตัวในตู้เอกสาร = แทบไม่ถูกสังเกตเห็นเลย
+        const detectMult = isHiding ? 0.045 : (flashlightOn ? 1.0 : 0.62);
         if (distSmiler < 20 * detectMult) {
           smilerState = 'CHASE';
           playerEnergy = Math.max(0, playerEnergy - 1.2 * dt);
@@ -2277,39 +2589,8 @@
         } else {
           staticCanvas.style.opacity = 0;
         }
+        } // จบเงื่อนไข firstBlackoutOccurred: ปิดการทำงานของ entity ทั้งหมดก่อนไฟดับครั้งแรก
 
-        // ทางออกฉุกเฉิน
+        // ทางออกฉุกเฉิน (ต้องเก็บบัตรผ่านให้ครบก่อน)
         if (camera.position.distanceTo(exitPos) < 2.0) {
-          window.gameEngineStarted = false;
-          if (document.exitPointerLock) document.exitPointerLock();
-          document.getElementById('win-menu').style.display = 'flex';
-        }
-      } else {
-        if (document.getElementById('over-menu').style.display === 'flex') {
-          renderNoise();
-        }
-      }
-
-      renderer.render(scene, camera);
-    }
-
-    window.addEventListener('resize', () => {
-      if (!camera || !renderer) return;
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
-    });
-
-    function startInitLoop() {
-      if (typeof THREE !== 'undefined') {
-        setupWorld();
-      } else {
-        setTimeout(startInitLoop, 100);
-      }
-    }
-    startInitLoop();
-  </script>
-</body>
-</html>
+          if (keycardsCollected >
