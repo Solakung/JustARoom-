@@ -76,6 +76,10 @@
       gap: 6px;
       font-size: 11px;
     }
+    #meter-label {
+      font-weight: bold;
+      transition: color 0.4s ease;
+    }
     .energy-bar-bg {
       width: 110px;
       height: 9px;
@@ -281,9 +285,9 @@
 
   <div class="hud">
     <div><span class="rec">● CAM-04</span> [LIVE] 22:48:12</div>
-    <div style="font-size: 11px; margin-top: 3px; opacity: 0.7;">BLDG-A: 4F // SECTOR-WIDE EXIT SOUGHT</div>
+    <div id="hud-subtitle" style="font-size: 11px; margin-top: 3px; opacity: 0.7;">BLDG-A: 4F // SECTOR-WIDE EXIT SOUGHT</div>
     <div class="energy-container">
-      <span>ENERGY:</span>
+      <span id="meter-label">ENERGY:</span>
       <div class="energy-bar-bg">
         <div id="energy-bar-fill"></div>
       </div>
@@ -295,7 +299,7 @@
   <div id="joy-base"><div id="joy-handle"></div></div>
   <div id="touch-look"></div>
 
-  <!-- Start Menu พรางตัวเป็นฟีลเลิกงานดึกแท้ๆ -->
+  <!-- Start Menu พรางตัว -->
   <div id="start-menu" class="dialog-layer" onpointerdown="doStartGame(event)" onclick="doStartGame(event)" ontouchend="doStartGame(event)">
     <h1>OFFICE ESCAPE 3D</h1>
     <p>
@@ -331,7 +335,7 @@
   </div>
 
   <script>
-    // ขยายแมปมหึมา 70x70 บล็อก (~250 เมตร กว้างกว่า 63,000 ตร.ม.)
+    // แมปขนาด 70x70 บล็อก (~250 เมตร กว้างกว่า 63,000 ตร.ม.)
     const MAP_SIZE = 70;
     const CELL = 3.6;
     const HEIGHT = 3.0;
@@ -344,37 +348,37 @@
 
     let camera, scene, renderer, flashlight, ambientLight;
     
-    // InstancedMesh สำหรับเรนเดอร์กำแพงกว่า 2,000 ชิ้นใน 1 Draw Call
     let wallInstancedMesh = null;
     let ceilingLights = [];
     let lampMeshes = [];
     let stairMeshes = [];
 
-    // Entity 1: The Smiler (รอยยิ้มเรืองแสงลอยส่ายเลื้อย)
+    // Entity 1: The Smiler
     let smilerEntity, smilerLight;
     let smilerSpawn = new THREE.Vector3(90, 1.4, 90);
     let smilerSpeed = 1.2;
     let smilerEnraged = false, smilerTimer = 0, smilerCooldown = 0;
 
-    // Entity 2: The Bacteria (เงามนุษย์กิ่งไม้ เดินกะเผลกโยกเยก)
+    // Entity 2: The Bacteria
     let bacteriaEntity, bacteriaLight;
     let bacteriaSpawn = new THREE.Vector3(160, 1.6, 60);
     let bacteriaSpeed = 1.0;
     let bacteriaEnraged = false, bacteriaTimer = 0, bacteriaCooldown = 0;
     let bacteriaWalkCycle = 0;
 
-    // Entity 3: The Duller (มนุษย์คลานสี่ขาต่ำติดพื้นพรม)
+    // Entity 3: The Duller
     let dullerEntity, dullerLight;
     let dullerSpawn = new THREE.Vector3(55, 0.65, 180);
     let dullerSpeed = 1.4;
     let dullerEnraged = false, dullerTimer = 0, dullerCooldown = 0;
 
-    // Almond Water Items (พรางตัวเป็นเครื่องดื่มกระป๋อง)
+    // กระจายนมอัลมอนด์ (Almond Milk) ทั่วแมป
     let almondBottles = [];
 
     // ค่า Energy (Sanity ปลอมตัว)
     let playerEnergy = 100;
     let baseFov = 72;
+    let hasRevealedSanity = false; // จู๊ค: เปลี่ยนเป็น SANITY หลังไฟดับรอบแรก
 
     // Jumpscare Camera Lock State
     let jumpscareTarget = null;
@@ -400,7 +404,7 @@
     let wallMat, floorMat, ceilingMat, boxGeo;
 
     // -------------------------------------------------------------
-    // 1. Procedural 70x70 Map Generator (สุ่มตำแหน่งทางออกฉุกเฉิน)
+    // 1. Procedural 70x70 Map Generator
     // -------------------------------------------------------------
     function generateSolvableOfficeMap() {
       const map = [];
@@ -413,7 +417,6 @@
         }
       }
 
-      // แบ่งห้อง 10x10 โซน (ขนาดใหญ่เคว้งคว้าง)
       const sectorSize = 7;
       const sectorsCount = Math.floor((MAP_SIZE - 2) / sectorSize);
 
@@ -442,7 +445,6 @@
             }
           }
 
-          // สุ่มเสาสี่เหลี่ยมกลางห้อง
           const midR = startR + 2 + Math.floor(Math.random() * 3);
           const midC = startC + 2 + Math.floor(Math.random() * 3);
           if (midR < MAP_SIZE - 2 && midC < MAP_SIZE - 2) {
@@ -452,14 +454,12 @@
         }
       }
 
-      // จุดเกิดผู้เล่น (มุมซ้ายบน)
       for (let r = 1; r <= 3; r++) {
         for (let c = 1; c <= 3; c++) map[r][c] = 0;
       }
       map[1][1] = 2;
 
-      // สุ่มตำแหน่งทางออกฉุกเฉิน (ไม่ให้เดาได้ว่าอยู่มุมขวาล่าง)
-      // สุ่มอยู่ในช่วงลึกของแผนที่ แต่ไม่ใช่ตรงมุมตาย
+      // สุ่มตำแหน่งทางออกฉุกเฉิน
       let exitR = 25 + Math.floor(Math.random() * (MAP_SIZE - 30));
       let exitC = 25 + Math.floor(Math.random() * (MAP_SIZE - 30));
       for (let r = exitR - 1; r <= exitR + 1; r++) {
@@ -467,7 +467,6 @@
       }
       map[exitR][exitC] = 3;
 
-      // จุดเกิด Entity ทั้ง 3 ชนิด
       map[25][35] = 4; // Smiler
       map[50][20] = 5; // Bacteria
       map[18][55] = 6; // Duller
@@ -507,7 +506,7 @@
     }
 
     // -------------------------------------------------------------
-    // 2. Sound Engine (เสียงไฟนีออนหึ่งดังชัดเจนสไตล์ Backrooms)
+    // 2. Sound Engine
     // -------------------------------------------------------------
     window.initAudioContextSafely = function() {
       try {
@@ -517,7 +516,6 @@
         if (audioCtx.state === 'suspended') audioCtx.resume();
 
         if (!humGain) {
-          // เสียงนีออนหึ่งดังชัดเจน (Maximum Fluorescent Buzz: 60Hz + 120Hz + 180Hz)
           const h1 = audioCtx.createOscillator();
           const h2 = audioCtx.createOscillator();
           const h3 = audioCtx.createOscillator();
@@ -528,15 +526,14 @@
           const f = audioCtx.createBiquadFilter();
           f.type = 'lowpass'; f.frequency.value = 240;
 
-          // ปรับความดังของเสียงนีออนเพิ่มขึ้นตามสั่ง
           humGain = audioCtx.createGain();
-          humGain.gain.value = 0.18;
+          humGain.gain.value = 0.18; // เสียงนีออนหึ่งอื้ออึง
 
           h1.connect(f); h2.connect(f); h3.connect(f);
           f.connect(humGain); humGain.connect(audioCtx.destination);
           h1.start(); h2.start(); h3.start();
 
-          // 1. เสียง Smiler
+          // 1. Smiler
           monsterOsc1 = audioCtx.createOscillator();
           monsterOsc2 = audioCtx.createOscillator();
           monsterOsc1.type = 'sawtooth'; monsterOsc1.frequency.value = 90;
@@ -549,7 +546,7 @@
           mf.connect(monsterSoundGain); monsterSoundGain.connect(audioCtx.destination);
           monsterOsc1.start(); monsterOsc2.start();
 
-          // 2. เสียง The Bacteria
+          // 2. The Bacteria
           shadowOsc = audioCtx.createOscillator();
           shadowOsc.type = 'sawtooth'; shadowOsc.frequency.value = 36;
           const sf = audioCtx.createBiquadFilter();
@@ -560,7 +557,7 @@
           shadowSoundGain.connect(audioCtx.destination);
           shadowOsc.start();
 
-          // 3. เสียง The Duller
+          // 3. The Duller
           dullerOsc = audioCtx.createOscillator();
           dullerOsc.type = 'triangle'; dullerOsc.frequency.value = 140;
           const df = audioCtx.createBiquadFilter();
@@ -636,13 +633,26 @@
       } catch(e) {}
     }
 
-    // เสียง Jumpscare สะพรึงขวัญ 4 ชั้น
+    function playGlitchShiftSound() {
+      if (!audioCtx || audioCtx.state !== 'running') return;
+      try {
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(160, now);
+        osc.frequency.linearRampToValueAtTime(60, now + 0.35);
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(now); osc.stop(now + 0.42);
+      } catch(e) {}
+    }
+
     function playViolentJumpscareSound() {
       if (!audioCtx || audioCtx.state !== 'running') return;
       try {
         const now = audioCtx.currentTime;
-
-        // Sub-Bass Impact Boom
         const sub = audioCtx.createOscillator();
         const subG = audioCtx.createGain();
         sub.type = 'sine';
@@ -653,7 +663,6 @@
         sub.connect(subG); subG.connect(audioCtx.destination);
         sub.start(now); sub.stop(now + 1.0);
 
-        // Dissonant Screech
         const sc1 = audioCtx.createOscillator();
         const sc2 = audioCtx.createOscillator();
         const scGain = audioCtx.createGain();
@@ -666,7 +675,6 @@
         sc1.start(now); sc2.start(now);
         sc1.stop(now + 0.8); sc2.stop(now + 0.8);
 
-        // Noise
         const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.7, audioCtx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * 0.55;
@@ -674,60 +682,38 @@
         noise.buffer = buffer;
         noise.connect(audioCtx.destination);
         noise.start(now);
-
-        // Tinnitus Ring
-        const ring = audioCtx.createOscillator();
-        const ringG = audioCtx.createGain();
-        ring.type = 'sine';
-        ring.frequency.setValueAtTime(3600, now + 0.2);
-        ringG.gain.setValueAtTime(0.001, now);
-        ringG.gain.linearRampToValueAtTime(0.06, now + 0.3);
-        ringG.gain.exponentialRampToValueAtTime(0.0001, now + 1.6);
-        ring.connect(ringG); ringG.connect(audioCtx.destination);
-        ring.start(now + 0.2); ring.stop(now + 1.65);
       } catch(e) {}
     }
 
     // -------------------------------------------------------------
-    // 3. Textures สไตล์ Backrooms แท้ (สว่างและสมจริง)
+    // 3. Textures สไตล์ Backrooms แท้
     // -------------------------------------------------------------
     function genAuthenticWallTex() {
       const c = document.createElement('canvas');
       c.width = 512; c.height = 512;
       const ctx = c.getContext('2d');
+      ctx.fillStyle = '#c8ae58'; ctx.fillRect(0, 0, 512, 512);
 
-      // สีเหลือง Mono-Yellow ของแท้
-      ctx.fillStyle = '#c8ae58';
-      ctx.fillRect(0, 0, 512, 512);
-
-      // ลายพิมพ์วอลเปเปอร์เรโทร Damask
-      ctx.strokeStyle = '#b29744';
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#b29744'; ctx.lineWidth = 2;
       for (let y = 0; y < 512; y += 32) {
         for (let x = 0; x < 512; x += 32) {
           ctx.beginPath();
-          ctx.moveTo(x + 16, y);
-          ctx.lineTo(x + 32, y + 16);
-          ctx.lineTo(x + 16, y + 32);
-          ctx.lineTo(x, y + 16);
-          ctx.closePath();
-          ctx.stroke();
+          ctx.moveTo(x + 16, y); ctx.lineTo(x + 32, y + 16);
+          ctx.lineTo(x + 16, y + 32); ctx.lineTo(x, y + 16);
+          ctx.closePath(); ctx.stroke();
           ctx.strokeRect(x + 13, y + 13, 6, 6);
         }
       }
 
-      // คราบน้ำและรอยหยดย้อย
       ctx.fillStyle = 'rgba(38, 30, 8, 0.2)';
       for (let i = 0; i < 8; i++) {
         const sx = 40 + i * 60;
         ctx.beginPath();
-        ctx.moveTo(sx, 0);
-        ctx.lineTo(sx + 16, 0);
+        ctx.moveTo(sx, 0); ctx.lineTo(sx + 16, 0);
         ctx.lineTo(sx + 8, 120 + Math.sin(i) * 60);
         ctx.fill();
       }
 
-      // บัวเชิงผนังล่าง (Baseboard)
       const baseH = 48;
       ctx.fillStyle = '#3a2a18'; ctx.fillRect(0, 512 - baseH, 512, baseH);
       ctx.fillStyle = '#22170c'; ctx.fillRect(0, 512 - baseH, 512, 5);
@@ -742,8 +728,7 @@
       const c = document.createElement('canvas');
       c.width = 256; c.height = 256;
       const ctx = c.getContext('2d');
-      ctx.fillStyle = '#5c5436';
-      ctx.fillRect(0, 0, 256, 256);
+      ctx.fillStyle = '#5c5436'; ctx.fillRect(0, 0, 256, 256);
 
       ctx.fillStyle = 'rgba(0,0,0,0.12)';
       for (let x = 0; x < 256; x += 4) {
@@ -752,7 +737,6 @@
         }
       }
 
-      // รอยคราบน้ำเปียกชุ่ม
       ctx.fillStyle = 'rgba(22, 18, 8, 0.32)';
       ctx.beginPath();
       ctx.arc(65, 65, 50, 0, Math.PI * 2);
@@ -769,11 +753,9 @@
       const c = document.createElement('canvas');
       c.width = 256; c.height = 256;
       const ctx = c.getContext('2d');
-      ctx.fillStyle = '#dcd5be';
-      ctx.fillRect(0, 0, 256, 256);
+      ctx.fillStyle = '#dcd5be'; ctx.fillRect(0, 0, 256, 256);
 
-      ctx.strokeStyle = '#827c68';
-      ctx.lineWidth = 4;
+      ctx.strokeStyle = '#827c68'; ctx.lineWidth = 4;
       ctx.strokeRect(0, 0, 256, 256);
       ctx.beginPath();
       ctx.moveTo(128, 0); ctx.lineTo(128, 256);
@@ -820,10 +802,7 @@
 
       ctx.lineWidth = 5.5;
       for (let tx = 105; tx <= 279; tx += 14) {
-        ctx.beginPath();
-        ctx.moveTo(tx, 220);
-        ctx.lineTo(tx + 4, 260);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(tx, 220); ctx.lineTo(tx + 4, 260); ctx.stroke();
       }
       return new THREE.CanvasTexture(c);
     }
@@ -835,27 +814,19 @@
       const ctx = c.getContext('2d');
       ctx.fillStyle = 'rgba(0,0,0,0)'; ctx.fillRect(0, 0, 256, 512);
 
-      ctx.fillStyle = '#060606';
-      ctx.strokeStyle = '#080808';
-      ctx.lineWidth = 8;
-
+      ctx.fillStyle = '#060606'; ctx.strokeStyle = '#080808'; ctx.lineWidth = 8;
       ctx.beginPath();
       ctx.ellipse(128, 70, 26, 38, 0.2, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = '#ff2222';
-      ctx.shadowColor = '#ff0000';
-      ctx.shadowBlur = 14;
+      ctx.fillStyle = '#ff2222'; ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 14;
       ctx.beginPath();
       ctx.arc(122, 65, 5, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.shadowBlur = 0;
-      ctx.strokeStyle = '#050505';
-      ctx.lineWidth = 9;
+      ctx.shadowBlur = 0; ctx.strokeStyle = '#050505'; ctx.lineWidth = 9;
       ctx.beginPath();
-      ctx.moveTo(128, 105);
-      ctx.quadraticCurveTo(105, 200, 135, 280);
+      ctx.moveTo(128, 105); ctx.quadraticCurveTo(105, 200, 135, 280);
       ctx.stroke();
 
       ctx.lineWidth = 6;
@@ -880,10 +851,7 @@
       const ctx = c.getContext('2d');
       ctx.fillStyle = 'rgba(0,0,0,0)'; ctx.fillRect(0, 0, 384, 256);
 
-      ctx.fillStyle = '#222220';
-      ctx.strokeStyle = '#181816';
-      ctx.lineWidth = 8;
-
+      ctx.fillStyle = '#222220'; ctx.strokeStyle = '#181816'; ctx.lineWidth = 8;
       ctx.beginPath();
       ctx.ellipse(192, 140, 85, 35, -0.1, 0, Math.PI * 2);
       ctx.fill();
@@ -906,32 +874,38 @@
       return new THREE.CanvasTexture(c);
     }
 
-    // กระป๋องเครื่องดื่ม
-    function genDrinkCanTex() {
+    // ขวดนมอัลมอนด์ Almond Milk
+    function genAlmondMilkTex() {
       const c = document.createElement('canvas');
       c.width = 128; c.height = 256;
       const ctx = c.getContext('2d');
       ctx.fillStyle = 'rgba(0,0,0,0)'; ctx.fillRect(0, 0, 128, 256);
 
-      ctx.fillStyle = '#4a90e2';
-      ctx.shadowColor = '#64b5f6';
-      ctx.shadowBlur = 16;
+      // ขวดแก้วสีชาเรืองแสงนวล
+      ctx.fillStyle = '#f5e6ca';
+      ctx.shadowColor = '#fff3db';
+      ctx.shadowBlur = 18;
       ctx.beginPath();
-      ctx.roundRect(34, 70, 60, 160, 8);
+      ctx.roundRect(32, 60, 64, 175, 10);
       ctx.fill();
 
+      // ฝาขวด
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(48, 50, 32, 20);
+      ctx.fillRect(46, 38, 36, 22);
 
+      // ฉลาก Almond Milk
+      ctx.fillStyle = '#3a2713';
+      ctx.fillRect(34, 115, 60, 55);
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 13px sans-serif';
-      ctx.fillText('ENERGY', 36, 145);
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText('ALMOND', 38, 138);
+      ctx.fillText('MILK', 48, 154);
 
       return new THREE.CanvasTexture(c);
     }
 
     // -------------------------------------------------------------
-    // 4. World Setup (สว่างแบบ Backrooms แท้)
+    // 4. World Setup
     // -------------------------------------------------------------
     function setupWorld() {
       const container = document.getElementById('viewport');
@@ -939,8 +913,6 @@
       const h = window.innerHeight || 640;
 
       scene = new THREE.Scene();
-      
-      // ปรับหมอกให้เบาลง (density: 0.028) มองเห็นทางเดินยาวไกล สว่างแบบ Backrooms
       scene.fog = new THREE.FogExp2(0x8a7b3c, 0.028);
 
       camera = new THREE.PerspectiveCamera(72, w / h, 0.1, 85);
@@ -949,7 +921,6 @@
       renderer.setClearColor(0x8a7b3c);
       container.appendChild(renderer.domElement);
 
-      // ปรับแสง Ambient สว่างขึ้นให้โทนสีเหลืองเด่นชัด
       ambientLight = new THREE.AmbientLight(0xd4c278, 0.82);
       scene.add(ambientLight);
 
@@ -1038,7 +1009,6 @@
 
       GRID = generateSolvableOfficeMap();
 
-      // นับจำนวนกำแพงสำหรับ InstancedMesh
       let wallCount = 0;
       for (let r = 0; r < MAP_SIZE; r++) {
         for (let c = 0; c < MAP_SIZE; c++) {
@@ -1050,8 +1020,8 @@
       const dummy = new THREE.Object3D();
       let instIndex = 0;
 
-      const drinkMat = new THREE.SpriteMaterial({
-        map: genDrinkCanTex(),
+      const almondMat = new THREE.SpriteMaterial({
+        map: genAlmondMilkTex(),
         transparent: true
       });
 
@@ -1066,7 +1036,6 @@
             dummy.updateMatrix();
             wallInstancedMesh.setMatrixAt(instIndex++, dummy.matrix);
           } else {
-            // โคมไฟนีออนสว่างเป็นระยะ
             if ((r % 5 === 1) && (c % 5 === 1)) {
               const light = new THREE.PointLight(0xfff4c2, 0.85, 15, 1.7);
               light.position.set(wx, HEIGHT - 0.2, wz);
@@ -1082,14 +1051,14 @@
               lampMeshes.push(lamp);
             }
 
-            // กระป๋องเครื่องดื่มเพิ่มพลังงาน 18 กระป๋องทั่วแมป
-            if (val === 0 && Math.random() < 0.01 && almondBottles.length < 18) {
-              const bottle = new THREE.Sprite(drinkMat);
-              bottle.scale.set(0.6, 1.2, 1);
-              bottle.position.set(wx, 0.6, wz);
+            // กระจายขวดนมอัลมอนด์ 35-45 ขวดทั่วแมป 70x70
+            if (val === 0 && Math.random() < 0.022 && almondBottles.length < 42) {
+              const bottle = new THREE.Sprite(almondMat);
+              bottle.scale.set(0.65, 1.3, 1);
+              bottle.position.set(wx, 0.65, wz);
               scene.add(bottle);
 
-              const bLight = new THREE.PointLight(0x4a90e2, 0.8, 5);
+              const bLight = new THREE.PointLight(0xf5e6ca, 0.75, 4.5);
               bottle.add(bLight);
 
               almondBottles.push({ mesh: bottle, active: true, x: wx, z: wz });
@@ -1142,6 +1111,12 @@
       cameraPitch = 0;
 
       playerEnergy = 100;
+      hasRevealedSanity = false;
+
+      // รีเซ็ตข้อความ HUD กลับเป็น ENERGY
+      document.getElementById('meter-label').innerText = 'ENERGY:';
+      document.getElementById('meter-label').style.color = '#9cb873';
+      document.getElementById('hud-subtitle').innerText = 'BLDG-A: 4F // SECTOR-WIDE EXIT SOUGHT';
       updateEnergyHUD();
 
       if (smilerEntity) smilerEntity.position.copy(smilerSpawn);
@@ -1327,7 +1302,7 @@
       if (window.gameEngineStarted) {
 
         // =========================================================
-        // JUMPSCARE: ล็อกสบตาในระยะ 1.5 เมตร ชัดเจนเต็มตา ไม่จมหน้า
+        // JUMPSCARE
         // =========================================================
         if (isJumpscareActive && jumpscareTarget) {
           camera.lookAt(jumpscareTarget.position.x, jumpscareTarget.position.y, jumpscareTarget.position.z);
@@ -1344,7 +1319,7 @@
           const strobe = document.getElementById('jumpscare-strobe');
           strobe.style.display = (Math.random() < 0.4) ? 'block' : 'none';
 
-          staticCanvas.style.opacity = 0.14; // เกรนจางๆ ไม่บังมอนสเตอร์
+          staticCanvas.style.opacity = 0.14;
           renderNoise();
 
           if (now - jumpscareStartTime > 1350) {
@@ -1394,13 +1369,13 @@
           headBobTimer += dt * 9.5;
         }
 
-        // ระบบลดค่า Energy (Sanity ในเงามืด)
+        // ระบบลดค่า Energy / Sanity
         let drainRate = 0.45 * dt;
         if (isBlackout) drainRate = 1.5 * dt;
         playerEnergy = Math.max(0, playerEnergy - drainRate);
         updateEnergyHUD();
 
-        // อาการสติหลุด: FOV บวมและบิดเบี้ยว
+        // FOV อาการหลอน
         let fovWarp = 0;
         if (playerEnergy < 50) {
           fovWarp = Math.sin(now * 0.003) * ((50 - playerEnergy) * 0.25);
@@ -1408,7 +1383,7 @@
           camera.updateProjectionMatrix();
         }
 
-        // Energy = 0 เสียชีวิตจากสติแตกซ่าน
+        // เสียชีวิตจากสติแตกซ่าน
         if (playerEnergy <= 0) {
           window.gameEngineStarted = false;
           document.getElementById('over-title').innerText = "INSANITY OVERTAKEN";
@@ -1417,7 +1392,7 @@
           return;
         }
 
-        // เก็บกระป๋องเครื่องดื่ม
+        // เก็บขวดนมอัลมอนด์
         for (let i = 0; i < almondBottles.length; i++) {
           const b = almondBottles[i];
           if (b.active) {
@@ -1430,6 +1405,8 @@
               updateEnergyHUD();
 
               const notif = document.getElementById('item-notification');
+              // เปลี่ยนข้อความแจ้งเตือนตามสถานะจู๊ค
+              notif.innerText = hasRevealedSanity ? '+45% SANITY RESTORED' : '+45% ENERGY RESTORED';
               notif.style.display = 'block';
               setTimeout(() => { notif.style.display = 'none'; }, 2200);
             }
@@ -1451,17 +1428,29 @@
         camera.rotation.x = cameraPitch;
         camera.rotation.z = bobZ;
 
-        // สุ่มไฟดับ
+        // =========================================================
+        // ระบบไฟดับ & จู๊คเปลี่ยนคำเป็น SANITY (The Juke Mechanism)
+        // =========================================================
         if (!isBlackout && now > nextBlackoutTime) {
           isBlackout = true;
-          blackoutEndTime = now + 1800;
+          blackoutEndTime = now + 2000;
           ambientLight.intensity = 0.04;
           if (humGain && audioCtx) humGain.gain.setValueAtTime(0.02, audioCtx.currentTime);
           for (let i = 0; i < ceilingLights.length; i++) ceilingLights[i].intensity = 0;
+
+          // จู๊คผู้เล่นตอนไฟดับรอบแรก: เปลี่ยนคำเป็น SANITY ค้างยาวไปตลอดเกม!
+          if (!hasRevealedSanity) {
+            hasRevealedSanity = true;
+            playGlitchShiftSound();
+            const label = document.getElementById('meter-label');
+            label.innerText = 'SANITY:';
+            label.style.color = '#ff4d4d'; // เปลี่ยนเป็นสีแดงเตือนภัย
+            document.getElementById('hud-subtitle').innerText = 'LEVEL 0: THE LOBBY // YOU NEVER LEFT';
+          }
         } else if (isBlackout) {
           if (now > blackoutEndTime) {
             isBlackout = false;
-            nextBlackoutTime = now + 25000 + Math.random() * 20000;
+            nextBlackoutTime = now + 28000 + Math.random() * 20000;
             ambientLight.intensity = 0.82;
             if (humGain && audioCtx) humGain.gain.setValueAtTime(0.18, audioCtx.currentTime);
             for (let i = 0; i < ceilingLights.length; i++) ceilingLights[i].intensity = 0.85;
@@ -1469,7 +1458,7 @@
         }
 
         // =========================================================
-        // AI 1: The Smiler (ส่ายเลื้อย + กระตุกเอียงคอ)
+        // AI 1: The Smiler
         // =========================================================
         const distSmiler = smilerEntity.position.distanceTo(camera.position);
 
@@ -1482,18 +1471,13 @@
               smilerTimer += dt;
               smilerSpeed = 4.45;
               if (smilerTimer > 3.2) {
-                smilerEnraged = false;
-                smilerTimer = 0;
-                smilerCooldown = 2.4;
-                smilerSpeed = 2.0;
+                smilerEnraged = false; smilerTimer = 0; smilerCooldown = 2.4; smilerSpeed = 2.0;
               }
             } else {
-              smilerCooldown -= dt;
-              smilerSpeed = 2.0;
+              smilerCooldown -= dt; smilerSpeed = 2.0;
             }
           } else {
-            smilerEnraged = false;
-            smilerTimer = 0;
+            smilerEnraged = false; smilerTimer = 0;
             if (smilerCooldown > 0) smilerCooldown -= dt;
             smilerSpeed = isBlackout ? 3.4 : 2.3;
           }
@@ -1527,7 +1511,7 @@
         }
 
         // =========================================================
-        // AI 2: The Bacteria (ก้าวเดินกระตุกโยกเยกเก้งก้าง)
+        // AI 2: The Bacteria
         // =========================================================
         const distShadow = bacteriaEntity.position.distanceTo(camera.position);
 
@@ -1540,18 +1524,13 @@
               bacteriaTimer += dt;
               bacteriaSpeed = 4.25;
               if (bacteriaTimer > 3.0) {
-                bacteriaEnraged = false;
-                bacteriaTimer = 0;
-                bacteriaCooldown = 2.5;
-                bacteriaSpeed = 1.8;
+                bacteriaEnraged = false; bacteriaTimer = 0; bacteriaCooldown = 2.5; bacteriaSpeed = 1.8;
               }
             } else {
-              bacteriaCooldown -= dt;
-              bacteriaSpeed = 1.8;
+              bacteriaCooldown -= dt; bacteriaSpeed = 1.8;
             }
           } else {
-            bacteriaEnraged = false;
-            bacteriaTimer = 0;
+            bacteriaEnraged = false; bacteriaTimer = 0;
             if (bacteriaCooldown > 0) bacteriaCooldown -= dt;
             bacteriaSpeed = isBlackout ? 3.0 : 2.1;
           }
@@ -1583,7 +1562,7 @@
         }
 
         // =========================================================
-        // AI 3: The Duller (คลานสี่ขาต่ำติดพื้นพรม)
+        // AI 3: The Duller
         // =========================================================
         const distDuller = dullerEntity.position.distanceTo(camera.position);
 
@@ -1616,7 +1595,7 @@
           }
         }
 
-        // หัวใจเต้นอิงตามตัวที่ใกล้ที่สุด
+        // เสียงหัวใจเต้น
         const closestDist = Math.min(distSmiler, distShadow, distDuller);
         if (closestDist < 18) {
           const glitchStrength = Math.pow(1 - closestDist / 18, 1.6);
