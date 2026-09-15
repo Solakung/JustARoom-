@@ -177,12 +177,37 @@
       color: #ffffff;
       transform: scale(0.97);
     }
+    .action-btn.secondary-btn {
+      background: transparent;
+      color: #cfc98a;
+      border: 2px solid #6b6640;
+      box-shadow: none;
+    }
+    .action-btn.secondary-btn:active {
+      background: rgba(140, 134, 77, 0.25);
+      color: #ffffff;
+    }
+    .menu-btn-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
     .hint-text {
       margin-top: 14px;
       font-size: 12px;
       color: #857e4e;
       letter-spacing: 1px;
       pointer-events: none;
+    }
+    #howto-menu {
+      overflow-y: auto;
+      justify-content: flex-start;
+      padding-top: 48px;
+      padding-bottom: 48px;
+    }
+    #howto-menu .howto-text {
+      text-align: left;
     }
 
     #noise-canvas {
@@ -428,6 +453,23 @@
       }
       window.gameEngineStarted = true;
     };
+
+    // เปิด/ปิดหน้าจอ "วิธีเล่น"
+    // ปุ่มเปิดผูกทั้ง pointerdown/click/touchend + stopPropagation ทุกตัว เพราะ #start-menu
+    // ข้างนอกดักฟัง 3 event นี้อยู่ (แตะตรงไหนก็เริ่มเกม) — ถ้าไม่ stopPropagation ให้ครบทุก
+    // event type จะมี event ที่หลุดรอดไปโดน onclick/ontouchend ของ #start-menu แล้วเริ่มเกมทันที
+    // preventDefault() บน pointerdown ช่วยกัน click "ผี" ที่เบราว์เซอร์ยิงตามหลัง touchend
+    // (ซึ่งจะ hit-test ใหม่ ณ ตอนนั้นแล้วอาจไปโดนโอเวอร์เลย์ที่เพิ่งโผล่แทน)
+    window.openHowTo = function(e) {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      const howto = document.getElementById('howto-menu');
+      if (howto) howto.style.display = 'flex';
+    };
+    window.closeHowTo = function(e) {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      const howto = document.getElementById('howto-menu');
+      if (howto) howto.style.display = 'none';
+    };
   </script>
 
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
@@ -473,19 +515,32 @@
   <div id="start-menu" class="dialog-layer" onpointerdown="doStartGame(event)" onclick="doStartGame(event)" ontouchend="doStartGame(event)">
     <h1>OFFICE ESCAPE 3D</h1>
     <p>
-      <b>ภารกิจ: หาทางออกจากตึกสำนักงานหลังเลิกงาน</b><br>
-      คุณทำงานล่วงเวลาจนดึก เพื่อนร่วมงานกลับบ้านกันหมดแล้ว และตึกก็เข้าสู่โหมดปิดไฟประหยัดพลังงาน<br>
-      • สำรวจตึกเพื่อหาทาง <b>บันไดหนีไฟ (EXIT)</b> แล้วกลับบ้าน<br>
-      • ประตู EXIT ถูกล็อกไว้ ต้องเก็บ <b>บัตรผ่าน (Keycard) ให้ครบ 3 ใบ</b> ก่อนถึงจะออกได้<br>
-      • ถ้าเริ่มเหนื่อยล้า ให้แวะเก็บเครื่องดื่มตามทางเพื่อเติม <b>พลังงาน</b><br>
-      • ระหว่างทางมีเอกสาร/โน้ตของเพื่อนร่วมงานวางทิ้งไว้ เก็บอ่านเล่นได้<br>
-      • ใช้ <b>ไฟฉาย</b> ช่วยให้มองเห็นทางเดินได้ชัดขึ้นในจุดที่แสงไม่พอ<br><br>
-      <b>การควบคุม:</b><br>
-      • <b>มือถือ:</b> จอยสติ๊กซ้ายเดิน | ปัดนิ้วฝั่งขวาหันมอง | ปุ่ม FLASHLIGHT ปิด/เปิดไฟฉาย | ปุ่ม HIDE แวะพักที่ตู้เอกสารระหว่างทาง<br>
-      • <b>PC:</b> W, A, S, D เดิน | คลิกเมาส์เพื่อหันมุมมอง | กด F ปิด/เปิดไฟฉาย | กด E แวะพักที่ตู้เอกสารระหว่างทาง
+      คุณทำงานล่วงเวลาจนดึก เพื่อนร่วมงานกลับบ้านกันหมดแล้ว<br>
+      ตึกเข้าสู่โหมดปิดไฟประหยัดพลังงาน หาทางออกจากตึกให้ได้
     </p>
-    <button id="start-btn" class="action-btn">START GAME</button>
-    <div class="hint-text">[ แตะที่ปุ่มหรือแตะตรงไหนก็ได้บนจอเพื่อเริ่ม ]</div>
+    <div class="menu-btn-row">
+      <button id="start-btn" class="action-btn">START GAME</button>
+      <button id="howto-btn" class="action-btn secondary-btn" onpointerdown="openHowTo(event)" onclick="openHowTo(event)" ontouchend="openHowTo(event)">วิธีเล่น</button>
+    </div>
+    <div class="hint-text">[ แตะปุ่ม START GAME หรือแตะตรงไหนก็ได้บนจอเพื่อเริ่ม ]</div>
+  </div>
+
+  <!-- How To Play -->
+  <div id="howto-menu" class="dialog-layer" style="display: none;" onclick="closeHowTo(event)">
+    <h1>วิธีเล่น</h1>
+    <p class="howto-text">
+      <b>เป้าหมาย:</b> หาทาง <b>บันไดหนีไฟ (EXIT)</b> แล้วออกจากตึกให้ได้<br><br>
+      • ประตู EXIT ถูกล็อกไว้ ต้องเก็บ <b>บัตรผ่าน (Keycard) ให้ครบ 3 ใบ</b> ก่อนถึงจะออกได้<br>
+      • ถ้าพลังงานใกล้หมด ให้แวะเก็บเครื่องดื่มตามทางเพื่อเติม <b>พลังงาน</b><br>
+      • ระหว่างทางมีเอกสาร/โน้ตของเพื่อนร่วมงานวางทิ้งไว้ เก็บอ่านเล่นได้<br>
+      • ใช้ <b>ไฟฉาย</b> ช่วยให้มองเห็นทางเดินชัดขึ้น แต่จะทำให้ถูกสังเกตเห็นง่ายขึ้นด้วย<br>
+      • ถ้าเจอมอนสเตอร์ หลบเข้า <b>ตู้เอกสาร</b> เพื่อซ่อนตัว ลดโอกาสถูกสังเกตเห็นได้มาก<br><br>
+      <b>การควบคุม:</b><br>
+      • <b>มือถือ:</b> จอยสติ๊กซ้ายเดิน | ปัดนิ้วฝั่งขวาหันมอง | ปุ่ม SPRINT วิ่ง | ปุ่ม FLASHLIGHT ปิด/เปิดไฟฉาย | ปุ่ม HIDE ซ่อนตัวที่ตู้เอกสาร<br>
+      • <b>PC:</b> W, A, S, D เดิน | คลิกเมาส์เพื่อหันมุมมอง | Shift หรือ Space วิ่ง | กด F ปิด/เปิดไฟฉาย | กด E ซ่อนตัวที่ตู้เอกสาร
+    </p>
+    <button id="howto-back-btn" class="action-btn">ย้อนกลับ</button>
+    <div class="hint-text">[ แตะที่ใดก็ได้เพื่อย้อนกลับ ]</div>
   </div>
 
   <!-- Game Over Screen -->
@@ -598,8 +653,8 @@
     let dullerNextCheatTime = performance.now() + 26000 + Math.random() * 8000;
     const CHEAT_MIN_INTERVAL = 22000;
     const CHEAT_MAX_INTERVAL = 38000;
-    const CHEAT_MIN_DIST = 13;   // ใกล้พอให้รู้สึกขนลุก แต่ไม่ประชิดจนหนีไม่ทัน
-    const CHEAT_MAX_DIST = 19;
+    const CHEAT_MIN_DIST = 17;   // ขยับให้ไกลขึ้น ผู้เล่นมีเวลาตั้งตัวก่อนเจอ
+    const CHEAT_MAX_DIST = 27;
 
     let wallMat, floorMat, ceilingMat, boxGeo;
     let officeWallTex, backroomsWallTex;
@@ -1873,12 +1928,8 @@
     });
 
     const hideBtn = document.getElementById('hide-btn');
-    hideBtn.addEventListener('touchstart', (e) => {
-      e.preventDefault(); e.stopPropagation();
-      toggleHiding();
-    }, { passive: false });
     hideBtn.addEventListener('pointerdown', (e) => {
-      e.stopPropagation();
+      e.preventDefault(); e.stopPropagation();
       toggleHiding();
     });
 
@@ -1896,12 +1947,8 @@
     }
 
     const sprintBtn = document.getElementById('sprint-btn');
-    sprintBtn.addEventListener('touchstart', (e) => {
-      e.preventDefault(); e.stopPropagation();
-      triggerSprint();
-    }, { passive: false });
     sprintBtn.addEventListener('pointerdown', (e) => {
-      e.stopPropagation();
+      e.preventDefault(); e.stopPropagation();
       triggerSprint();
     });
 
@@ -1912,12 +1959,8 @@
     });
 
     const flashBtn = document.getElementById('flash-btn');
-    flashBtn.addEventListener('touchstart', (e) => {
-      e.preventDefault(); e.stopPropagation();
-      toggleFlashlight();
-    }, { passive: false });
     flashBtn.addEventListener('pointerdown', (e) => {
-      e.stopPropagation();
+      e.preventDefault(); e.stopPropagation();
       toggleFlashlight();
     });
 
@@ -2356,6 +2399,13 @@
                 document.getElementById('flash-btn').style.display = 'flex';
                 document.getElementById('hide-btn').style.display = 'flex';
               }
+
+              // ตั้งคิวเวลา "โกง" วาปเข้าใกล้ผู้เล่นใหม่ทั้งหมด ณ จุดที่ entity เริ่มทำงานจริง
+              // (ถ้าไม่ตั้งใหม่ตรงนี้ ตัวจับเวลาเดิมที่นับมาตั้งแต่ต้นเกมจะหมดอายุพร้อมกันหมด
+              // ทำให้ทั้ง 3 ตัววาปมาใกล้ผู้เล่นพร้อมกันทันทีที่ไฟกลับมาติด) — ให้เรียงคิวมาทีละตัวแทน
+              smilerNextCheatTime = now + 22000 + Math.random() * 8000;
+              bacteriaNextCheatTime = smilerNextCheatTime + 16000 + Math.random() * 8000;
+              dullerNextCheatTime = bacteriaNextCheatTime + 16000 + Math.random() * 8000;
             }
           }
         }
@@ -2415,8 +2465,8 @@
             monsterSoundGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
           }
 
-          // แอบโกง: ถึงเวลาแล้ววาปมาป้วนเปี้ยนใกล้ๆผู้เล่นบ้าง
-          if (now > smilerNextCheatTime) {
+          // แอบโกง: ถึงเวลาแล้ววาปมาป้วนเปี้ยนใกล้ๆผู้เล่นบ้าง (ไม่โกงตอนผู้เล่นซ่อนตัวอยู่)
+          if (!isHiding && now > smilerNextCheatTime) {
             const cheatSpot = getRandomFloorCellNear(camera.position.x, camera.position.z, CHEAT_MIN_DIST, CHEAT_MAX_DIST);
             if (cheatSpot) {
               smilerRig.position.x = cheatSpot.x;
@@ -2477,8 +2527,8 @@
             shadowSoundGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
           }
 
-          // แอบโกง: ถึงเวลาแล้ววาปมาป้วนเปี้ยนใกล้ๆผู้เล่นบ้าง
-          if (now > bacteriaNextCheatTime) {
+          // แอบโกง: ถึงเวลาแล้ววาปมาป้วนเปี้ยนใกล้ๆผู้เล่นบ้าง (ไม่โกงตอนผู้เล่นซ่อนตัวอยู่)
+          if (!isHiding && now > bacteriaNextCheatTime) {
             const cheatSpot = getRandomFloorCellNear(camera.position.x, camera.position.z, CHEAT_MIN_DIST, CHEAT_MAX_DIST);
             if (cheatSpot) {
               bacteriaRig.position.x = cheatSpot.x;
@@ -2541,56 +2591,6 @@
             dullerSoundGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
           }
 
-          // แอบโกง: ถึงเวลาแล้ววาปมาป้วนเปี้ยนใกล้ๆผู้เล่นบ้าง
-          if (now > dullerNextCheatTime) {
-            const cheatSpot = getRandomFloorCellNear(camera.position.x, camera.position.z, CHEAT_MIN_DIST, CHEAT_MAX_DIST);
-            if (cheatSpot) {
-              dullerRig.position.x = cheatSpot.x;
-              dullerRig.position.z = cheatSpot.z;
-              dullerWaypoint = getRandomFloorCell();
-            }
-            dullerNextCheatTime = now + CHEAT_MIN_INTERVAL + Math.random() * (CHEAT_MAX_INTERVAL - CHEAT_MIN_INTERVAL);
-          }
-
-          if (!dullerWaypoint || dullerRig.position.distanceTo(dullerWaypoint) < 2.0) {
-            dullerWaypoint = getRandomFloorCell();
-          }
-          const dDir = new THREE.Vector3().subVectors(dullerWaypoint, dullerRig.position).normalize();
-          dullerRig.position.x += dDir.x * dullerSpeed * dt;
-          dullerRig.position.z += dDir.z * dullerSpeed * dt;
-          dullerRig.lookAt(dullerWaypoint.x, dullerRig.position.y, dullerWaypoint.z);
-        }
-
-        // อนิเมชันคลานสี่ขา 3D ของ The Duller
-        dullerCrawlCycle += dt * (dullerSpeed * 8.0);
-        if (dullerLegs.length === 4) {
-          dullerLegs[0].rotation.x = Math.sin(dullerCrawlCycle) * 0.7;
-          dullerLegs[3].rotation.x = Math.sin(dullerCrawlCycle) * 0.7;
-          dullerLegs[1].rotation.x = -Math.sin(dullerCrawlCycle) * 0.7;
-          dullerLegs[2].rotation.x = -Math.sin(dullerCrawlCycle) * 0.7;
-        }
-
-        // เสียงหัวใจเต้น (คงระยะเดิมไว้ให้ยังรู้สึกได้ว่ามีอะไรเข้าใกล้)
-        const closestDist = Math.min(distSmiler, distBacteria, distDuller);
-        if (closestDist < 18) {
-          const heartRateInterval = Math.max(360, closestDist * 60);
-          if (now > nextHeartbeatTime) {
-            const hbVolume = Math.min(0.45, (1 - closestDist / 18) * 0.55);
-            playHeartbeat(hbVolume);
-            nextHeartbeatTime = now + heartRateInterval;
-          }
-        }
-
-        // จอซ่า: ให้ขึ้นเฉพาะตอนใกล้จริงๆ (ไม่งั้นบังทางตอนพยายามหนี) และลดความจัดลงมาก
-        if (closestDist < 10) {
-          const glitchStrength = Math.pow(1 - closestDist / 10, 1.8);
-          staticCanvas.style.opacity = Math.min(0.28, glitchStrength * 0.28);
-          renderNoise();
-        } else {
-          staticCanvas.style.opacity = 0;
-        }
-        } // จบเงื่อนไข firstBlackoutOccurred: ปิดการทำงานของ entity ทั้งหมดก่อนไฟดับครั้งแรก
-
-        // ทางออกฉุกเฉิน (ต้องเก็บบัตรผ่านให้ครบก่อน)
-        if (camera.position.distanceTo(exitPos) < 2.0) {
-          if (keycardsCollected >
+          // แอบโกง: ถึงเวลาแล้ววาปมาป้วนเปี้ยนใกล้ๆผู้เล่นบ้าง (ไม่โกงตอนผู้เล่นซ่อนตัวอยู่)
+          if (!isHiding && now > dullerNextCheatTime) {
+            const cheatSpot = getRandom
