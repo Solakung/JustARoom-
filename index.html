@@ -9,8 +9,6 @@
       box-sizing: border-box;
       margin: 0;
       padding: 0;
-      -webkit-user-select: none;
-      user-select: none;
       -webkit-tap-highlight-color: transparent;
     }
     html, body {
@@ -19,7 +17,6 @@
       overflow: hidden;
       background: #0c0d08;
       font-family: monospace;
-      touch-action: none;
     }
     #viewport {
       position: absolute;
@@ -28,6 +25,7 @@
       width: 100%;
       height: 100%;
       z-index: 1;
+      touch-action: none; /* เฉพาะฉาก 3D */
     }
     .vhs {
       position: absolute;
@@ -68,21 +66,25 @@
       z-index: 6;
       pointer-events: none;
     }
+
+    /* หน้าต่างเมนู Start / Game Over / Win */
     .dialog-layer {
       position: absolute;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(10, 11, 7, 0.94);
+      background: rgba(10, 11, 7, 0.95);
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       color: #dfd89d;
-      z-index: 50;
+      z-index: 100; /* อยู่ชั้นบนสุดเสมอ */
       padding: 24px;
       text-align: center;
+      touch-action: auto !important;
+      pointer-events: auto !important;
     }
     .dialog-layer h1 {
       font-size: 26px;
@@ -94,25 +96,30 @@
       font-size: 13px;
       max-width: 440px;
       line-height: 1.6;
-      margin-bottom: 22px;
+      margin-bottom: 24px;
       color: #aaa580;
     }
     .action-btn {
-      background: #252818;
+      background: #2b2f1c;
       color: #f0e6a8;
-      border: 1px solid #757143;
-      padding: 14px 32px;
+      border: 2px solid #8c864d;
+      padding: 16px 36px;
       font-size: 16px;
       font-family: inherit;
       letter-spacing: 2px;
+      font-weight: bold;
       cursor: pointer;
-      pointer-events: auto;
-      border-radius: 4px;
-      transition: background 0.2s;
+      border-radius: 6px;
+      box-shadow: 0 0 12px rgba(140, 134, 77, 0.4);
+      touch-action: manipulation !important;
+      pointer-events: auto !important;
+      -webkit-user-select: none;
+      user-select: none;
     }
     .action-btn:active {
-      background: #4a4d2e;
+      background: #4e532b;
       color: #ffffff;
+      transform: scale(0.97);
     }
     #noise-canvas {
       position: absolute;
@@ -124,18 +131,20 @@
       display: none;
       pointer-events: none;
     }
+
     /* Touch Controls */
     #joy-base {
       position: absolute;
-      bottom: 28px;
-      left: 28px;
+      bottom: 30px;
+      left: 30px;
       width: 120px;
       height: 120px;
       border-radius: 50%;
       background: rgba(240, 240, 180, 0.08);
-      border: 1.5px solid rgba(220, 220, 160, 0.25);
+      border: 1.5px solid rgba(220, 220, 160, 0.3);
       z-index: 10;
       display: none;
+      touch-action: none;
     }
     #joy-handle {
       position: absolute;
@@ -145,8 +154,8 @@
       width: 48px;
       height: 48px;
       border-radius: 50%;
-      background: rgba(220, 200, 120, 0.35);
-      border: 1px solid rgba(255, 255, 200, 0.6);
+      background: rgba(220, 200, 120, 0.4);
+      border: 1.5px solid rgba(255, 255, 200, 0.7);
       pointer-events: none;
     }
     #touch-look {
@@ -157,15 +166,11 @@
       height: 100%;
       z-index: 9;
       display: none;
+      touch-action: none;
     }
   </style>
-  <!-- Three.js CDN พร้อม Fallback สำรอง -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script>
-    if (typeof THREE === 'undefined') {
-      document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"><\/script>');
-    }
-  </script>
+  <!-- ใช้ CDN jsDelivr ที่เสถียรและเร็วที่สุดบนเครือข่ายมือถือ -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 </head>
 <body>
   <div id="viewport"></div>
@@ -182,405 +187,172 @@
   <div id="joy-base"><div id="joy-handle"></div></div>
   <div id="touch-look"></div>
 
-  <!-- Menus -->
+  <!-- Menus พร้อม Event Handler ตรงบนปุ่ม -->
   <div id="start-menu" class="dialog-layer">
     <h1>THE BACKROOMS</h1>
     <p>
       <b>Level 0: The Lobby</b><br>
       กลิ่นพรมชื้น แสงสีเหลืองหม่น และเสียงหึ่งของหลอดไฟนีออน<br><br>
       <b>การควบคุม:</b><br>
-      • <b>PC:</b> W, A, S, D เดิน | คลิกเมาส์ล็อกมุมมอง (ESC เพื่อปลด)<br>
-      • <b>Mobile:</b> จอยสติ๊กซ้ายเดิน | ปัดนิ้วฝั่งขวาหันมุมมอง<br><br>
-      <i>เป้าหมาย: หาบันไดหนีไฟสีแดง (EXIT) และหลบ Entity</i>
+      • <b>มือถือ:</b> จอยสติ๊กซ้ายเดิน | ปัดนิ้วฝั่งขวาหันมอง<br>
+      • <b>PC:</b> W, A, S, D เดิน | คลิกเมาส์เพื่อหันมุมมอง<br><br>
+      <i>เป้าหมาย: หาทางออกฉุกเฉินสีแดง (EXIT) และหนี Entity</i>
     </p>
-    <button id="start-btn" class="action-btn">TAP TO ENTER</button>
+    <button id="start-btn" class="action-btn" onpointerdown="triggerStartGame(event)" onclick="triggerStartGame(event)">TAP TO ENTER</button>
   </div>
 
   <div id="over-menu" class="dialog-layer" style="display: none;">
     <h1 style="color: #ff4a4a; text-shadow: 0 0 15px #f00;">SIGNAL LOST</h1>
     <p>คุณถูก Entity ในเงามืดเข้าประชิดตัว...</p>
-    <button id="retry-btn" class="action-btn">TRY AGAIN</button>
+    <button id="retry-btn" class="action-btn" onpointerdown="triggerRestartGame(event)" onclick="triggerRestartGame(event)">TRY AGAIN</button>
   </div>
 
   <div id="win-menu" class="dialog-layer" style="display: none;">
     <h1 style="color: #6ed66e; text-shadow: 0 0 15px #0f0;">YOU ESCAPED</h1>
     <p>คุณก้าวขึ้นบันไดทางออกและหนีพ้นจาก Level 0 ได้สำเร็จ!</p>
-    <button id="replay-btn" class="action-btn">ENTER AGAIN</button>
+    <button id="replay-btn" class="action-btn" onpointerdown="triggerRestartGame(event)" onclick="triggerRestartGame(event)">ENTER AGAIN</button>
   </div>
 
   <script>
-    window.addEventListener('DOMContentLoaded', () => {
-      // -------------------------------------------------------------
-      // 1. ตรวจสอบ Three.js Library
-      // -------------------------------------------------------------
-      if (typeof THREE === 'undefined') {
-        alert('ไม่สามารถโหลด Three.js ได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต');
-        return;
+    // -------------------------------------------------------------
+    // Global Game State & Trigger Controls (เรียกได้ทันที)
+    // -------------------------------------------------------------
+    let gameState = 'START';
+    let audioCtx = null, humGain = null, alarmGain = null, alarmOsc = null;
+    let camera, scene, renderer, entity;
+    const flickerLights = [];
+    let playerSpawn = null;
+    let exitPos = null;
+    let entitySpawn = null;
+    const keys = { KeyW: false, KeyS: false, KeyA: false, KeyD: false };
+    const joyVector = { x: 0, y: 0 };
+    let cameraPitch = 0, cameraYaw = 0;
+
+    const GRID = [
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [1,2,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,1],
+      [1,0,1,0,1,0,1,1,0,1,0,1,1,1,1,1,0,1],
+      [1,0,1,0,0,0,0,1,0,0,0,1,0,0,0,1,0,1],
+      [1,0,1,1,1,1,0,1,1,1,0,1,0,1,0,1,0,1],
+      [1,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1],
+      [1,1,1,1,0,1,1,1,0,1,1,1,1,1,1,1,0,1],
+      [1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,1],
+      [1,0,1,1,1,1,0,1,1,1,1,0,1,1,0,1,0,1],
+      [1,0,1,0,0,0,0,0,0,0,1,0,0,1,0,0,0,1],
+      [1,0,1,0,1,1,1,1,1,0,1,1,0,1,1,1,0,1],
+      [1,0,0,0,1,4,0,0,1,0,0,0,0,0,0,1,0,1],
+      [1,1,1,0,1,1,1,0,1,1,1,1,1,1,0,1,0,1],
+      [1,0,0,0,0,0,1,0,0,0,0,0,0,1,0,1,0,1],
+      [1,0,1,1,1,0,1,1,1,1,1,1,0,1,0,0,0,1],
+      [1,0,1,0,0,0,0,0,0,0,0,1,0,1,1,1,0,1],
+      [1,0,0,0,1,1,1,1,1,1,0,0,0,0,0,1,3,1],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+    ];
+    const CELL = 4;
+    const HEIGHT = 3.6;
+
+    // ฟังก์ชันเริ่มเกมที่ถูกเรียกโดยตรงจากปุ่ม
+    window.triggerStartGame = function(e) {
+      if (e) {
+        e.stopPropagation();
       }
+      if (gameState === 'PLAYING') return;
 
-      // -------------------------------------------------------------
-      // 2. แผนที่เขาวงกต (Grid Map 18x18)
-      // 0 = ทางเดิน, 1 = กำแพง, 2 = จุดเริ่ม, 3 = ทางออก, 4 = Entity
-      // -------------------------------------------------------------
-      const GRID = [
-        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-        [1,2,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,1],
-        [1,0,1,0,1,0,1,1,0,1,0,1,1,1,1,1,0,1],
-        [1,0,1,0,0,0,0,1,0,0,0,1,0,0,0,1,0,1],
-        [1,0,1,1,1,1,0,1,1,1,0,1,0,1,0,1,0,1],
-        [1,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1],
-        [1,1,1,1,0,1,1,1,0,1,1,1,1,1,1,1,0,1],
-        [1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,1],
-        [1,0,1,1,1,1,0,1,1,1,1,0,1,1,0,1,0,1],
-        [1,0,1,0,0,0,0,0,0,0,1,0,0,1,0,0,0,1],
-        [1,0,1,0,1,1,1,1,1,0,1,1,0,1,1,1,0,1],
-        [1,0,0,0,1,4,0,0,1,0,0,0,0,0,0,1,0,1],
-        [1,1,1,0,1,1,1,0,1,1,1,1,1,1,0,1,0,1],
-        [1,0,0,0,0,0,1,0,0,0,0,0,0,1,0,1,0,1],
-        [1,0,1,1,1,0,1,1,1,1,1,1,0,1,0,0,0,1],
-        [1,0,1,0,0,0,0,0,0,0,0,1,0,1,1,1,0,1],
-        [1,0,0,0,1,1,1,1,1,1,0,0,0,0,0,1,3,1],
-        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
-      ];
-      const CELL = 4;
-      const HEIGHT = 3.6;
+      // ซ่อนหน้าจอเมนูทันที
+      const startMenu = document.getElementById('start-menu');
+      if (startMenu) startMenu.style.display = 'none';
 
-      // -------------------------------------------------------------
-      // 3. Web Audio API พร้อม Resume ปลอดภัย
-      // -------------------------------------------------------------
-      let audioCtx = null, humGain = null, alarmGain = null, alarmOsc = null;
+      // เริ่มเสียง
+      setupAudio();
 
-      function setupAudio() {
-        try {
-          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-          if (!AudioContextClass) return;
-          if (!audioCtx) {
-            audioCtx = new AudioContextClass();
-          }
-          if (audioCtx.state === 'suspended') {
-            audioCtx.resume();
-          }
-          if (!humGain) {
-            const hum1 = audioCtx.createOscillator();
-            const hum2 = audioCtx.createOscillator();
-            hum1.type = 'sawtooth';
-            hum1.frequency.value = 60;
-            hum2.type = 'sine';
-            hum2.frequency.value = 120;
+      // รีเซ็ตตำแหน่งและเริ่มเกม
+      resetGame();
+      gameState = 'PLAYING';
+    };
 
-            const humFilter = audioCtx.createBiquadFilter();
-            humFilter.type = 'lowpass';
-            humFilter.frequency.value = 180;
+    window.triggerRestartGame = function(e) {
+      if (e) e.stopPropagation();
+      document.getElementById('over-menu').style.display = 'none';
+      document.getElementById('win-menu').style.display = 'none';
+      setupAudio();
+      resetGame();
+      gameState = 'PLAYING';
+    };
 
-            humGain = audioCtx.createGain();
-            humGain.gain.value = 0.08;
+    function setupAudio() {
+      try {
+        const AudioClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioClass) return;
+        if (!audioCtx) audioCtx = new AudioClass();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
 
-            hum1.connect(humFilter);
-            hum2.connect(humFilter);
-            humFilter.connect(humGain);
-            humGain.connect(audioCtx.destination);
-            hum1.start();
-            hum2.start();
+        if (!humGain) {
+          const h1 = audioCtx.createOscillator();
+          const h2 = audioCtx.createOscillator();
+          h1.type = 'sawtooth'; h1.frequency.value = 60;
+          h2.type = 'sine'; h2.frequency.value = 120;
 
-            alarmOsc = audioCtx.createOscillator();
-            alarmOsc.type = 'sawtooth';
-            alarmOsc.frequency.value = 520;
-            const alarmFilter = audioCtx.createBiquadFilter();
-            alarmFilter.type = 'bandpass';
-            alarmFilter.frequency.value = 850;
-            alarmFilter.Q.value = 4.0;
-            alarmGain = audioCtx.createGain();
-            alarmGain.gain.value = 0.0001;
+          const f = audioCtx.createBiquadFilter();
+          f.type = 'lowpass'; f.frequency.value = 180;
 
-            alarmOsc.connect(alarmFilter);
-            alarmFilter.connect(alarmGain);
-            alarmGain.connect(audioCtx.destination);
-            alarmOsc.start();
-          }
-        } catch (e) {
-          console.warn("Audio Context Warning:", e);
+          humGain = audioCtx.createGain();
+          humGain.gain.value = 0.08;
+
+          h1.connect(f); h2.connect(f);
+          f.connect(humGain); humGain.connect(audioCtx.destination);
+          h1.start(); h2.start();
+
+          alarmOsc = audioCtx.createOscillator();
+          alarmOsc.type = 'sawtooth'; alarmOsc.frequency.value = 520;
+          const af = audioCtx.createBiquadFilter();
+          af.type = 'bandpass'; af.frequency.value = 850; af.Q.value = 4.0;
+          alarmGain = audioCtx.createGain();
+          alarmGain.gain.value = 0.0001;
+
+          alarmOsc.connect(af); af.connect(alarmGain);
+          alarmGain.connect(audioCtx.destination);
+          alarmOsc.start();
         }
+      } catch (err) {
+        console.warn('Audio note:', err);
       }
+    }
 
-      function playFootstep() {
-        if (!audioCtx || audioCtx.state !== 'running') return;
-        try {
-          const now = audioCtx.currentTime;
-          const osc = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(90, now);
-          osc.frequency.exponentialRampToValueAtTime(30, now + 0.1);
-          gain.gain.setValueAtTime(0.05, now);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-          osc.connect(gain);
-          gain.connect(audioCtx.destination);
-          osc.start(now);
-          osc.stop(now + 0.11);
-        } catch(e) {}
-      }
+    function playFootstep() {
+      if (!audioCtx || audioCtx.state !== 'running') return;
+      try {
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(80, now);
+        osc.frequency.exponentialRampToValueAtTime(30, now + 0.1);
+        gain.gain.setValueAtTime(0.04, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(now); osc.stop(now + 0.11);
+      } catch(e) {}
+    }
 
-      function playStaticSound() {
-        if (!audioCtx || audioCtx.state !== 'running') return;
-        try {
-          const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.4, audioCtx.sampleRate);
-          const data = buffer.getChannelData(0);
-          for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * 0.25;
-          const noise = audioCtx.createBufferSource();
-          noise.buffer = buffer;
-          noise.connect(audioCtx.destination);
-          noise.start();
-        } catch(e) {}
-      }
+    function playStaticSound() {
+      if (!audioCtx || audioCtx.state !== 'running') return;
+      try {
+        const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.35, audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * 0.25;
+        const noise = audioCtx.createBufferSource();
+        noise.buffer = buffer;
+        noise.connect(audioCtx.destination);
+        noise.start();
+      } catch(e) {}
+    }
 
-      // -------------------------------------------------------------
-      // 4. Procedural Canvas Textures
-      // -------------------------------------------------------------
-      function genWallTex() {
-        const c = document.createElement('canvas');
-        c.width = 256; c.height = 256;
-        const ctx = c.getContext('2d');
-        ctx.fillStyle = '#b79e54';
-        ctx.fillRect(0, 0, 256, 256);
-        ctx.strokeStyle = '#9c8442';
-        ctx.lineWidth = 1.5;
-        for (let x = 0; x < 256; x += 16) {
-          ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 256); ctx.stroke();
-        }
-        ctx.fillStyle = 'rgba(0,0,0,0.06)';
-        for (let y = 0; y < 256; y += 32) ctx.fillRect(0, y, 256, 2);
-        const t = new THREE.CanvasTexture(c);
-        t.wrapS = t.wrapT = THREE.RepeatWrapping;
-        return t;
-      }
-
-      function genCarpetTex() {
-        const c = document.createElement('canvas');
-        c.width = 128; c.height = 128;
-        const ctx = c.getContext('2d');
-        ctx.fillStyle = '#615a3a';
-        ctx.fillRect(0, 0, 128, 128);
-        ctx.fillStyle = 'rgba(0,0,0,0.12)';
-        for (let x = 0; x < 128; x += 4) {
-          for (let y = 0; y < 128; y += 4) {
-            if ((x + y) % 8 === 0) ctx.fillRect(x, y, 2, 2);
-          }
-        }
-        const t = new THREE.CanvasTexture(c);
-        t.wrapS = t.wrapT = THREE.RepeatWrapping;
-        t.repeat.set(18, 18);
-        return t;
-      }
-
-      function genCeilingTex() {
-        const c = document.createElement('canvas');
-        c.width = 128; c.height = 128;
-        const ctx = c.getContext('2d');
-        ctx.fillStyle = '#d5ceb6';
-        ctx.fillRect(0, 0, 128, 128);
-        ctx.strokeStyle = '#857e6a';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(0, 0, 128, 128);
-        const t = new THREE.CanvasTexture(c);
-        t.wrapS = t.wrapT = THREE.RepeatWrapping;
-        t.repeat.set(18, 18);
-        return t;
-      }
-
-      function genSmilerTex() {
-        const c = document.createElement('canvas');
-        c.width = 256; c.height = 256;
-        const ctx = c.getContext('2d');
-        ctx.fillStyle = 'rgba(0,0,0,0)';
-        ctx.fillRect(0, 0, 256, 256);
-
-        ctx.fillStyle = '#ffffff';
-        ctx.shadowColor = '#ffff99';
-        ctx.shadowBlur = 16;
-        ctx.beginPath();
-        ctx.arc(85, 95, 14, 0, Math.PI * 2);
-        ctx.arc(171, 95, 14, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.beginPath();
-        ctx.arc(128, 120, 68, 0.15 * Math.PI, 0.85 * Math.PI, false);
-        ctx.lineWidth = 14;
-        ctx.strokeStyle = '#ffffff';
-        ctx.stroke();
-
-        ctx.lineWidth = 3;
-        for (let tx = 80; tx <= 176; tx += 12) {
-          ctx.beginPath();
-          ctx.moveTo(tx, 160);
-          ctx.lineTo(tx, 178);
-          ctx.stroke();
-        }
-        return new THREE.CanvasTexture(c);
-      }
-
-      // -------------------------------------------------------------
-      // 5. Scene, Camera, Renderer
-      // -------------------------------------------------------------
-      const scene = new THREE.Scene();
-      scene.fog = new THREE.FogExp2(0x232213, 0.075);
-
-      const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 80);
-      const renderer = new THREE.WebGLRenderer({ antialias: true });
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setClearColor(0x232213);
-      document.getElementById('viewport').appendChild(renderer.domElement);
-
-      const ambientLight = new THREE.AmbientLight(0xd9c87d, 0.45);
-      scene.add(ambientLight);
-
-      const wallMat = new THREE.MeshLambertMaterial({ map: genWallTex() });
-      const floorMat = new THREE.MeshLambertMaterial({ map: genCarpetTex() });
-      const ceilingMat = new THREE.MeshLambertMaterial({ map: genCeilingTex() });
-
-      const mapW = GRID[0].length * CELL;
-      const mapH = GRID.length * CELL;
-
-      // พื้นและเพดาน
-      const planeGeo = new THREE.PlaneGeometry(mapW, mapH);
-      const floor = new THREE.Mesh(planeGeo, floorMat);
-      floor.rotation.x = -Math.PI / 2;
-      floor.position.set(mapW / 2, 0, mapH / 2);
-      scene.add(floor);
-
-      const ceiling = new THREE.Mesh(planeGeo, ceilingMat);
-      ceiling.rotation.x = Math.PI / 2;
-      ceiling.position.set(mapW / 2, HEIGHT, mapH / 2);
-      scene.add(ceiling);
-
-      const boxGeo = new THREE.BoxGeometry(CELL, HEIGHT, CELL);
-      const flickerLights = [];
-      let playerSpawn = new THREE.Vector3(6, 1.6, 6);
-      let exitPos = new THREE.Vector3(0, 0, 0);
-      let entitySpawn = new THREE.Vector3(20, 1.5, 20);
-
-      for (let r = 0; r < GRID.length; r++) {
-        for (let c = 0; c < GRID[r].length; c++) {
-          const val = GRID[r][c];
-          const wx = c * CELL + CELL / 2;
-          const wz = r * CELL + CELL / 2;
-
-          if (val === 1) {
-            const w = new THREE.Mesh(boxGeo, wallMat);
-            w.position.set(wx, HEIGHT / 2, wz);
-            scene.add(w);
-          } else {
-            if ((r % 3 === 1) && (c % 3 === 1)) {
-              const light = new THREE.PointLight(0xffecc0, 0.75, 12, 1.8);
-              light.position.set(wx, HEIGHT - 0.2, wz);
-              scene.add(light);
-              flickerLights.push(light);
-
-              const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 0.4), new THREE.MeshBasicMaterial({ color: 0xfff6cf }));
-              lamp.position.set(wx, HEIGHT - 0.05, wz);
-              scene.add(lamp);
-            }
-
-            if (val === 2) playerSpawn.set(wx, 1.6, wz);
-            if (val === 3) {
-              exitPos.set(wx, 0.5, wz);
-              const exitLight = new THREE.PointLight(0xff2222, 1.5, 9);
-              exitLight.position.set(wx, 1.8, wz);
-              scene.add(exitLight);
-
-              const stairMat = new THREE.MeshLambertMaterial({ color: 0x3d1111 });
-              for (let s = 0; s < 4; s++) {
-                const step = new THREE.Mesh(new THREE.BoxGeometry(2, 0.25, 0.5), stairMat);
-                step.position.set(wx, 0.125 + s * 0.25, wz - 1 + s * 0.5);
-                scene.add(step);
-              }
-              const sign = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.4, 0.1), new THREE.MeshBasicMaterial({ color: 0xff3333 }));
-              sign.position.set(wx, 2.5, wz);
-              scene.add(sign);
-            }
-            if (val === 4) entitySpawn.set(wx, 1.5, wz);
-          }
-        }
-      }
-
-      // Entity (The Smiler)
-      const smilerMat = new THREE.SpriteMaterial({
-        map: genSmilerTex(),
-        color: 0xffffff,
-        transparent: true,
-        blending: THREE.AdditiveBlending
-      });
-      const entity = new THREE.Sprite(smilerMat);
-      entity.scale.set(2.4, 2.4, 1);
-      entity.position.copy(entitySpawn);
-      scene.add(entity);
-
-      // -------------------------------------------------------------
-      // 6. ระบบควบคุม (PC & Mobile ทำงานร่วมกันได้สมบูรณ์)
-      // -------------------------------------------------------------
-      const keys = { KeyW: false, KeyS: false, KeyA: false, KeyD: false };
-      const joyVector = { x: 0, y: 0 };
-      let cameraPitch = 0, cameraYaw = 0;
-      let gameState = 'START';
-
-      // แสดง Touch Controls เสมอเมื่อเปิดบนอุปกรณ์สัมผัส
-      if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
-        document.getElementById('joy-base').style.display = 'block';
-        document.getElementById('touch-look').style.display = 'block';
-      }
-
-      window.addEventListener('keydown', (e) => { if (keys.hasOwnProperty(e.code)) keys[e.code] = true; });
-      window.addEventListener('keyup', (e) => { if (keys.hasOwnProperty(e.code)) keys[e.code] = false; });
-
-      // Pointer Lock บน PC
-      document.body.addEventListener('click', (e) => {
-        if (gameState === 'PLAYING' && !e.target.closest('.dialog-layer')) {
-          try {
-            document.body.requestPointerLock();
-          } catch(err) {}
-        }
-      });
-
-      document.addEventListener('mousemove', (e) => {
-        if (document.pointerLockElement === document.body && gameState === 'PLAYING') {
-          cameraYaw -= e.movementX * 0.0024;
-          cameraPitch -= e.movementY * 0.0024;
-          cameraPitch = Math.max(-1.4, Math.min(1.4, cameraPitch));
-        }
-      });
-
-      // Mobile Touch Joystick
-      const joyBase = document.getElementById('joy-base');
-      const joyHandle = document.getElementById('joy-handle');
-      let joyTouchId = null;
-      let joyCenter = { x: 0, y: 0 };
-
-      joyBase.addEventListener('touchstart', (e) => {
-        const touch = e.changedTouches[0];
-        joyTouchId = touch.identifier;
-        const rect = joyBase.getBoundingClientRect();
-        joyCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-        updateJoy(touch.clientX, touch.clientY);
-      }, { passive: false });
-
-      window.addEventListener('touchmove', (e) => {
-        for (let i = 0; i < e.changedTouches.length; i++) {
-          const touch = e.changedTouches[i];
-          if (touch.identifier === joyTouchId) updateJoy(touch.clientX, touch.clientY);
-        }
-      }, { passive: false });
-
-      const resetJoy = () => {
-        joyTouchId = null;
-        joyVector.x = 0;
-        joyVector.y = 0;
-        joyHandle.style.transform = `translate(-50%, -50%)`;
-      };
-      window.addEventListener('touchend', (e) => {
-        for (let i = 0; i < e.changedTouches.length; i++) {
-          if (e.changedTouches[i].identifier === joyTouchId) resetJoy();
-        }
-      });
-      window.addEventListener('touchcancel', resetJoy);
-
-      function updateJoy(cx, cy) {
-        const dx = cx - j
+    // -------------------------------------------------------------
+    // Procedural Textures
+    // -------------------------------------------------------------
+    function genWallTex() {
+      const c = document.createElement('canvas');
+      c.width = 256; c.height = 256;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#b7
+        
