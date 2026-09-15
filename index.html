@@ -58,7 +58,7 @@
       color: #9cb873;
       font-size: 13px;
       letter-spacing: 1px;
-      z-index: 7;
+      z-index: 13;
       pointer-events: none;
       text-shadow: 0 0 4px #5a7b3c;
     }
@@ -373,7 +373,7 @@
       align-items: center;
       justify-content: center;
       text-align: center;
-      z-index: 11;
+      z-index: 13;
       touch-action: manipulation;
       user-select: none;
       transition: opacity 0.15s ease, filter 0.15s ease, transform 0.1s ease, background 0.15s ease;
@@ -455,6 +455,14 @@
 
   <script>
     window.gameEngineStarted = false;
+    window.gameStartTime = 0;
+    window.formatSurvivalTime = function(ms) {
+      const totalSec = Math.max(0, Math.floor(ms / 1000));
+      const mm = Math.floor(totalSec / 60);
+      const ss = totalSec % 60;
+      return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+    };
+
     window.doStartGame = function(e) {
       if (e) e.stopPropagation();
       const menu = document.getElementById('start-menu');
@@ -463,6 +471,7 @@
       if (window.initAudioContextSafely) {
         window.initAudioContextSafely();
       }
+      window.gameStartTime = performance.now();
       window.gameEngineStarted = true;
     };
 
@@ -473,6 +482,7 @@
       if (window.regenerateLevelAndRestart) {
         window.regenerateLevelAndRestart();
       }
+      window.gameStartTime = performance.now();
       window.gameEngineStarted = true;
     };
 
@@ -572,6 +582,7 @@
       ที่นี่... ไม่ใช่อาคารสำนักงานธรรมดาอีกต่อไป<br>
       <b>คุณไม่มีวันหาทางออกเจอ</b>
     </p>
+    <p id="survival-time-over" style="color: #f0d9a0; font-size: 13px; letter-spacing: 1px; margin-top: 4px;"></p>
     <button id="retry-btn" class="action-btn">TRY AGAIN</button>
     <div class="hint-text">[ แตะที่ใดก็ได้เพื่อลองใหม่อีกครั้ง ]</div>
   </div>
@@ -580,6 +591,7 @@
   <div id="win-menu" class="dialog-layer" style="display: none;" onpointerdown="doRestartGame(event)" onclick="doRestartGame(event)">
     <h1 style="color: #6ed66e; text-shadow: 0 0 15px #0f0;">YOU ESCAPED</h1>
     <p>คุณผลักประตูหนีไฟและหลุดพ้นจากฝันร้ายได้สำเร็จ!</p>
+    <p id="survival-time-win" style="color: #d9f0d9; font-size: 13px; letter-spacing: 1px; margin-top: 4px;"></p>
     <button id="replay-btn" class="action-btn">PLAY AGAIN</button>
     <div class="hint-text">[ แตะที่ใดก็ได้เพื่อเริ่มใหม่ ]</div>
   </div>
@@ -721,6 +733,17 @@
     // Flashlight Toggle (ปิดไฟฉายเพื่อลดโอกาสถูกสังเกตเห็น แลกกับมองเห็นน้อยลง)
     // -------------------------------------------------------------
     let flashlightOn = true;
+    let flashlightBattery = 100;
+    let flashlightDead = false; // แบตหมดสนิท ถูกบังคับปิดจนกว่าจะชาร์จถึงเกณฑ์ขั้นต่ำ
+    const FLASHLIGHT_DRAIN_PER_SEC = 3.4;   // ใช้ต่อเนื่องได้ ~30 วิ
+    const FLASHLIGHT_REGEN_PER_SEC = 6.0;   // ปิดพัก ฟื้นเร็วกว่าใช้ ~2 เท่า
+    const FLASHLIGHT_MIN_TO_REUSE = 15;     // แบตต้องฟื้นถึงระดับนี้ก่อนเปิดใหม่ได้หลังหมด
+
+    // เสียงที่ผู้เล่นสร้างขึ้น (สปรินท์ / คลิกไฟฉาย) — The Duller ไม่สนแสง แต่ไวต่อเสียงมาก
+    let recentNoise = null; // { x, z, radius, time }
+    function emitNoise(x, z, radius) {
+      recentNoise = { x, z, radius, time: performance.now() };
+    }
 
     // -------------------------------------------------------------
     // Safe-zone / จุดซ่อนตัว (ตู้เอกสาร) — กด/แตะเพื่อหลบ ลดโอกาสถูกสังเกตเห็นเกือบเป็นศูนย์
@@ -740,6 +763,14 @@
     // แต่จะเดินไปวนดูจุดที่เห็นครั้งสุดท้ายก่อนสักพัก แล้วค่อยเลิกล่ากลับไปลาดตระเวนปกติ
     const SEARCH_LINGER_MS = 4000;
     const SEARCH_SPEED = 1.8;
+
+    // Smiler ล่าด้วยสายตา: ไฟฉายจ่อหน้าตรงๆ ระยะใกล้ทำให้มันสะดุ้งถอยชั่วคราว
+    const SMILER_LIGHT_REPEL_DIST = 9.0;
+    const SMILER_LIGHT_REPEL_DOT = 0.55; // ~56 องศาครึ่งมุม ใกล้เคียงลำแสงไฟฉาย
+    const SMILER_RECOIL_SPEED = 3.0;
+
+    // Duller ตาบอด ไม่สนไฟฉาย ระยะตรวจจับพื้นฐานคงที่เสมอ (ต่างกับ Smiler/Bacteria ที่ยิ่งเปิดไฟยิ่งเห็นไกลขึ้น)
+    const DULLER_BASE_DETECT_RANGE = 18;
     let smilerLastKnownPos = new THREE.Vector3();
     let smilerSearchUntil = 0;
     let bacteriaLastKnownPos = new THREE.Vector3();
@@ -1147,10 +1178,9 @@
         }
       }
 
-      ctx.fillStyle = 'rgba(22, 18, 8, 0.32)';
+      ctx.fillStyle = 'rgba(22, 18, 8, 0.09)';
       ctx.beginPath();
-      ctx.arc(65, 65, 50, 0, Math.PI * 2);
-      ctx.arc(195, 175, 75, 0, Math.PI * 2);
+      ctx.arc(150, 130, 34, 0, Math.PI * 2);
       ctx.fill();
 
       const t = new THREE.CanvasTexture(c);
@@ -1821,6 +1851,9 @@
       }
 
       nextAmbientEventTime = performance.now() + 9000 + Math.random() * 6000;
+      flashlightBattery = 100;
+      flashlightDead = false;
+      recentNoise = null;
       setFlashlight(true);
       const noteOverlay = document.getElementById('note-overlay');
       if (noteOverlay) noteOverlay.style.display = 'none';
@@ -1925,16 +1958,38 @@
     // Flashlight Toggle (ปิดไฟฉายลดโอกาสถูกสังเกตเห็น แลกกับมองเห็นทางน้อยลง)
     // -------------------------------------------------------------
     function setFlashlight(on) {
+      if (on && (flashlightDead || flashlightBattery <= 0.5)) return; // แบตไม่พอ เปิดไม่ติด
       flashlightOn = on;
       if (flashlight) flashlight.intensity = on ? 1.2 : 0;
-      const indicator = document.getElementById('flashlight-indicator');
-      if (indicator) indicator.style.display = on ? 'none' : 'block';
       const btn = document.getElementById('flash-btn');
       if (btn) btn.classList.toggle('off', !on);
+      updateFlashlightIndicator();
     }
     function toggleFlashlight() {
       if (!window.gameEngineStarted || isJumpscareActive || isHiding) return;
-      setFlashlight(!flashlightOn);
+      const goingOn = !flashlightOn;
+      setFlashlight(goingOn);
+      // เสียงคลิกไฟฉาย + เสียงเปิด/ปิดตัวมันเอง ดึงความสนใจ The Duller ได้จากระยะไกล
+      emitNoise(camera.position.x, camera.position.z, 14);
+    }
+    function updateFlashlightIndicator() {
+      const indicator = document.getElementById('flashlight-indicator');
+      if (!indicator) return;
+      if (flashlightDead) {
+        indicator.style.color = '#ff5555';
+        indicator.innerText = `แบตไฟฉายหมด — กำลังชาร์จ ${Math.floor(flashlightBattery)}%`;
+        indicator.style.display = 'block';
+      } else if (!flashlightOn) {
+        indicator.style.color = '#ff8888';
+        indicator.innerText = 'FLASHLIGHT OFF';
+        indicator.style.display = 'block';
+      } else if (flashlightBattery < 25) {
+        indicator.style.color = '#ffb84d';
+        indicator.innerText = `แบตไฟฉายต่ำ ${Math.floor(flashlightBattery)}%`;
+        indicator.style.display = 'block';
+      } else {
+        indicator.style.display = 'none';
+      }
     }
 
     function getNearestHidingDist() {
@@ -2030,6 +2085,7 @@
       sprintCooldownEndTime = sprintBoostEndTime + SPRINT_COOLDOWN;
       playerEnergy = Math.max(0, playerEnergy - SPRINT_ENERGY_COST);
       playSprintSound();
+      emitNoise(camera.position.x, camera.position.z, 20); // วิ่งเสียงดัง The Duller ได้ยินจากไกล
     }
 
     const sprintBtn = document.getElementById('sprint-btn');
@@ -2283,6 +2339,7 @@
             strobe.style.display = 'none';
             document.getElementById('over-title').innerText = "SIGNAL LOST";
             document.getElementById('over-desc').innerHTML = "คุณถูกบางสิ่งในเงามืดดักจับตัว...<br><b>ไม่มีใครหนีออกจาก Level 0 ได้</b>";
+            document.getElementById('survival-time-over').innerText = `เวลาที่รอดมาได้: ${window.formatSurvivalTime(now - window.gameStartTime)}`;
             document.getElementById('over-menu').style.display = 'flex';
           }
 
@@ -2355,6 +2412,21 @@
           hideBtn.classList.add('disabled');
         }
 
+        // ระบบแบตไฟฉาย: ใช้แล้วหมดไปเรื่อยๆ, ปิดไว้ค่อยๆ ฟื้น
+        if (flashlightOn) {
+          flashlightBattery = Math.max(0, flashlightBattery - FLASHLIGHT_DRAIN_PER_SEC * dt);
+          if (flashlightBattery <= 0) {
+            flashlightDead = true;
+            setFlashlight(false);
+          }
+        } else {
+          flashlightBattery = Math.min(100, flashlightBattery + FLASHLIGHT_REGEN_PER_SEC * dt);
+          if (flashlightDead && flashlightBattery >= FLASHLIGHT_MIN_TO_REUSE) {
+            flashlightDead = false;
+          }
+        }
+        updateFlashlightIndicator();
+
         // ระบบลดค่า Energy / Sanity
         let drainRate = 0.45 * dt;
         if (isBlackout) drainRate = 1.5 * dt;
@@ -2372,6 +2444,7 @@
           window.gameEngineStarted = false;
           document.getElementById('over-title').innerText = "INSANITY OVERTAKEN";
           document.getElementById('over-desc').innerHTML = "สติของคุณแตกสลายโดยสมบูรณ์...<br><b>คุณกลายสภาพเป็นส่วนหนึ่งของ The Backrooms</b>";
+          document.getElementById('survival-time-over').innerText = `เวลาที่รอดมาได้: ${window.formatSurvivalTime(now - window.gameStartTime)}`;
           document.getElementById('over-menu').style.display = 'flex';
           return;
         }
@@ -2524,8 +2597,6 @@
         const detectMult = flashlightOn ? 1.0 : 0.62;
         if (!isHiding && distSmiler < 20 * detectMult) {
           smilerState = 'CHASE';
-          playerEnergy = Math.max(0, playerEnergy - 1.2 * dt);
-          smilerSpeed = (distSmiler < 9.0) ? 4.45 : (isBlackout ? 3.4 : 2.3);
 
           // จำจุดที่เห็นผู้เล่นล่าสุดไว้ เผื่อคลาดกัน (เช่นผู้เล่นซ่อนตัว) จะได้ไปวนหาก่อนเลิกล่า
           smilerLastKnownPos.copy(camera.position);
@@ -2538,17 +2609,31 @@
           }
 
           const dir = new THREE.Vector3().subVectors(camera.position, smilerRig.position).normalize();
-          smilerRig.position.x += dir.x * smilerSpeed * dt;
-          smilerRig.position.z += dir.z * smilerSpeed * dt;
 
-          smilerRig.lookAt(camera.position.x, smilerRig.position.y, camera.position.z);
+          // Smiler ล่าด้วยสายตา: ถ้าผู้เล่นส่องไฟฉายจ่อหน้ามันตรงๆ ในระยะใกล้ มันจะสะดุ้งถอยแทนที่จะพุ่งเข้าหา
+          const fx = -Math.sin(cameraYaw), fz = -Math.cos(cameraYaw);
+          const litDot = fx * -dir.x + fz * -dir.z; // มุมระหว่างทิศที่มองกับทิศไปหา Smiler
+          const isBlindedByLight = flashlightOn && distSmiler < SMILER_LIGHT_REPEL_DIST && litDot > SMILER_LIGHT_REPEL_DOT;
 
-          if (distSmiler < 1.45) {
-            isJumpscareActive = true;
-            jumpscareTargetRig = smilerRig;
-            jumpscareStartTime = now;
-            playViolentJumpscareSound();
-            if (document.exitPointerLock) document.exitPointerLock();
+          if (isBlindedByLight) {
+            smilerState = 'RECOIL';
+            smilerRig.position.x -= dir.x * SMILER_RECOIL_SPEED * dt;
+            smilerRig.position.z -= dir.z * SMILER_RECOIL_SPEED * dt;
+            smilerRig.lookAt(camera.position.x, smilerRig.position.y, camera.position.z);
+          } else {
+            playerEnergy = Math.max(0, playerEnergy - 1.2 * dt);
+            smilerSpeed = (distSmiler < 9.0) ? 4.45 : (isBlackout ? 3.4 : 2.3);
+            smilerRig.position.x += dir.x * smilerSpeed * dt;
+            smilerRig.position.z += dir.z * smilerSpeed * dt;
+            smilerRig.lookAt(camera.position.x, smilerRig.position.y, camera.position.z);
+
+            if (distSmiler < 1.45) {
+              isJumpscareActive = true;
+              jumpscareTargetRig = smilerRig;
+              jumpscareStartTime = now;
+              playViolentJumpscareSound();
+              if (document.exitPointerLock) document.exitPointerLock();
+            }
           }
         } else {
           smilerState = 'PATROL';
@@ -2674,7 +2759,12 @@
         // =========================================================
         const distDuller = dullerRig.position.distanceTo(camera.position);
 
-        if (!isHiding && distDuller < 18 * detectMult) {
+        // The Duller ตาบอด ไม่สนไฟฉายเปิด/ปิดเลย (ระยะตรวจจับคงที่) แต่หูไวมาก
+        // เสียงสปรินท์/คลิกไฟฉายจะดึงมันมาจากระยะไกลกว่าระยะมองเห็นปกติ
+        const dullerNoiseHeard = !!recentNoise && (now - recentNoise.time < 700) &&
+          Math.hypot(dullerRig.position.x - recentNoise.x, dullerRig.position.z - recentNoise.z) < recentNoise.radius;
+
+        if (!isHiding && (distDuller < DULLER_BASE_DETECT_RANGE || dullerNoiseHeard)) {
           dullerState = 'CHASE';
           playerEnergy = Math.max(0, playerEnergy - 0.9 * dt);
           dullerSpeed = (distDuller < 8.0) ? 4.3 : 2.2;
@@ -2683,9 +2773,9 @@
           dullerSearchUntil = now + SEARCH_LINGER_MS;
 
           if (dullerSoundGain && audioCtx && audioCtx.state === 'running') {
-            const dVol = (1 - distDuller / 18) * 0.25;
+            const dVol = Math.max(0, 1 - distDuller / 18) * 0.25;
             dullerSoundGain.gain.setValueAtTime(dVol, audioCtx.currentTime);
-            dullerOsc.frequency.setValueAtTime(130 + (18 - distDuller) * 8, audioCtx.currentTime);
+            dullerOsc.frequency.setValueAtTime(130 + Math.max(0, 18 - distDuller) * 8, audioCtx.currentTime);
           }
 
           const dDir = new THREE.Vector3().subVectors(camera.position, dullerRig.position).normalize();
@@ -2770,6 +2860,7 @@
           if (keycardsCollected >= KEYCARDS_REQUIRED) {
             window.gameEngineStarted = false;
             if (document.exitPointerLock) document.exitPointerLock();
+            document.getElementById('survival-time-win').innerText = `เวลาที่ใช้หนี: ${window.formatSurvivalTime(now - window.gameStartTime)}`;
             document.getElementById('win-menu').style.display = 'flex';
           } else if (now > lastExitLockedNoticeTime + 2500) {
             lastExitLockedNoticeTime = now;
