@@ -39,7 +39,6 @@
       background: radial-gradient(circle, rgba(0,0,0,0) 30%, rgba(10,12,5,0.78) 100%);
       box-shadow: inset 0 0 100px rgba(0,0,0,0.9);
     }
-    /* เอฟเฟกต์เส้นสแกน CRT/VHS */
     .vhs::after {
       content: " ";
       display: block;
@@ -142,7 +141,6 @@
       pointer-events: none;
     }
 
-    /* จอสัญญาณซ่า Dynamic Glitch */
     #noise-canvas {
       position: absolute;
       top: 0;
@@ -222,8 +220,8 @@
       if (e) e.stopPropagation();
       document.getElementById('over-menu').style.display = 'none';
       document.getElementById('win-menu').style.display = 'none';
-      if (window.resetBackroomsPlayer) {
-        window.resetBackroomsPlayer();
+      if (window.regenerateLevelAndRestart) {
+        window.regenerateLevelAndRestart();
       }
       window.gameEngineStarted = true;
     };
@@ -237,14 +235,12 @@
   <canvas id="noise-canvas"></canvas>
   <div id="jumpscare-flash"></div>
 
-  <!-- HUD แบบกล้องวงจรปิดอาคาร -->
   <div class="hud">
     <div><span class="rec">● CAM-04</span> [LIVE] 22:48:12</div>
     <div style="font-size: 11px; margin-top: 3px; opacity: 0.7;">BLDG-A: 4F // FIND EMERGENCY EXIT</div>
   </div>
   <div id="crosshair"></div>
 
-  <!-- Touch UI -->
   <div id="joy-base"><div id="joy-handle"></div></div>
   <div id="touch-look"></div>
 
@@ -284,38 +280,20 @@
   </div>
 
   <script>
-    const GRID = [
-      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-      [1,2,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1],
-      [1,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,1],
-      [1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1],
-      [1,0,0,0,0,0,0,1,0,0,0,0,1,0,0,1,0,0,1,1,1,0,0,1],
-      [1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,0,0,0,0,1,0,0,1],
-      [1,1,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-      [1,0,0,0,1,0,0,1,1,1,0,0,1,1,1,1,1,0,0,0,0,0,0,1],
-      [1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,1],
-      [1,0,0,0,0,0,0,1,0,0,1,0,0,1,0,0,1,0,0,0,0,0,0,1],
-      [1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-      [1,0,0,0,0,0,0,0,0,0,0,4,0,0,0,0,1,0,0,1,0,0,0,1],
-      [1,1,1,0,0,1,1,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1],
-      [1,0,0,0,0,0,0,1,0,0,1,1,1,0,0,0,1,1,1,0,0,1,1,1],
-      [1,0,0,1,0,0,0,1,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,1],
-      [1,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,1,0,0,1,0,1],
-      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-      [1,1,1,1,0,0,1,1,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,1],
-      [1,0,0,0,0,0,0,1,0,0,1,0,0,1,0,0,1,0,0,0,0,0,0,1],
-      [1,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,1],
-      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-      [1,0,0,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,1],
-      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,3,1],
-      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
-    ];
+    const MAP_SIZE = 24;
     const CELL = 3.6;
     const HEIGHT = 3.0;
 
+    let GRID = [];
     let audioCtx = null, humGain = null, alarmGain = null, alarmOsc = null;
     let camera, scene, renderer, entity, flashlight, ambientLight;
-    const ceilingLights = [];
+    
+    // อาร์เรย์เก็บวัตถุในฉากสำหรับล้าง Memory เมื่อเริ่มรอบใหม่
+    let wallMeshes = [];
+    let ceilingLights = [];
+    let lampMeshes = [];
+    let stairMeshes = [];
+
     let playerSpawn = new THREE.Vector3(5, 1.5, 5);
     let exitPos = new THREE.Vector3(0, 0, 0);
     let entitySpawn = new THREE.Vector3(40, 1.4, 40);
@@ -325,14 +303,140 @@
     let cameraPitch = 0, cameraYaw = 0;
     let headBobTimer = 0;
 
-    // สถานะไฟดับสยองขวัญ (Blackout Event)
+    // ระบบความเร็วของ Entity
+    let entitySpeed = 1.2;
+    let isEnraged = false;
+    let enrageTimer = 0;
+    let enrageCooldown = 0;
+
+    // สถานะไฟดับสยองขวัญ
     let isBlackout = false;
-    let nextBlackoutTime = performance.now() + 18000;
+    let nextBlackoutTime = performance.now() + 20000;
     let blackoutEndTime = 0;
-    let nextHallucinationTime = performance.now() + 12000;
+    let nextHallucinationTime = performance.now() + 14000;
+
+    // วัสดุที่ใช้ซ้ำ (แชร์หน่วยความจำ)
+    let wallMat, floorMat, ceilingMat, boxGeo;
 
     // -------------------------------------------------------------
-    // Web Audio API: Soundscape
+    // 1. Procedural Map Generator (การันตีเส้นทางแก้ได้ 100%)
+    // -------------------------------------------------------------
+    function generateSolvableOfficeMap() {
+      const map = [];
+      for (let r = 0; r < MAP_SIZE; r++) {
+        map[r] = new Array(MAP_SIZE).fill(0);
+        for (let c = 0; c < MAP_SIZE; c++) {
+          if (r === 0 || r === MAP_SIZE - 1 || c === 0 || c === MAP_SIZE - 1) {
+            map[r][c] = 1; // กำแพงขอบนอกสุด
+          }
+        }
+      }
+
+      // แบ่งอาคารเป็นห้อง 4x4 เซกเตอร์ (ขนาดห้องละ 6x6 บล็อก)
+      for (let sr = 0; sr < 4; sr++) {
+        for (let sc = 0; sc < 4; sc++) {
+          const startR = sr * 6;
+          const startC = sc * 6;
+
+          // กำแพงแบ่งห้องแนวนอน พร้อมสุ่มช่องประตู 2 ช่อง
+          if (sr > 0) {
+            const doorC1 = startC + 1 + Math.floor(Math.random() * 2);
+            const doorC2 = startC + 3 + Math.floor(Math.random() * 2);
+            for (let c = startC; c < startC + 6; c++) {
+              if (c !== doorC1 && c !== doorC2 && Math.random() < 0.8) {
+                map[startR][c] = 1;
+              }
+            }
+          }
+
+          // กำแพงแบ่งห้องแนวตั้ง พร้อมสุ่มช่องประตู 2 ช่อง
+          if (sc > 0) {
+            const doorR1 = startR + 1 + Math.floor(Math.random() * 2);
+            const doorR2 = startR + 3 + Math.floor(Math.random() * 2);
+            for (let r = startR; r < startR + 6; r++) {
+              if (r !== doorR1 && r !== doorR2 && Math.random() < 0.8) {
+                map[r][startC] = 1;
+              }
+            }
+          }
+
+          // สุ่มเสาสี่เหลี่ยมกลางห้อง (สไตล์ Backrooms)
+          const midR = startR + 2 + Math.floor(Math.random() * 2);
+          const midC = startC + 2 + Math.floor(Math.random() * 2);
+          if (Math.random() < 0.65) {
+            map[midR][midC] = 1;
+          }
+          // สุ่มผนังกั้นพาร์ติชันครึ่งห้อง
+          if (Math.random() < 0.35 && midR + 1 < MAP_SIZE - 1) {
+            map[midR + 1][midC] = 1;
+          }
+        }
+      }
+
+      // เคลียร์พื้นที่เกิดของผู้เล่น (มุมซ้ายบน)
+      for (let r = 1; r <= 3; r++) {
+        for (let c = 1; c <= 3; c++) map[r][c] = 0;
+      }
+      map[1][1] = 2; // Player Start
+
+      // เคลียร์พื้นที่ทางออกฉุกเฉิน (มุมขวาล่าง)
+      for (let r = MAP_SIZE - 4; r < MAP_SIZE - 1; r++) {
+        for (let c = MAP_SIZE - 4; c < MAP_SIZE - 1; c++) map[r][c] = 0;
+      }
+      map[MAP_SIZE - 2][MAP_SIZE - 2] = 3; // Emergency Exit
+
+      // จุดเกิด Entity (กึ่งกลางค่อนไปทางขวา)
+      map[12][13] = 4;
+
+      // ตรวจสอบความเชื่อมต่อด้วย BFS (Breadth-First Search)
+      if (!isPathReachable(map, 1, 1, MAP_SIZE - 2, MAP_SIZE - 2)) {
+        carveGuaranteedCorridor(map, 1, 1, MAP_SIZE - 2, MAP_SIZE - 2);
+      }
+
+      return map;
+    }
+
+    // ฟังก์ชันตรวจทางเดิน BFS
+    function isPathReachable(map, startR, startC, endR, endC) {
+      const q = [[startR, startC]];
+      const visited = Array.from({ length: MAP_SIZE }, () => new Array(MAP_SIZE).fill(false));
+      visited[startR][startC] = true;
+
+      const dirs = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+      while (q.length > 0) {
+        const [cr, cc] = q.shift();
+        if (cr === endR && cc === endC) return true;
+
+        for (const [dr, dc] of dirs) {
+          const nr = cr + dr;
+          const nc = cc + dc;
+          if (nr >= 1 && nr < MAP_SIZE - 1 && nc >= 1 && nc < MAP_SIZE - 1) {
+            if (!visited[nr][nc] && map[nr][nc] !== 1) {
+              visited[nr][nc] = true;
+              q.push([nr, nc]);
+            }
+          }
+        }
+      }
+      return false;
+    }
+
+    // ขุดทางเชื่อมฉุกเฉินหากเกิดข้อผิดพลาดในการสุ่ม (Failsafe Carve)
+    function carveGuaranteedCorridor(map, startR, startC, endR, endC) {
+      let cr = startR, cc = startC;
+      while (cr !== endR) {
+        map[cr][cc] = 0;
+        cr += (cr < endR) ? 1 : -1;
+      }
+      while (cc !== endC) {
+        map[cr][cc] = 0;
+        cc += (cc < endC) ? 1 : -1;
+      }
+      map[endR][endC] = 3;
+    }
+
+    // -------------------------------------------------------------
+    // 2. Web Audio API
     // -------------------------------------------------------------
     window.initAudioContextSafely = function() {
       try {
@@ -357,7 +461,6 @@
           f.connect(humGain); humGain.connect(audioCtx.destination);
           h1.start(); h2.start();
 
-          // เสียงเตือนกรีดร้องของ Entity
           alarmOsc = audioCtx.createOscillator();
           alarmOsc.type = 'sawtooth'; alarmOsc.frequency.value = 520;
           const af = audioCtx.createBiquadFilter();
@@ -372,7 +475,6 @@
       } catch (err) {}
     };
 
-    // ป้องกันเสียงหลุดเมื่อสลับหน้าจอกลับมา
     window.addEventListener('pointerdown', () => {
       if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
     });
@@ -393,7 +495,6 @@
       } catch(e) {}
     }
 
-    // เสียงภาพสัญญาณซ่า
     function playStaticSound() {
       if (!audioCtx || audioCtx.state !== 'running') return;
       try {
@@ -407,7 +508,6 @@
       } catch(e) {}
     }
 
-    // เสียงหลอนไกลๆ (Audio Hallucination)
     function playDistantHorrorDrone() {
       if (!audioCtx || audioCtx.state !== 'running') return;
       try {
@@ -422,31 +522,25 @@
         gain.gain.linearRampToValueAtTime(0.04, now + 1.2);
         gain.gain.linearRampToValueAtTime(0.0001, now + 3.2);
 
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start(now);
-        osc.stop(now + 3.3);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(now); osc.stop(now + 3.3);
       } catch(e) {}
     }
 
     // -------------------------------------------------------------
-    // Procedural Textures (พร้อมรอยขีดเขียนชวนขนลุกบนผนัง)
+    // 3. Textures
     // -------------------------------------------------------------
     function genWallTex() {
       const c = document.createElement('canvas');
       c.width = 512; c.height = 512;
       const ctx = c.getContext('2d');
-      ctx.fillStyle = '#c5ac55';
-      ctx.fillRect(0, 0, 512, 512);
+      ctx.fillStyle = '#c5ac55'; ctx.fillRect(0, 0, 512, 512);
 
-      // ลายทางแนวตั้ง
-      ctx.strokeStyle = '#b09642';
-      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#b09642'; ctx.lineWidth = 3;
       for (let x = 0; x < 512; x += 16) {
         ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 512); ctx.stroke();
       }
 
-      // คราบฝุ่นและเกรเดียนท์มืด
       const grad = ctx.createLinearGradient(0, 0, 0, 512);
       grad.addColorStop(0, 'rgba(30, 25, 8, 0.3)');
       grad.addColorStop(0.3, 'rgba(0,0,0,0)');
@@ -455,12 +549,9 @@
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, 512, 512);
 
-      // บัวเชิงผนังล่าง (Baseboard)
       const baseH = 46;
-      ctx.fillStyle = '#3a2a18';
-      ctx.fillRect(0, 512 - baseH, 512, baseH);
-      ctx.fillStyle = '#22170c';
-      ctx.fillRect(0, 512 - baseH, 512, 4);
+      ctx.fillStyle = '#3a2a18'; ctx.fillRect(0, 512 - baseH, 512, baseH);
+      ctx.fillStyle = '#22170c'; ctx.fillRect(0, 512 - baseH, 512, 4);
       ctx.fillRect(0, 512 - 6, 512, 6);
 
       const t = new THREE.CanvasTexture(c);
@@ -472,8 +563,7 @@
       const c = document.createElement('canvas');
       c.width = 256; c.height = 256;
       const ctx = c.getContext('2d');
-      ctx.fillStyle = '#574f33';
-      ctx.fillRect(0, 0, 256, 256);
+      ctx.fillStyle = '#574f33'; ctx.fillRect(0, 0, 256, 256);
 
       ctx.fillStyle = 'rgba(0,0,0,0.12)';
       for (let x = 0; x < 256; x += 4) {
@@ -482,7 +572,6 @@
         }
       }
 
-      // คราบน้ำเปียกชื้น
       ctx.fillStyle = 'rgba(20, 18, 8, 0.35)';
       ctx.beginPath();
       ctx.arc(75, 75, 55, 0, Math.PI * 2);
@@ -499,11 +588,8 @@
       const c = document.createElement('canvas');
       c.width = 256; c.height = 256;
       const ctx = c.getContext('2d');
-      ctx.fillStyle = '#d5ceb5';
-      ctx.fillRect(0, 0, 256, 256);
-
-      ctx.strokeStyle = '#7d7763';
-      ctx.lineWidth = 4;
+      ctx.fillStyle = '#d5ceb5'; ctx.fillRect(0, 0, 256, 256);
+      ctx.strokeStyle = '#7d7763'; ctx.lineWidth = 4;
       ctx.strokeRect(0, 0, 256, 256);
       ctx.beginPath();
       ctx.moveTo(128, 0); ctx.lineTo(128, 256);
@@ -516,16 +602,13 @@
       return t;
     }
 
-    // หน้าตา Smiler หลอนขึ้น ดวงตาและรอยยิ้มเรืองแสงคมชัด
     function genSmilerTex() {
       const c = document.createElement('canvas');
       c.width = 256; c.height = 256;
       const ctx = c.getContext('2d');
       ctx.fillStyle = 'rgba(0,0,0,0)'; ctx.fillRect(0, 0, 256, 256);
 
-      ctx.fillStyle = '#ffffff';
-      ctx.shadowColor = '#ffffaa';
-      ctx.shadowBlur = 22;
+      ctx.fillStyle = '#ffffff'; ctx.shadowColor = '#ffffaa'; ctx.shadowBlur = 22;
       ctx.beginPath();
       ctx.arc(82, 92, 14, 0, Math.PI * 2);
       ctx.arc(174, 92, 14, 0, Math.PI * 2);
@@ -543,7 +626,7 @@
     }
 
     // -------------------------------------------------------------
-    // Setup World & Atmosphere
+    // 4. World Setup & Dynamic Level Generation
     // -------------------------------------------------------------
     function setupWorld() {
       const container = document.getElementById('viewport');
@@ -551,7 +634,6 @@
       const h = window.innerHeight || 640;
 
       scene = new THREE.Scene();
-      // หมอกสีเหลืองมัสตาร์ดสลัว จำกัดทัศนวิสัยเหลือระยะ 12-16 เมตร
       scene.fog = new THREE.FogExp2(0x1f1d0d, 0.088);
 
       camera = new THREE.PerspectiveCamera(72, w / h, 0.1, 70);
@@ -563,19 +645,20 @@
       ambientLight = new THREE.AmbientLight(0xd9c87d, 0.32);
       scene.add(ambientLight);
 
-      // แสงไฟฉายหน้าตัวผู้เล่น (Camcorder Flashlight)
       flashlight = new THREE.SpotLight(0xfff6dc, 1.4, 20, Math.PI * 0.22, 0.65, 1.2);
       camera.add(flashlight);
       flashlight.position.set(0, 0, 0.1);
       flashlight.target = camera;
       scene.add(camera);
 
-      const wallMat = new THREE.MeshLambertMaterial({ map: genWallTex() });
-      const floorMat = new THREE.MeshLambertMaterial({ map: genCarpetTex() });
-      const ceilingMat = new THREE.MeshLambertMaterial({ map: genCeilingTex() });
+      // สร้าง Texture และ Geometry ครั้งเดียวเพื่อประหยัดหน่วยความจำ
+      wallMat = new THREE.MeshLambertMaterial({ map: genWallTex() });
+      floorMat = new THREE.MeshLambertMaterial({ map: genCarpetTex() });
+      ceilingMat = new THREE.MeshLambertMaterial({ map: genCeilingTex() });
+      boxGeo = new THREE.BoxGeometry(CELL, HEIGHT, CELL);
 
-      const mapW = GRID[0].length * CELL;
-      const mapH = GRID.length * CELL;
+      const mapW = MAP_SIZE * CELL;
+      const mapH = MAP_SIZE * CELL;
 
       const planeGeo = new THREE.PlaneGeometry(mapW, mapH);
       const floor = new THREE.Mesh(planeGeo, floorMat);
@@ -588,10 +671,44 @@
       ceiling.position.set(mapW / 2, HEIGHT, mapH / 2);
       scene.add(ceiling);
 
-      const boxGeo = new THREE.BoxGeometry(CELL, HEIGHT, CELL);
+      const smilerMat = new THREE.SpriteMaterial({
+        map: genSmilerTex(),
+        color: 0xffffff,
+        transparent: true,
+        blending: THREE.AdditiveBlending
+      });
+      entity = new THREE.Sprite(smilerMat);
+      entity.scale.set(2.4, 2.4, 1);
+      scene.add(entity);
 
-      for (let r = 0; r < GRID.length; r++) {
-        for (let c = 0; c < GRID[r].length; c++) {
+      if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+        document.getElementById('joy-base').style.display = 'block';
+        document.getElementById('touch-look').style.display = 'block';
+      }
+
+      // สร้างแผนที่แรกเริ่ม
+      buildProceduralLevel();
+      requestAnimationFrame(renderLoop);
+    }
+
+    // ล้างและประกอบแผนที่ใหม่เมื่อเริ่มรอบใหม่
+    function buildProceduralLevel() {
+      // 1. ล้างวัตถุเดิมในฉาก (Memory Cleanup)
+      for (const w of wallMeshes) scene.remove(w);
+      wallMeshes = [];
+      for (const l of ceilingLights) scene.remove(l);
+      ceilingLights = [];
+      for (const m of lampMeshes) scene.remove(m);
+      lampMeshes = [];
+      for (const s of stairMeshes) scene.remove(s);
+      stairMeshes = [];
+
+      // 2. สุ่มผังห้องใหม่
+      GRID = generateSolvableOfficeMap();
+
+      // 3. ปลูกสร้างกำแพงและไฟใหม่
+      for (let r = 0; r < MAP_SIZE; r++) {
+        for (let c = 0; c < MAP_SIZE; c++) {
           const val = GRID[r][c];
           const wx = c * CELL + CELL / 2;
           const wz = r * CELL + CELL / 2;
@@ -600,6 +717,7 @@
             const wall = new THREE.Mesh(boxGeo, wallMat);
             wall.position.set(wx, HEIGHT / 2, wz);
             scene.add(wall);
+            wallMeshes.push(wall);
           } else {
             if ((r % 3 === 1) && (c % 3 === 1)) {
               const light = new THREE.PointLight(0xffecc0, 0.72, 11, 1.8);
@@ -613,6 +731,7 @@
               );
               lamp.position.set(wx, HEIGHT - 0.03, wz);
               scene.add(lamp);
+              lampMeshes.push(lamp);
             }
 
             if (val === 2) playerSpawn.set(wx, 1.5, wz);
@@ -621,12 +740,14 @@
               const exitLight = new THREE.PointLight(0xff2222, 1.6, 9);
               exitLight.position.set(wx, 1.8, wz);
               scene.add(exitLight);
+              stairMeshes.push(exitLight);
 
               const stairMat = new THREE.MeshLambertMaterial({ color: 0x3d1111 });
               for (let s = 0; s < 4; s++) {
                 const step = new THREE.Mesh(new THREE.BoxGeometry(2, 0.25, 0.5), stairMat);
                 step.position.set(wx, 0.125 + s * 0.25, wz - 1 + s * 0.5);
                 scene.add(step);
+                stairMeshes.push(step);
               }
               const sign = new THREE.Mesh(
                 new THREE.BoxGeometry(1.2, 0.4, 0.1),
@@ -634,32 +755,19 @@
               );
               sign.position.set(wx, 2.3, wz);
               scene.add(sign);
+              stairMeshes.push(sign);
             }
             if (val === 4) entitySpawn.set(wx, 1.4, wz);
           }
         }
       }
 
-      // Entity (The Smiler - เรืองแสงสว่างทะลุหมอก)
-      const smilerMat = new THREE.SpriteMaterial({
-        map: genSmilerTex(),
-        color: 0xffffff,
-        transparent: true,
-        blending: THREE.AdditiveBlending
-      });
-      entity = new THREE.Sprite(smilerMat);
-      entity.scale.set(2.4, 2.4, 1);
-      entity.position.copy(entitySpawn);
-      scene.add(entity);
-
-      if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
-        document.getElementById('joy-base').style.display = 'block';
-        document.getElementById('touch-look').style.display = 'block';
-      }
-
       window.resetBackroomsPlayer();
-      requestAnimationFrame(renderLoop);
     }
+
+    window.regenerateLevelAndRestart = function() {
+      buildProceduralLevel();
+    };
 
     window.resetBackroomsPlayer = function() {
       if (!camera) return;
@@ -668,10 +776,14 @@
       cameraPitch = 0;
       if (entity) entity.position.copy(entitySpawn);
       
-      // ล้างค่าสถานะการกดและจอยสติ๊ก ป้องกันบัคเดินเอง
       for (let k in keys) keys[k] = false;
       joyVector.x = 0;
       joyVector.y = 0;
+
+      entitySpeed = 1.2;
+      isEnraged = false;
+      enrageTimer = 0;
+      enrageCooldown = 0;
 
       document.getElementById('noise-canvas').style.opacity = 0;
       document.getElementById('jumpscare-flash').style.display = 'none';
@@ -682,7 +794,7 @@
     };
 
     // -------------------------------------------------------------
-    // Controls (PC + Mobile)
+    // Controls
     // -------------------------------------------------------------
     window.addEventListener('keydown', (e) => { if (keys.hasOwnProperty(e.code)) keys[e.code] = true; });
     window.addEventListener('keyup', (e) => { if (keys.hasOwnProperty(e.code)) keys[e.code] = false; });
@@ -776,7 +888,7 @@
 
     touchLook.addEventListener('touchend', () => { lookTouchId = null; });
 
-    // ตรวจสอบการชน 8 ทิศทางรอบตัวแบบวงกลม (ป้องกันสะดุดมุม 100%)
+    // ตรวจสอบการชน 8 ทิศทางแบบวงกลม
     function isWall(x, z, r = 0.44) {
       const d = r * 0.707;
       const points = [
@@ -786,8 +898,8 @@
       for (let i = 0; i < points.length; i++) {
         const col = Math.floor(points[i][0] / CELL);
         const row = Math.floor(points[i][1] / CELL);
-        if (row < 0 || row >= GRID.length || col < 0 || col >= GRID[0].length) return true;
-        if (GRID[row][col] === 1) return true;
+        if (row < 0 || row >= MAP_SIZE || col < 0 || col >= MAP_SIZE) return true;
+        if (GRID[row] && GRID[row][col] === 1) return true;
       }
       return false;
     }
@@ -827,17 +939,16 @@
         moveSide += joyVector.x;
 
         const moveLen = Math.hypot(moveFwd, moveSide);
-        let currentSpeed = 0;
+        const playerSpeed = 4.0;
 
         if (moveLen > 0.05) {
           const normFwd = moveFwd / Math.max(1, moveLen);
           const normSide = moveSide / Math.max(1, moveLen);
-          currentSpeed = 4.0;
 
           const cosY = Math.cos(cameraYaw);
           const sinY = Math.sin(cameraYaw);
-          const vx = (-sinY * normFwd + cosY * normSide) * currentSpeed * dt;
-          const vz = (-cosY * normFwd - sinY * normSide) * currentSpeed * dt;
+          const vx = (-sinY * normFwd + cosY * normSide) * playerSpeed * dt;
+          const vz = (-cosY * normFwd - sinY * normSide) * playerSpeed * dt;
 
           if (!isWall(camera.position.x + vx, camera.position.z)) camera.position.x += vx;
           if (!isWall(camera.position.x, camera.position.z + vz)) camera.position.z += vz;
@@ -851,13 +962,13 @@
           headBobTimer += dt * 9.5;
         }
 
-        // Head Bobbing & Breathing Effect (โยกมุมมองกล้อง)
+        // Head Bobbing & Breathing
         let bobY = 0, bobZ = 0;
         if (moveLen > 0.05) {
           bobY = Math.sin(headBobTimer) * 0.055;
-          bobZ = Math.cos(headBobTimer * 0.5) * 0.012; // เอียงข้างเล็กน้อย
+          bobZ = Math.cos(headBobTimer * 0.5) * 0.012;
         } else {
-          bobY = Math.sin(now * 0.002) * 0.012; // หายใจช้าๆ ตอนอยู่นิ่ง
+          bobY = Math.sin(now * 0.002) * 0.012;
         }
 
         camera.position.y = 1.5 + bobY;
@@ -866,61 +977,88 @@
         camera.rotation.x = cameraPitch;
         camera.rotation.z = bobZ;
 
-        // สุ่มเสียงสะท้อนหลอนไกลๆ ทุก 18-28 วินาที
+        // สุ่มเสียงสะท้อนไกลๆ
         if (now > nextHallucinationTime) {
           playDistantHorrorDrone();
-          nextHallucinationTime = now + 18000 + Math.random() * 10000;
+          nextHallucinationTime = now + 18000 + Math.random() * 12000;
         }
 
-        // ระบบไฟดับสยองขวัญ (Random Blackout)
+        // ไฟดับกะทันหัน
         if (!isBlackout && now > nextBlackoutTime) {
           isBlackout = true;
-          blackoutEndTime = now + 1600; // ไฟดับ 1.6 วินาที
-          ambientLight.intensity = 0.05;
+          blackoutEndTime = now + 1700;
+          ambientLight.intensity = 0.04;
           if (humGain && audioCtx) humGain.gain.setValueAtTime(0.01, audioCtx.currentTime);
           for (let i = 0; i < ceilingLights.length; i++) ceilingLights[i].intensity = 0;
         } else if (isBlackout) {
           if (now > blackoutEndTime) {
             isBlackout = false;
-            nextBlackoutTime = now + 24000 + Math.random() * 20000;
+            nextBlackoutTime = now + 25000 + Math.random() * 20000;
             ambientLight.intensity = 0.32;
             if (humGain && audioCtx) humGain.gain.setValueAtTime(0.08, audioCtx.currentTime);
             for (let i = 0; i < ceilingLights.length; i++) ceilingLights[i].intensity = 0.72;
           }
         } else {
-          // กะพริบไฟสุ่มตอนปกติ
           if (Math.random() < 0.04 && ceilingLights.length > 0) {
             const l = ceilingLights[Math.floor(Math.random() * ceilingLights.length)];
             l.intensity = Math.random() < 0.5 ? 0.1 : 0.75;
           }
         }
 
-        // Entity AI & Proximity Screen Glitch
+        // Entity AI: ระบบพุ่งชาร์จความเร็วสูง (Dynamic Sprint & Burst)
         const distToPlayer = entity.position.distanceTo(camera.position);
 
-        if (distToPlayer < 16) {
-          // จอสัญญาณแตกซ่าแรงขึ้นตามความใกล้
-          const glitchStrength = Math.pow(1 - distToPlayer / 16, 1.8);
-          staticCanvas.style.opacity = Math.min(0.75, glitchStrength * 0.85);
+        if (distToPlayer < 17) {
+          // จอสัญญาณแตกซ่าตามความใกล้
+          const glitchStrength = Math.pow(1 - distToPlayer / 17, 1.8);
+          staticCanvas.style.opacity = Math.min(0.85, glitchStrength * 0.9);
           renderNoise();
 
-          if (alarmGain && audioCtx && audioCtx.state === 'running') {
-            const vol = (1 - distToPlayer / 16) * 0.22;
-            alarmGain.gain.setValueAtTime(vol, audioCtx.currentTime);
-            alarmOsc.frequency.setValueAtTime(460 + (16 - distToPlayer) * 45, audioCtx.currentTime);
+          // คำนวณความเร็ว Entity
+          if (distToPlayer < 8.5) {
+            // โหมด Enrage พุ่งชาร์จ
+            if (enrageCooldown <= 0) {
+              isEnraged = true;
+              enrageTimer += dt;
+              entitySpeed = 4.55; // เร็วกว่าผู้เล่นที่วิ่ง 4.0!
+
+              if (enrageTimer > 3.5) { // พุ่งเต็มที่ 3.5 วิ แล้วเหนื่อย
+                isEnraged = false;
+                enrageTimer = 0;
+                enrageCooldown = 2.2; // พักหายใจ 2.2 วินาที
+                entitySpeed = 2.2;
+              }
+            } else {
+              enrageCooldown -= dt;
+              entitySpeed = 2.2;
+            }
+          } else {
+            // โหมดสะกดรอยตามระยะกลาง
+            isEnraged = false;
+            enrageTimer = 0;
+            if (enrageCooldown > 0) enrageCooldown -= dt;
+            entitySpeed = isBlackout ? 3.4 : 2.4;
           }
 
-          const dir = new THREE.Vector3().subVectors(camera.position, entity.position).normalize();
-          entity.position.x += dir.x * 2.35 * dt;
-          entity.position.z += dir.z * 2.35 * dt;
-          entity.position.y = 1.4 + Math.sin(now * 0.006) * 0.18;
+          // ปรับเสียงเตือน
+          if (alarmGain && audioCtx && audioCtx.state === 'running') {
+            const vol = isEnraged ? 0.28 : (1 - distToPlayer / 17) * 0.2;
+            alarmGain.gain.setValueAtTime(vol, audioCtx.currentTime);
+            const pitch = isEnraged ? 620 : (460 + (17 - distToPlayer) * 40);
+            alarmOsc.frequency.setValueAtTime(pitch, audioCtx.currentTime);
+          }
 
-          // Jumpscare Moment (เมื่อสัมผัสตัว)
+          // พุ่งเข้าหาตำแหน่งผู้เล่น
+          const dir = new THREE.Vector3().subVectors(camera.position, entity.position).normalize();
+          entity.position.x += dir.x * entitySpeed * dt;
+          entity.position.z += dir.z * entitySpeed * dt;
+          entity.position.y = 1.4 + Math.sin(now * 0.008) * (isEnraged ? 0.25 : 0.15);
+
+          // โดนจับตัว (Jumpscare)
           if (distToPlayer < 1.1) {
             window.gameEngineStarted = false;
-            // แฟลชสีแดงกระชากมุมมอง
             document.getElementById('jumpscare-flash').style.display = 'block';
-            staticCanvas.style.opacity = 0.95;
+            staticCanvas.style.opacity = 0.98;
             playStaticSound();
             if (document.exitPointerLock) document.exitPointerLock();
 
@@ -931,11 +1069,15 @@
           }
         } else {
           staticCanvas.style.opacity = 0;
+          isEnraged = false;
+          enrageTimer = 0;
+          entitySpeed = 1.2;
           if (alarmGain && audioCtx && audioCtx.state === 'running') {
             alarmGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
           }
         }
 
+        // ตรวจสอบการถึงทางออกฉุกเฉิน
         if (camera.position.distanceTo(exitPos) < 2.0) {
           window.gameEngineStarted = false;
           if (document.exitPointerLock) document.exitPointerLock();
