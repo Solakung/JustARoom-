@@ -403,6 +403,16 @@
     let nextBlackoutTime = performance.now() + 25000;
     let blackoutEndTime = 0;
 
+    // "โกง" ให้ entity วาปมาป้วนเปี้ยนใกล้ผู้เล่นเป็นระยะ ระหว่างที่มันแค่ PATROL อยู่ไกลๆ
+    // (สุ่มเวลาถัดไปของแต่ละตัวไม่พร้อมกัน กันไม่ให้โผล่มาพร้อมกันทั้ง 3 ตัว)
+    let smilerNextCheatTime = performance.now() + 14000 + Math.random() * 8000;
+    let bacteriaNextCheatTime = performance.now() + 20000 + Math.random() * 8000;
+    let dullerNextCheatTime = performance.now() + 26000 + Math.random() * 8000;
+    const CHEAT_MIN_INTERVAL = 22000;
+    const CHEAT_MAX_INTERVAL = 38000;
+    const CHEAT_MIN_DIST = 13;   // ใกล้พอให้รู้สึกขนลุก แต่ไม่ประชิดจนหนีไม่ทัน
+    const CHEAT_MAX_DIST = 19;
+
     let wallMat, floorMat, ceilingMat, boxGeo;
 
     // -------------------------------------------------------------
@@ -1061,6 +1071,9 @@
         transparent: true
       });
 
+      // เก็บพื้นทุกช่องไว้ก่อน แล้วค่อยสุ่มวางนมทีหลัง (กันไม่ให้กระจุกอยู่แค่ต้นแมพ)
+      const floorCellsForBottles = [];
+
       for (let r = 0; r < MAP_SIZE; r++) {
         for (let c = 0; c < MAP_SIZE; c++) {
           const val = GRID[r][c];
@@ -1087,18 +1100,7 @@
               lampMeshes.push(lamp);
             }
 
-            // กระจายนมอัลมอนด์ 35-45 ขวด
-            if (val === 0 && Math.random() < 0.022 && almondBottles.length < 42) {
-              const bottle = new THREE.Sprite(almondMat);
-              bottle.scale.set(0.65, 1.3, 1);
-              bottle.position.set(wx, 0.65, wz);
-              scene.add(bottle);
-
-              const bLight = new THREE.PointLight(0xf5e6ca, 0.75, 4.5);
-              bottle.add(bLight);
-
-              almondBottles.push({ mesh: bottle, active: true, x: wx, z: wz });
-            }
+            if (val === 0) floorCellsForBottles.push({ wx, wz });
 
             if (val === 2) playerSpawn.set(wx, 1.5, wz);
             if (val === 3) {
@@ -1133,6 +1135,24 @@
       wallInstancedMesh.instanceMatrix.needsUpdate = true;
       scene.add(wallInstancedMesh);
 
+      // กระจายนมอัลมอนด์ 35-45 ขวด แบบสุ่มทั่วทั้งแมป (สับลำดับก่อนเลือก กันไม่ให้ไปกระจุกอยู่แค่ต้นแมพ)
+      for (let i = floorCellsForBottles.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [floorCellsForBottles[i], floorCellsForBottles[j]] = [floorCellsForBottles[j], floorCellsForBottles[i]];
+      }
+      const bottleTarget = Math.min(floorCellsForBottles.length, 35 + Math.floor(Math.random() * 11));
+      for (let i = 0; i < bottleTarget; i++) {
+        const { wx, wz } = floorCellsForBottles[i];
+        const bottle = new THREE.Sprite(almondMat);
+        bottle.scale.set(0.65, 1.3, 1);
+        bottle.position.set(wx, 0.65, wz);
+        scene.add(bottle);
+        // หมายเหตุ: ตั้งใจไม่ใส่ PointLight แยกต่อขวดแล้ว เพราะการ add/remove
+        // dynamic light จำนวนมากบ่อยๆ (ตอนเก็บของ) ทำให้ WebGL ต้อง recompile
+        // shader ของวัสดุที่รับแสงใหม่ทุกครั้ง เป็นสาเหตุของอาการเกมกระตุก/ค้างตอนเก็บของ
+        almondBottles.push({ mesh: bottle, active: true, x: wx, z: wz });
+      }
+
       window.resetBackroomsPlayer();
     }
 
@@ -1165,6 +1185,11 @@
       smilerSpeed = 1.4; smilerState = 'PATROL'; smilerWaypoint = null;
       bacteriaSpeed = 1.2; bacteriaState = 'PATROL'; bacteriaWaypoint = null;
       dullerSpeed = 1.3; dullerState = 'PATROL'; dullerWaypoint = null;
+
+      const restartNow = performance.now();
+      smilerNextCheatTime = restartNow + 14000 + Math.random() * 8000;
+      bacteriaNextCheatTime = restartNow + 20000 + Math.random() * 8000;
+      dullerNextCheatTime = restartNow + 26000 + Math.random() * 8000;
 
       isJumpscareActive = false;
       jumpscareTargetRig = null;
@@ -1320,6 +1345,22 @@
         }
       }
       return new THREE.Vector3(MAP_SIZE * CELL / 2, 0, MAP_SIZE * CELL / 2);
+    }
+
+    // ฟังก์ชันสุ่มจุด "โกง" ให้ entity วาปไปโผล่ใกล้ๆผู้เล่น (อยู่ในช่วงระยะ minDist-maxDist)
+    function getRandomFloorCellNear(px, pz, minDist, maxDist) {
+      for (let i = 0; i < 24; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const dist = minDist + Math.random() * (maxDist - minDist);
+        const wx = px + Math.cos(ang) * dist;
+        const wz = pz + Math.sin(ang) * dist;
+        const c = Math.floor(wx / CELL);
+        const r = Math.floor(wz / CELL);
+        if (r > 1 && r < MAP_SIZE - 2 && c > 1 && c < MAP_SIZE - 2 && GRID[r] && GRID[r][c] === 0) {
+          return new THREE.Vector3(c * CELL + CELL / 2, 0, r * CELL + CELL / 2);
+        }
+      }
+      return null; // หาไม่เจอ (เช่นติดผนังหมด) ก็ไม่ต้องโกงรอบนี้
     }
 
     let lastTime = performance.now();
@@ -1546,6 +1587,17 @@
             monsterSoundGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
           }
 
+          // แอบโกง: ถึงเวลาแล้ววาปมาป้วนเปี้ยนใกล้ๆผู้เล่นบ้าง
+          if (now > smilerNextCheatTime) {
+            const cheatSpot = getRandomFloorCellNear(camera.position.x, camera.position.z, CHEAT_MIN_DIST, CHEAT_MAX_DIST);
+            if (cheatSpot) {
+              smilerRig.position.x = cheatSpot.x;
+              smilerRig.position.z = cheatSpot.z;
+              smilerWaypoint = getRandomFloorCell();
+            }
+            smilerNextCheatTime = now + CHEAT_MIN_INTERVAL + Math.random() * (CHEAT_MAX_INTERVAL - CHEAT_MIN_INTERVAL);
+          }
+
           // ลาดตระเวนสุ่มห้อง
           if (!smilerWaypoint || smilerRig.position.distanceTo(smilerWaypoint) < 2.0) {
             smilerWaypoint = getRandomFloorCell();
@@ -1595,6 +1647,17 @@
           bacteriaSpeed = 1.2;
           if (shadowSoundGain && audioCtx && audioCtx.state === 'running') {
             shadowSoundGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+          }
+
+          // แอบโกง: ถึงเวลาแล้ววาปมาป้วนเปี้ยนใกล้ๆผู้เล่นบ้าง
+          if (now > bacteriaNextCheatTime) {
+            const cheatSpot = getRandomFloorCellNear(camera.position.x, camera.position.z, CHEAT_MIN_DIST, CHEAT_MAX_DIST);
+            if (cheatSpot) {
+              bacteriaRig.position.x = cheatSpot.x;
+              bacteriaRig.position.z = cheatSpot.z;
+              bacteriaWaypoint = getRandomFloorCell();
+            }
+            bacteriaNextCheatTime = now + CHEAT_MIN_INTERVAL + Math.random() * (CHEAT_MAX_INTERVAL - CHEAT_MIN_INTERVAL);
           }
 
           if (!bacteriaWaypoint || bacteriaRig.position.distanceTo(bacteriaWaypoint) < 2.0) {
@@ -1648,6 +1711,17 @@
           dullerSpeed = 1.3;
           if (dullerSoundGain && audioCtx && audioCtx.state === 'running') {
             dullerSoundGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+          }
+
+          // แอบโกง: ถึงเวลาแล้ววาปมาป้วนเปี้ยนใกล้ๆผู้เล่นบ้าง
+          if (now > dullerNextCheatTime) {
+            const cheatSpot = getRandomFloorCellNear(camera.position.x, camera.position.z, CHEAT_MIN_DIST, CHEAT_MAX_DIST);
+            if (cheatSpot) {
+              dullerRig.position.x = cheatSpot.x;
+              dullerRig.position.z = cheatSpot.z;
+              dullerWaypoint = getRandomFloorCell();
+            }
+            dullerNextCheatTime = now + CHEAT_MIN_INTERVAL + Math.random() * (CHEAT_MAX_INTERVAL - CHEAT_MIN_INTERVAL);
           }
 
           if (!dullerWaypoint || dullerRig.position.distanceTo(dullerWaypoint) < 2.0) {
