@@ -2614,4 +2614,198 @@
           }
 
           const sDir = new THREE.Vector3().subVectors(camera.position, bacteriaRig.position).normalize();
-          bacteriaRi
+          bacteriaRig.position.x += sDir.x * bacteriaSpeed * dt;
+          bacteriaRig.position.z += sDir.z * bacteriaSpeed * dt;
+          bacteriaRig.lookAt(camera.position.x, bacteriaRig.position.y, camera.position.z);
+
+          if (distBacteria < 1.45) {
+            isJumpscareActive = true;
+            jumpscareTargetRig = bacteriaRig;
+            jumpscareStartTime = now;
+            playViolentJumpscareSound();
+            if (document.exitPointerLock) document.exitPointerLock();
+          }
+        } else {
+          bacteriaState = 'PATROL';
+          if (shadowSoundGain && audioCtx && audioCtx.state === 'running') {
+            shadowSoundGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+          }
+
+          if (now < bacteriaSearchUntil) {
+            bacteriaSpeed = SEARCH_SPEED;
+            if (!bacteriaWaypoint || bacteriaRig.position.distanceTo(bacteriaWaypoint) < 2.0) {
+              bacteriaWaypoint = getRandomFloorCellNear(bacteriaLastKnownPos.x, bacteriaLastKnownPos.z, 0, 5) || bacteriaLastKnownPos.clone();
+            }
+          } else {
+            bacteriaSpeed = 1.2;
+
+            // แอบโกง: ถึงเวลาแล้ววาปมาป้วนเปี้ยนใกล้ๆผู้เล่นบ้าง (ไม่โกงตอนผู้เล่นซ่อนตัวอยู่)
+            if (!isHiding && now > bacteriaNextCheatTime) {
+              const cheatSpot = getRandomFloorCellNear(camera.position.x, camera.position.z, CHEAT_MIN_DIST, CHEAT_MAX_DIST);
+              if (cheatSpot) {
+                bacteriaRig.position.x = cheatSpot.x;
+                bacteriaRig.position.z = cheatSpot.z;
+                bacteriaWaypoint = getRandomFloorCell();
+              }
+              bacteriaNextCheatTime = now + CHEAT_MIN_INTERVAL + Math.random() * (CHEAT_MAX_INTERVAL - CHEAT_MIN_INTERVAL);
+            }
+
+            if (!bacteriaWaypoint || bacteriaRig.position.distanceTo(bacteriaWaypoint) < 2.0) {
+              bacteriaWaypoint = getRandomFloorCell();
+            }
+          }
+          const bDir = new THREE.Vector3().subVectors(bacteriaWaypoint, bacteriaRig.position).normalize();
+          bacteriaRig.position.x += bDir.x * bacteriaSpeed * dt;
+          bacteriaRig.position.z += bDir.z * bacteriaSpeed * dt;
+          bacteriaRig.lookAt(bacteriaWaypoint.x, bacteriaRig.position.y, bacteriaWaypoint.z);
+        }
+
+        // อนิเมชันการก้าวเดิน 3D ของ The Bacteria
+        bacteriaWalkCycle += dt * (bacteriaSpeed * 3.8);
+        bacteriaLeftLeg.rotation.x = Math.sin(bacteriaWalkCycle) * 0.65;
+        bacteriaRightLeg.rotation.x = -Math.sin(bacteriaWalkCycle) * 0.65;
+        bacteriaLeftArm.rotation.x = -Math.sin(bacteriaWalkCycle) * 0.55;
+        bacteriaRightArm.rotation.x = Math.sin(bacteriaWalkCycle) * 0.55;
+        bacteriaTorso.rotation.z = Math.sin(bacteriaWalkCycle) * 0.1;
+        bacteriaRig.position.y = Math.abs(Math.sin(bacteriaWalkCycle * 2)) * 0.08;
+
+        // =========================================================
+        // AI 3: The Duller (3D Rig คลาน 4 ขาตามพื้นพรม)
+        // =========================================================
+        const distDuller = dullerRig.position.distanceTo(camera.position);
+
+        if (!isHiding && distDuller < 18 * detectMult) {
+          dullerState = 'CHASE';
+          playerEnergy = Math.max(0, playerEnergy - 0.9 * dt);
+          dullerSpeed = (distDuller < 8.0) ? 4.3 : 2.2;
+
+          dullerLastKnownPos.copy(camera.position);
+          dullerSearchUntil = now + SEARCH_LINGER_MS;
+
+          if (dullerSoundGain && audioCtx && audioCtx.state === 'running') {
+            const dVol = (1 - distDuller / 18) * 0.25;
+            dullerSoundGain.gain.setValueAtTime(dVol, audioCtx.currentTime);
+            dullerOsc.frequency.setValueAtTime(130 + (18 - distDuller) * 8, audioCtx.currentTime);
+          }
+
+          const dDir = new THREE.Vector3().subVectors(camera.position, dullerRig.position).normalize();
+          dullerRig.position.x += dDir.x * dullerSpeed * dt;
+          dullerRig.position.z += dDir.z * dullerSpeed * dt;
+          dullerRig.lookAt(camera.position.x, dullerRig.position.y, camera.position.z);
+
+          if (distDuller < 1.45) {
+            isJumpscareActive = true;
+            jumpscareTargetRig = dullerRig;
+            jumpscareStartTime = now;
+            playViolentJumpscareSound();
+            if (document.exitPointerLock) document.exitPointerLock();
+          }
+        } else {
+          dullerState = 'PATROL';
+          if (dullerSoundGain && audioCtx && audioCtx.state === 'running') {
+            dullerSoundGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+          }
+
+          if (now < dullerSearchUntil) {
+            dullerSpeed = SEARCH_SPEED;
+            if (!dullerWaypoint || dullerRig.position.distanceTo(dullerWaypoint) < 2.0) {
+              dullerWaypoint = getRandomFloorCellNear(dullerLastKnownPos.x, dullerLastKnownPos.z, 0, 5) || dullerLastKnownPos.clone();
+            }
+          } else {
+            dullerSpeed = 1.3;
+
+            // แอบโกง: ถึงเวลาแล้ววาปมาป้วนเปี้ยนใกล้ๆผู้เล่นบ้าง (ไม่โกงตอนผู้เล่นซ่อนตัวอยู่)
+            if (!isHiding && now > dullerNextCheatTime) {
+              const cheatSpot = getRandomFloorCellNear(camera.position.x, camera.position.z, CHEAT_MIN_DIST, CHEAT_MAX_DIST);
+              if (cheatSpot) {
+                dullerRig.position.x = cheatSpot.x;
+                dullerRig.position.z = cheatSpot.z;
+                dullerWaypoint = getRandomFloorCell();
+              }
+              dullerNextCheatTime = now + CHEAT_MIN_INTERVAL + Math.random() * (CHEAT_MAX_INTERVAL - CHEAT_MIN_INTERVAL);
+            }
+
+            if (!dullerWaypoint || dullerRig.position.distanceTo(dullerWaypoint) < 2.0) {
+              dullerWaypoint = getRandomFloorCell();
+            }
+          }
+          const dDir = new THREE.Vector3().subVectors(dullerWaypoint, dullerRig.position).normalize();
+          dullerRig.position.x += dDir.x * dullerSpeed * dt;
+          dullerRig.position.z += dDir.z * dullerSpeed * dt;
+          dullerRig.lookAt(dullerWaypoint.x, dullerRig.position.y, dullerWaypoint.z);
+        }
+
+        // อนิเมชันคลานสี่ขา 3D ของ The Duller
+        dullerCrawlCycle += dt * (dullerSpeed * 8.0);
+        if (dullerLegs.length === 4) {
+          dullerLegs[0].rotation.x = Math.sin(dullerCrawlCycle) * 0.7;
+          dullerLegs[3].rotation.x = Math.sin(dullerCrawlCycle) * 0.7;
+          dullerLegs[1].rotation.x = -Math.sin(dullerCrawlCycle) * 0.7;
+          dullerLegs[2].rotation.x = -Math.sin(dullerCrawlCycle) * 0.7;
+        }
+
+        // เสียงหัวใจเต้น (คงระยะเดิมไว้ให้ยังรู้สึกได้ว่ามีอะไรเข้าใกล้)
+        const closestDist = Math.min(distSmiler, distBacteria, distDuller);
+        if (closestDist < 18) {
+          const heartRateInterval = Math.max(360, closestDist * 60);
+          if (now > nextHeartbeatTime) {
+            const hbVolume = Math.min(0.45, (1 - closestDist / 18) * 0.55);
+            playHeartbeat(hbVolume);
+            nextHeartbeatTime = now + heartRateInterval;
+          }
+        }
+
+        // จอซ่า: ให้ขึ้นเฉพาะตอนใกล้จริงๆ (ไม่งั้นบังทางตอนพยายามหนี) และลดความจัดลงมาก
+        if (closestDist < 10) {
+          const glitchStrength = Math.pow(1 - closestDist / 10, 1.8);
+          staticCanvas.style.opacity = Math.min(0.28, glitchStrength * 0.28);
+          renderNoise();
+        } else {
+          staticCanvas.style.opacity = 0;
+        }
+        } // จบเงื่อนไข firstBlackoutOccurred: ปิดการทำงานของ entity ทั้งหมดก่อนไฟดับครั้งแรก
+
+        // ทางออกฉุกเฉิน (ต้องเก็บบัตรผ่านให้ครบก่อน)
+        if (camera.position.distanceTo(exitPos) < 2.0) {
+          if (keycardsCollected >= KEYCARDS_REQUIRED) {
+            window.gameEngineStarted = false;
+            if (document.exitPointerLock) document.exitPointerLock();
+            document.getElementById('win-menu').style.display = 'flex';
+          } else if (now > lastExitLockedNoticeTime + 2500) {
+            lastExitLockedNoticeTime = now;
+            const notif = document.getElementById('item-notification');
+            notif.innerText = `ประตูล็อกอยู่ — ต้องมีบัตรผ่านครบ ${KEYCARDS_REQUIRED} ใบ (มี ${keycardsCollected})`;
+            notif.style.display = 'block';
+            setTimeout(() => { notif.style.display = 'none'; }, 2400);
+            playGlitchShiftSound();
+          }
+        }
+      } else {
+        if (document.getElementById('over-menu').style.display === 'flex') {
+          renderNoise();
+        }
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+      if (!camera || !renderer) return;
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    });
+
+    function startInitLoop() {
+      if (typeof THREE !== 'undefined') {
+        setupWorld();
+      } else {
+        setTimeout(startInitLoop, 100);
+      }
+    }
+    startInitLoop();
+  </script>
+</body>
+</html>
