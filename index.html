@@ -3,25 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>The Backrooms: Level 0 (The Lobby)</title>
+  <title>The Backrooms: Level 0</title>
   <style>
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
-      -webkit-touch-callout: none;
       -webkit-user-select: none;
       user-select: none;
+      -webkit-tap-highlight-color: transparent;
     }
     html, body {
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background-color: #0d0d08;
-      font-family: 'Courier New', Courier, monospace;
-      touch-action: none; /* ป้องกัน Pull-to-refresh และ Pinch-to-zoom */
+      background: #0c0d08;
+      font-family: monospace;
+      touch-action: none;
     }
-    #canvas-container {
+    #viewport {
       position: absolute;
       top: 0;
       left: 0;
@@ -29,9 +29,7 @@
       height: 100%;
       z-index: 1;
     }
-
-    /* กล้องฟิล์ม VHS Overlay */
-    .vhs-overlay {
+    .vhs {
       position: absolute;
       top: 0;
       left: 0;
@@ -39,340 +37,38 @@
       height: 100%;
       pointer-events: none;
       z-index: 5;
-      background: radial-gradient(circle, rgba(0,0,0,0) 55%, rgba(15,18,5,0.7) 100%);
-      box-shadow: inset 0 0 100px rgba(0,0,0,0.8);
+      background: radial-gradient(circle, rgba(0,0,0,0) 45%, rgba(12,14,6,0.7) 100%);
+      box-shadow: inset 0 0 90px rgba(0,0,0,0.85);
     }
     .hud {
       position: absolute;
       top: 16px;
       left: 18px;
       color: #9cbb7a;
-      text-shadow: 0 0 4px #5a7b3c;
-      font-size: 14px;
-      letter-spacing: 1px;
-      z-index: 6;
-      pointer-events: none;
-    }
-    .hud .rec {
-      color: #ff3333;
-      display: inline-block;
-      margin-right: 8px;
-      animation: blink 1.2s infinite;
-    }
-    @keyframes blink {
-      0%, 49% { opacity: 1; }
-      50%, 100% { opacity: 0; }
-    }
-    #crosshair {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 6px;
-      height: 6px;
-      background-color: rgba(230, 230, 180, 0.4);
-      border-radius: 50%;
-      z-index: 6;
-      pointer-events: none;
-    }
-
-    /* หน้าจอ Start / Game Over / Win */
-    .modal-screen {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(10, 11, 8, 0.94);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      color: #dfd89d;
-      z-index: 20;
-      padding: 24px;
-      text-align: center;
-    }
-    .modal-screen h1 {
-      font-size: 28px;
-      letter-spacing: 4px;
-      margin-bottom: 12px;
-      color: #e5cb5b;
-      text-shadow: 0 0 10px rgba(229, 203, 91, 0.5);
-    }
-    .modal-screen p {
-      font-size: 14px;
-      max-width: 480px;
-      line-height: 1.6;
-      margin-bottom: 22px;
-      color: #b0aa82;
-    }
-    .btn {
-      background: #2a2c1d;
-      color: #f0e6a8;
-      border: 1px solid #757143;
-      padding: 12px 28px;
-      font-size: 16px;
-      font-family: inherit;
-      letter-spacing: 2px;
-      cursor: pointer;
-      box-shadow: 0 0 8px rgba(117, 113, 67, 0.4);
-      transition: all 0.2s ease;
-    }
-    .btn:hover, .btn:active {
-      background: #4a4d2e;
-      color: #ffffff;
-      box-shadow: 0 0 14px rgba(229, 203, 91, 0.8);
-    }
-
-    /* Static Screen effect เมื่อโดนจับ */
-    #static-canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 15;
-      display: none;
-      pointer-events: none;
-      opacity: 0.85;
-    }
-
-    /* Virtual Joystick สำหรับหน้าจอมือถือ */
-    #joystick-area {
-      position: absolute;
-      bottom: 24px;
-      left: 24px;
-      width: 130px;
-      height: 130px;
-      border-radius: 50%;
-      background: rgba(255, 255, 220, 0.05);
-      border: 1.5px solid rgba(220, 220, 160, 0.25);
-      z-index: 10;
-      touch-action: none;
-      display: none; /* เปิดอัตโนมัติเมื่อตรวจพบ Touch Device */
-    }
-    #joystick-knob {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 50px;
-      height: 50px;
-      border-radius: 50%;
-      background: rgba(210, 195, 120, 0.4);
-      border: 1px solid rgba(255, 255, 200, 0.6);
-      pointer-events: none;
-    }
-    #touch-look-zone {
-      position: absolute;
-      top: 0;
-      right: 0;
-      width: 55%;
-      height: 100%;
-      z-index: 9;
-      touch-action: none;
-      display: none;
-    }
-  </style>
-  <!-- Three.js CDN -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-</head>
-<body>
-  <div id="canvas-container"></div>
-  <div class="vhs-overlay"></div>
-  <canvas id="static-canvas"></canvas>
-
-  <!-- HUD -->
-  <div class="hud">
-    <div><span class="rec">● REC</span> [PLAY] SP 00:04:12</div>
-    <div style="font-size: 11px; margin-top: 4px; opacity: 0.7;">LEVEL 0: THE LOBBY // ESCAPE SOUGHT</div>
-  </div>
-  <div id="crosshair"></div>
-
-  <!-- Touch Controls -->
-  <div id="joystick-area">
-    <div id="joystick-knob"></div>
-  </div>
-  <div id="touch-look-zone"></div>
-
-  <!-- Start Screen -->
-  <div id="start-screen" class="modal-screen">
-    <h1>THE BACKROOMS</h1>
-    <p>
-      คุณตกลงมายัง <b>Level 0: The Lobby</b><br>
-      กลิ่นพรมชื้นเก่า แสงนีออนสลัวสีเหลืองหม่น และเสียงหึ่งของหลอดไฟ<br><br>
-      <b>การควบคุม:</b><br>
-      • <b>PC:</b> เดินด้วย W, A, S, D | คลิกเพื่อล็อกเมาส์หันมุมมอง (ESC เพื่อปลด)<br>
-      • <b>Mobile:</b> จอยสติ๊กซ้ายเดิน | ปัดนิ้วฝั่งขวาหมุนมุมมอง<br><br>
-      <i>เป้าหมาย: หาประตูทางออกฉุกเฉิน (EXIT) และระวัง Entity ในเงามืด</i>
-    </p>
-    <button id="start-btn" class="btn">TAP TO ENTER</button>
-  </div>
-
-  <!-- Game Over Screen -->
-  <div id="gameover-screen" class="modal-screen" style="display: none;">
-    <h1 style="color: #ff4d4d; text-shadow: 0 0 12px #ff1a1a;">SIGNAL LOST</h1>
-    <p>คุณถูก Entity จู่โจมในความมืด...</p>
-    <button id="restart-btn" class="btn">TRY AGAIN</button>
-  </div>
-
-  <!-- Win Screen -->
-  <div id="win-screen" class="modal-screen" style="display: none;">
-    <h1 style="color: #62d662; text-shadow: 0 0 12px #32a832;">YOU ESCAPED</h1>
-    <p>คุณพบประตูทางออกและหลบหนีออกจาก Level 0 ได้สำเร็จ!</p>
-    <button id="playagain-btn" class="btn">PLAY AGAIN</button>
-  </div>
-
-  <script>
-    /* ==========================================================================
-       1. ผังห้องเขาวงกต (2D Array Map: 18x18)
-       0 = ทางเดิน, 1 = กำแพงวอลเปเปอร์, 2 = จุดเกิดผู้เล่น, 3 = ประตูทางออก, 4 = จุดเกิด Entity
-       ========================================================================== */
-    const MAP = [
-      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-      [1, 2, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
-      [1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1],
-      [1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1],
-      [1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1],
-      [1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
-      [1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1],
-      [1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1],
-      [1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 1],
-      [1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1],
-      [1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1],
-      [1, 0, 0, 0, 1, 4, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1],
-      [1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1],
-      [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1],
-      [1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 1],
-      [1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1],
-      [1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 3, 1],
-      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-    ];
-    const UNIT_SIZE = 4; // ขนาดแต่ละบล็อกใน 3D (เมตร)
-    const WALL_HEIGHT = 3.6;
-
-    /* ==========================================================================
-       2. Web Audio API: สังเคราะห์เสียงบรรยากาศ & SFX
-       ========================================================================== */
-    let audioCtx = null;
-    let humOsc1 = null, humOsc2 = null, humGain = null;
-    let alarmOsc = null, alarmGain = null;
-
-    function initAudio() {
-      if (audioCtx) return;
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      audioCtx = new AudioContext();
-
-      // 1. เสียงหึ่งความถี่ต่ำของหลอดไฟนีออน (Fluorescent Hum: 60Hz + 120Hz Harmonics)
-      humOsc1 = audioCtx.createOscillator();
-      humOsc1.type = 'sawtooth';
-      humOsc1.frequency.setValueAtTime(60, audioCtx.currentTime);
-
-      humOsc2 = audioCtx.createOscillator();
-      humOsc2.type = 'sine';
-      humOsc2.frequency.setValueAtTime(120, audioCtx.currentTime);
-
-      const filter = audioCtx.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(180, audioCtx.currentTime);
-
-      humGain = audioCtx.createGain();
-      humGain.gain.setValueAtTime(0.08, audioCtx.currentTime);
-
-      humOsc1.connect(filter);
-      humOsc2.connect(filter);
-      filter.connect(humGain);
-      humGain.connect(audioCtx.destination);
-
-      humOsc1.start();
-      humOsc2.start();
-
-      // 2. เสียงเตือนภัย / กรีดร้องของ Entity เมื่อผู้เล่นเข้าใกล้
-      alarmOsc = audioCtx.createOscillator();
-      alarmOsc.type = 'sawtooth';
-      alarmOsc.frequency.setValueAtTime(450, audioCtx.currentTime);
-
-      alarmGain = audioCtx.createGain();
-      alarmGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
-
-      const alarmFilter = audioCtx.createBiquadFilter();
-      alarmFilter.type = 'bandpass';
-      alarmFilter.frequency.setValueAtTime(800, audioCtx.currentTime);
-      alarmFilter.Q.setValueAtTime(3.0, audioCtx.currentTime);
-
-      alarmOscนี่คือโค้ดเกม **Backrooms: Level 0 (The Lobby)** แบบ First-Person 3D เต็มรูปแบบ รวมทุกอย่างไว้ในไฟล์เดียว **`index.html`** พร้อมนำไปอัปโหลดขึ้น GitHub Pages และเล่นได้ทันทีทั้งบนคอมพิวเตอร์และมือถือ โดยใช้ Procedural Textures จาก HTML Canvas และสังเคราะห์เสียงด้วย Web Audio API ทั้งหมด
-
-```html
-<!DOCTYPE html>
-<html lang="th">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>The Backrooms: Level 0 (The Lobby)</title>
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      -webkit-user-select: none;
-      user-select: none;
-    }
-    html, body {
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #0d0d08;
-      font-family: monospace;
-      touch-action: none;
-    }
-    #game-container {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-    }
-    .vhs-filter {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 5;
-      background: radial-gradient(circle, rgba(0,0,0,0) 50%, rgba(10,12,5,0.7) 100%);
-      box-shadow: inset 0 0 80px rgba(0,0,0,0.85);
-    }
-    .hud {
-      position: absolute;
-      top: 14px;
-      left: 16px;
-      color: #9cb873;
       font-size: 13px;
       letter-spacing: 1px;
       z-index: 6;
       pointer-events: none;
-      text-shadow: 0 0 5px rgba(100,160,50,0.6);
+      text-shadow: 0 0 4px #5a7b3c;
     }
     .hud .rec {
       color: #ff3333;
-      animation: blink 1.2s infinite;
+      animation: pulse 1s infinite;
     }
-    @keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+    @keyframes pulse { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
     #crosshair {
       position: absolute;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      width: 5px;
-      height: 5px;
-      background: rgba(230, 230, 180, 0.5);
+      width: 4px;
+      height: 4px;
+      background: rgba(220, 220, 180, 0.6);
       border-radius: 50%;
       z-index: 6;
       pointer-events: none;
     }
-    .screen-overlay {
+    .dialog-layer {
       position: absolute;
       top: 0;
       left: 0;
@@ -384,40 +80,41 @@
       justify-content: center;
       align-items: center;
       color: #dfd89d;
-      z-index: 25;
+      z-index: 50;
       padding: 24px;
       text-align: center;
     }
-    .screen-overlay h1 {
+    .dialog-layer h1 {
       font-size: 26px;
       letter-spacing: 3px;
       margin-bottom: 12px;
       color: #e5cb5b;
-      text-shadow: 0 0 10px rgba(229, 203, 91, 0.5);
     }
-    .screen-overlay p {
+    .dialog-layer p {
       font-size: 13px;
       max-width: 440px;
       line-height: 1.6;
-      margin-bottom: 20px;
-      color: #b0aa82;
+      margin-bottom: 22px;
+      color: #aaa580;
     }
-    .btn {
+    .action-btn {
       background: #252818;
       color: #f0e6a8;
       border: 1px solid #757143;
-      padding: 12px 28px;
-      font-size: 15px;
+      padding: 14px 32px;
+      font-size: 16px;
       font-family: inherit;
       letter-spacing: 2px;
       cursor: pointer;
-      box-shadow: 0 0 10px rgba(117, 113, 67, 0.4);
+      pointer-events: auto;
+      border-radius: 4px;
+      transition: background 0.2s;
     }
-    .btn:active {
+    .action-btn:active {
       background: #4a4d2e;
-      color: #fff;
+      color: #ffffff;
     }
-    #static-canvas {
+    #noise-canvas {
       position: absolute;
       top: 0;
       left: 0;
@@ -428,10 +125,10 @@
       pointer-events: none;
     }
     /* Touch Controls */
-    #joystick-base {
+    #joy-base {
       position: absolute;
-      bottom: 30px;
-      left: 30px;
+      bottom: 28px;
+      left: 28px;
       width: 120px;
       height: 120px;
       border-radius: 50%;
@@ -440,7 +137,7 @@
       z-index: 10;
       display: none;
     }
-    #joystick-thumb {
+    #joy-handle {
       position: absolute;
       top: 50%;
       left: 50%;
@@ -452,7 +149,7 @@
       border: 1px solid rgba(255, 255, 200, 0.6);
       pointer-events: none;
     }
-    #touch-look-zone {
+    #touch-look {
       position: absolute;
       top: 0;
       right: 0;
@@ -462,12 +159,18 @@
       display: none;
     }
   </style>
-  <script src="[https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js](https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js)"></script>
+  <!-- Three.js CDN พร้อม Fallback สำรอง -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    if (typeof THREE === 'undefined') {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"><\/script>');
+    }
+  </script>
 </head>
 <body>
-  <div id="game-container"></div>
-  <div class="vhs-filter"></div>
-  <canvas id="static-canvas"></canvas>
+  <div id="viewport"></div>
+  <div class="vhs"></div>
+  <canvas id="noise-canvas"></canvas>
 
   <div class="hud">
     <div><span class="rec">● REC</span> [PLAY] SP 00:04:12</div>
@@ -476,133 +179,408 @@
   <div id="crosshair"></div>
 
   <!-- Touch UI -->
-  <div id="joystick-base"><div id="joystick-thumb"></div></div>
-  <div id="touch-look-zone"></div>
+  <div id="joy-base"><div id="joy-handle"></div></div>
+  <div id="touch-look"></div>
 
-  <!-- Start Screen -->
-  <div id="start-screen" class="screen-overlay">
+  <!-- Menus -->
+  <div id="start-menu" class="dialog-layer">
     <h1>THE BACKROOMS</h1>
     <p>
       <b>Level 0: The Lobby</b><br>
       กลิ่นพรมชื้น แสงสีเหลืองหม่น และเสียงหึ่งของหลอดไฟนีออน<br><br>
       <b>การควบคุม:</b><br>
-      • <b>PC:</b> W, A, S, D เดิน | คลิกเมาส์เพื่อหมุนมุมมอง<br>
-      • <b>Mobile:</b> จอยสติ๊กซ้ายเดิน | ลากนิ้วฝั่งขวาหันมุมมอง<br><br>
-      <i>เป้าหมาย: หาประตูหนีไฟ (EXIT) สีแดง และหลบหนี Entity</i>
+      • <b>PC:</b> W, A, S, D เดิน | คลิกเมาส์ล็อกมุมมอง (ESC เพื่อปลด)<br>
+      • <b>Mobile:</b> จอยสติ๊กซ้ายเดิน | ปัดนิ้วฝั่งขวาหันมุมมอง<br><br>
+      <i>เป้าหมาย: หาบันไดหนีไฟสีแดง (EXIT) และหลบ Entity</i>
     </p>
-    <button id="start-btn" class="btn">TAP TO ENTER</button>
+    <button id="start-btn" class="action-btn">TAP TO ENTER</button>
   </div>
 
-  <!-- Game Over Screen -->
-  <div id="gameover-screen" class="screen-overlay" style="display: none;">
+  <div id="over-menu" class="dialog-layer" style="display: none;">
     <h1 style="color: #ff4a4a; text-shadow: 0 0 15px #f00;">SIGNAL LOST</h1>
-    <p>คุณถูกบางสิ่งในเงามืดกลืนกิน...</p>
-    <button id="restart-btn" class="btn">TRY AGAIN</button>
+    <p>คุณถูก Entity ในเงามืดเข้าประชิดตัว...</p>
+    <button id="retry-btn" class="action-btn">TRY AGAIN</button>
   </div>
 
-  <!-- Win Screen -->
-  <div id="win-screen" class="screen-overlay" style="display: none;">
+  <div id="win-menu" class="dialog-layer" style="display: none;">
     <h1 style="color: #6ed66e; text-shadow: 0 0 15px #0f0;">YOU ESCAPED</h1>
-    <p>คุณพบทางออกฉุกเฉินและหลุดพ้นจาก Level 0 สำเร็จ!</p>
-    <button id="playagain-btn" class="btn">ENTER AGAIN</button>
+    <p>คุณก้าวขึ้นบันไดทางออกและหนีพ้นจาก Level 0 ได้สำเร็จ!</p>
+    <button id="replay-btn" class="action-btn">ENTER AGAIN</button>
   </div>
 
   <script>
-    // -------------------------------------------------------------
-    // 1. ผังห้องเขาวงกต (18x18 Map)
-    // 0 = ทางเดิน, 1 = กำแพง, 2 = จุดเริ่ม, 3 = ทางออก, 4 = Entity
-    // -------------------------------------------------------------
-    const MAP = [
-      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-      [1, 2, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
-      [1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1],
-      [1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1],
-      [1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1],
-      [1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
-      [1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1],
-      [1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1],
-      [1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 1],
-      [1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1],
-      [1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1],
-      [1, 0, 0, 0, 1, 4, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1],
-      [1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1],
-      [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1],
-      [1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 1],
-      [1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1],
-      [1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 3, 1],
-      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-    ];
-    const CELL_SIZE = 4;
-    const WALL_H = 3.6;
+    window.addEventListener('DOMContentLoaded', () => {
+      // -------------------------------------------------------------
+      // 1. ตรวจสอบ Three.js Library
+      // -------------------------------------------------------------
+      if (typeof THREE === 'undefined') {
+        alert('ไม่สามารถโหลด Three.js ได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต');
+        return;
+      }
 
-    // -------------------------------------------------------------
-    // 2. Procedural Canvas Textures (สร้าง Texture อัตโนมัติ)
-    // -------------------------------------------------------------
-    function createWallTexture() {
-      const c = document.createElement('canvas');
-      c.width = 256; c.height = 256;
-      const ctx = c.getContext('2d');
-      ctx.fillStyle = '#bfa55a';
-      ctx.fillRect(0, 0, 256, 256);
-      // ลายวอลเปเปอร์สีเหลืองแบบ Backrooms
-      ctx.strokeStyle = '#a68c42';
-      ctx.lineWidth = 1;
-      for (let x = 0; x < 256; x += 16) {
+      // -------------------------------------------------------------
+      // 2. แผนที่เขาวงกต (Grid Map 18x18)
+      // 0 = ทางเดิน, 1 = กำแพง, 2 = จุดเริ่ม, 3 = ทางออก, 4 = Entity
+      // -------------------------------------------------------------
+      const GRID = [
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,2,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,1],
+        [1,0,1,0,1,0,1,1,0,1,0,1,1,1,1,1,0,1],
+        [1,0,1,0,0,0,0,1,0,0,0,1,0,0,0,1,0,1],
+        [1,0,1,1,1,1,0,1,1,1,0,1,0,1,0,1,0,1],
+        [1,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1],
+        [1,1,1,1,0,1,1,1,0,1,1,1,1,1,1,1,0,1],
+        [1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,1],
+        [1,0,1,1,1,1,0,1,1,1,1,0,1,1,0,1,0,1],
+        [1,0,1,0,0,0,0,0,0,0,1,0,0,1,0,0,0,1],
+        [1,0,1,0,1,1,1,1,1,0,1,1,0,1,1,1,0,1],
+        [1,0,0,0,1,4,0,0,1,0,0,0,0,0,0,1,0,1],
+        [1,1,1,0,1,1,1,0,1,1,1,1,1,1,0,1,0,1],
+        [1,0,0,0,0,0,1,0,0,0,0,0,0,1,0,1,0,1],
+        [1,0,1,1,1,0,1,1,1,1,1,1,0,1,0,0,0,1],
+        [1,0,1,0,0,0,0,0,0,0,0,1,0,1,1,1,0,1],
+        [1,0,0,0,1,1,1,1,1,1,0,0,0,0,0,1,3,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+      ];
+      const CELL = 4;
+      const HEIGHT = 3.6;
+
+      // -------------------------------------------------------------
+      // 3. Web Audio API พร้อม Resume ปลอดภัย
+      // -------------------------------------------------------------
+      let audioCtx = null, humGain = null, alarmGain = null, alarmOsc = null;
+
+      function setupAudio() {
+        try {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (!AudioContextClass) return;
+          if (!audioCtx) {
+            audioCtx = new AudioContextClass();
+          }
+          if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+          }
+          if (!humGain) {
+            const hum1 = audioCtx.createOscillator();
+            const hum2 = audioCtx.createOscillator();
+            hum1.type = 'sawtooth';
+            hum1.frequency.value = 60;
+            hum2.type = 'sine';
+            hum2.frequency.value = 120;
+
+            const humFilter = audioCtx.createBiquadFilter();
+            humFilter.type = 'lowpass';
+            humFilter.frequency.value = 180;
+
+            humGain = audioCtx.createGain();
+            humGain.gain.value = 0.08;
+
+            hum1.connect(humFilter);
+            hum2.connect(humFilter);
+            humFilter.connect(humGain);
+            humGain.connect(audioCtx.destination);
+            hum1.start();
+            hum2.start();
+
+            alarmOsc = audioCtx.createOscillator();
+            alarmOsc.type = 'sawtooth';
+            alarmOsc.frequency.value = 520;
+            const alarmFilter = audioCtx.createBiquadFilter();
+            alarmFilter.type = 'bandpass';
+            alarmFilter.frequency.value = 850;
+            alarmFilter.Q.value = 4.0;
+            alarmGain = audioCtx.createGain();
+            alarmGain.gain.value = 0.0001;
+
+            alarmOsc.connect(alarmFilter);
+            alarmFilter.connect(alarmGain);
+            alarmGain.connect(audioCtx.destination);
+            alarmOsc.start();
+          }
+        } catch (e) {
+          console.warn("Audio Context Warning:", e);
+        }
+      }
+
+      function playFootstep() {
+        if (!audioCtx || audioCtx.state !== 'running') return;
+        try {
+          const now = audioCtx.currentTime;
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(90, now);
+          osc.frequency.exponentialRampToValueAtTime(30, now + 0.1);
+          gain.gain.setValueAtTime(0.05, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now);
+          osc.stop(now + 0.11);
+        } catch(e) {}
+      }
+
+      function playStaticSound() {
+        if (!audioCtx || audioCtx.state !== 'running') return;
+        try {
+          const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.4, audioCtx.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * 0.25;
+          const noise = audioCtx.createBufferSource();
+          noise.buffer = buffer;
+          noise.connect(audioCtx.destination);
+          noise.start();
+        } catch(e) {}
+      }
+
+      // -------------------------------------------------------------
+      // 4. Procedural Canvas Textures
+      // -------------------------------------------------------------
+      function genWallTex() {
+        const c = document.createElement('canvas');
+        c.width = 256; c.height = 256;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#b79e54';
+        ctx.fillRect(0, 0, 256, 256);
+        ctx.strokeStyle = '#9c8442';
+        ctx.lineWidth = 1.5;
+        for (let x = 0; x < 256; x += 16) {
+          ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 256); ctx.stroke();
+        }
+        ctx.fillStyle = 'rgba(0,0,0,0.06)';
+        for (let y = 0; y < 256; y += 32) ctx.fillRect(0, y, 256, 2);
+        const t = new THREE.CanvasTexture(c);
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        return t;
+      }
+
+      function genCarpetTex() {
+        const c = document.createElement('canvas');
+        c.width = 128; c.height = 128;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#615a3a';
+        ctx.fillRect(0, 0, 128, 128);
+        ctx.fillStyle = 'rgba(0,0,0,0.12)';
+        for (let x = 0; x < 128; x += 4) {
+          for (let y = 0; y < 128; y += 4) {
+            if ((x + y) % 8 === 0) ctx.fillRect(x, y, 2, 2);
+          }
+        }
+        const t = new THREE.CanvasTexture(c);
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.repeat.set(18, 18);
+        return t;
+      }
+
+      function genCeilingTex() {
+        const c = document.createElement('canvas');
+        c.width = 128; c.height = 128;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#d5ceb6';
+        ctx.fillRect(0, 0, 128, 128);
+        ctx.strokeStyle = '#857e6a';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(0, 0, 128, 128);
+        const t = new THREE.CanvasTexture(c);
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.repeat.set(18, 18);
+        return t;
+      }
+
+      function genSmilerTex() {
+        const c = document.createElement('canvas');
+        c.width = 256; c.height = 256;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = 'rgba(0,0,0,0)';
+        ctx.fillRect(0, 0, 256, 256);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowColor = '#ffff99';
+        ctx.shadowBlur = 16;
         ctx.beginPath();
-        ctx.moveTo(x, 0); ctx.lineTo(x, 256);
+        ctx.arc(85, 95, 14, 0, Math.PI * 2);
+        ctx.arc(171, 95, 14, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(128, 120, 68, 0.15 * Math.PI, 0.85 * Math.PI, false);
+        ctx.lineWidth = 14;
+        ctx.strokeStyle = '#ffffff';
         ctx.stroke();
-      }
-      for (let i = 0; i < 2000; i++) {
-        ctx.fillStyle = Math.random() > 0.5 ? '#a88f44' : '#c9af62';
-        ctx.fillRect(Math.random() * 256, Math.random() * 256, 1.5, 1.5);
-      }
-      const tex = new THREE.CanvasTexture(c);
-      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-      return tex;
-    }
 
-    function createCarpetTexture() {
-      const c = document.createElement('canvas');
-      c.width = 256; c.height = 256;
-      const ctx = c.getContext('2d');
-      ctx.fillStyle = '#6e6542';
-      ctx.fillRect(0, 0, 256, 256);
-      for (let i = 0; i < 4000; i++) {
-        ctx.fillStyle = Math.random() > 0.5 ? '#575033' : '#807750';
-        ctx.fillRect(Math.random() * 256, Math.random() * 256, 2, 2);
+        ctx.lineWidth = 3;
+        for (let tx = 80; tx <= 176; tx += 12) {
+          ctx.beginPath();
+          ctx.moveTo(tx, 160);
+          ctx.lineTo(tx, 178);
+          ctx.stroke();
+        }
+        return new THREE.CanvasTexture(c);
       }
-      const tex = new THREE.CanvasTexture(c);
-      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-      นี่คือไฟล์เกม **`index.html`** แบบ Single-file ที่รวม HTML, CSS, JavaScript, Three.js, Procedural Canvas Textures และ Web Audio API ไว้อย่างสมบูรณ์ พร้อมนำไปอัปโหลดขึ้น GitHub Pages เพื่อเปิดเล่นบนเว็บได้ทันทีทั้งบนคอมพิวเตอร์และมือถือ:
 
-```html
-<!DOCTYPE html>
-<html lang="th">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>The Backrooms: Level 0</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-select: none; user-select: none; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #0c0d08; font-family: monospace; touch-action: none; }
-    #viewport { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-    .vhs {
-      position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5;
-      background: radial-gradient(circle, rgba(0,0,0,0) 45%, rgba(12,14,6,0.7) 100%);
-      box-shadow: inset 0 0 100px rgba(0,0,0,0.85);
-    }
-    .hud {
-      position: absolute; top: 16px; left: 18px; color: #9cbb7a; font-size: 13px; letter-spacing: 1px;
-      z-index: 6; pointer-events: none; text-shadow: 0 0 4px #5a7b3c;
-    }
-    .hud .rec { color: #ff3333; animation: pulse 1s infinite; }
-    @keyframes pulse { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
-    #crosshair {
-      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-      width: 4px; height: 4px; background: rgba(220, 220, 180, 0.6); border-radius: 50%;
-      z-index: 6; pointer-events: none;
-    }
-    .dialog-layer {
-      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(10, 11, 7, 0.92); display: flex; flex-direction: column;
-      justify
+      // -------------------------------------------------------------
+      // 5. Scene, Camera, Renderer
+      // -------------------------------------------------------------
+      const scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x232213, 0.075);
+
+      const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 80);
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setClearColor(0x232213);
+      document.getElementById('viewport').appendChild(renderer.domElement);
+
+      const ambientLight = new THREE.AmbientLight(0xd9c87d, 0.45);
+      scene.add(ambientLight);
+
+      const wallMat = new THREE.MeshLambertMaterial({ map: genWallTex() });
+      const floorMat = new THREE.MeshLambertMaterial({ map: genCarpetTex() });
+      const ceilingMat = new THREE.MeshLambertMaterial({ map: genCeilingTex() });
+
+      const mapW = GRID[0].length * CELL;
+      const mapH = GRID.length * CELL;
+
+      // พื้นและเพดาน
+      const planeGeo = new THREE.PlaneGeometry(mapW, mapH);
+      const floor = new THREE.Mesh(planeGeo, floorMat);
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.set(mapW / 2, 0, mapH / 2);
+      scene.add(floor);
+
+      const ceiling = new THREE.Mesh(planeGeo, ceilingMat);
+      ceiling.rotation.x = Math.PI / 2;
+      ceiling.position.set(mapW / 2, HEIGHT, mapH / 2);
+      scene.add(ceiling);
+
+      const boxGeo = new THREE.BoxGeometry(CELL, HEIGHT, CELL);
+      const flickerLights = [];
+      let playerSpawn = new THREE.Vector3(6, 1.6, 6);
+      let exitPos = new THREE.Vector3(0, 0, 0);
+      let entitySpawn = new THREE.Vector3(20, 1.5, 20);
+
+      for (let r = 0; r < GRID.length; r++) {
+        for (let c = 0; c < GRID[r].length; c++) {
+          const val = GRID[r][c];
+          const wx = c * CELL + CELL / 2;
+          const wz = r * CELL + CELL / 2;
+
+          if (val === 1) {
+            const w = new THREE.Mesh(boxGeo, wallMat);
+            w.position.set(wx, HEIGHT / 2, wz);
+            scene.add(w);
+          } else {
+            if ((r % 3 === 1) && (c % 3 === 1)) {
+              const light = new THREE.PointLight(0xffecc0, 0.75, 12, 1.8);
+              light.position.set(wx, HEIGHT - 0.2, wz);
+              scene.add(light);
+              flickerLights.push(light);
+
+              const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 0.4), new THREE.MeshBasicMaterial({ color: 0xfff6cf }));
+              lamp.position.set(wx, HEIGHT - 0.05, wz);
+              scene.add(lamp);
+            }
+
+            if (val === 2) playerSpawn.set(wx, 1.6, wz);
+            if (val === 3) {
+              exitPos.set(wx, 0.5, wz);
+              const exitLight = new THREE.PointLight(0xff2222, 1.5, 9);
+              exitLight.position.set(wx, 1.8, wz);
+              scene.add(exitLight);
+
+              const stairMat = new THREE.MeshLambertMaterial({ color: 0x3d1111 });
+              for (let s = 0; s < 4; s++) {
+                const step = new THREE.Mesh(new THREE.BoxGeometry(2, 0.25, 0.5), stairMat);
+                step.position.set(wx, 0.125 + s * 0.25, wz - 1 + s * 0.5);
+                scene.add(step);
+              }
+              const sign = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.4, 0.1), new THREE.MeshBasicMaterial({ color: 0xff3333 }));
+              sign.position.set(wx, 2.5, wz);
+              scene.add(sign);
+            }
+            if (val === 4) entitySpawn.set(wx, 1.5, wz);
+          }
+        }
+      }
+
+      // Entity (The Smiler)
+      const smilerMat = new THREE.SpriteMaterial({
+        map: genSmilerTex(),
+        color: 0xffffff,
+        transparent: true,
+        blending: THREE.AdditiveBlending
+      });
+      const entity = new THREE.Sprite(smilerMat);
+      entity.scale.set(2.4, 2.4, 1);
+      entity.position.copy(entitySpawn);
+      scene.add(entity);
+
+      // -------------------------------------------------------------
+      // 6. ระบบควบคุม (PC & Mobile ทำงานร่วมกันได้สมบูรณ์)
+      // -------------------------------------------------------------
+      const keys = { KeyW: false, KeyS: false, KeyA: false, KeyD: false };
+      const joyVector = { x: 0, y: 0 };
+      let cameraPitch = 0, cameraYaw = 0;
+      let gameState = 'START';
+
+      // แสดง Touch Controls เสมอเมื่อเปิดบนอุปกรณ์สัมผัส
+      if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+        document.getElementById('joy-base').style.display = 'block';
+        document.getElementById('touch-look').style.display = 'block';
+      }
+
+      window.addEventListener('keydown', (e) => { if (keys.hasOwnProperty(e.code)) keys[e.code] = true; });
+      window.addEventListener('keyup', (e) => { if (keys.hasOwnProperty(e.code)) keys[e.code] = false; });
+
+      // Pointer Lock บน PC
+      document.body.addEventListener('click', (e) => {
+        if (gameState === 'PLAYING' && !e.target.closest('.dialog-layer')) {
+          try {
+            document.body.requestPointerLock();
+          } catch(err) {}
+        }
+      });
+
+      document.addEventListener('mousemove', (e) => {
+        if (document.pointerLockElement === document.body && gameState === 'PLAYING') {
+          cameraYaw -= e.movementX * 0.0024;
+          cameraPitch -= e.movementY * 0.0024;
+          cameraPitch = Math.max(-1.4, Math.min(1.4, cameraPitch));
+        }
+      });
+
+      // Mobile Touch Joystick
+      const joyBase = document.getElementById('joy-base');
+      const joyHandle = document.getElementById('joy-handle');
+      let joyTouchId = null;
+      let joyCenter = { x: 0, y: 0 };
+
+      joyBase.addEventListener('touchstart', (e) => {
+        const touch = e.changedTouches[0];
+        joyTouchId = touch.identifier;
+        const rect = joyBase.getBoundingClientRect();
+        joyCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+        updateJoy(touch.clientX, touch.clientY);
+      }, { passive: false });
+
+      window.addEventListener('touchmove', (e) => {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          const touch = e.changedTouches[i];
+          if (touch.identifier === joyTouchId) updateJoy(touch.clientX, touch.clientY);
+        }
+      }, { passive: false });
+
+      const resetJoy = () => {
+        joyTouchId = null;
+        joyVector.x = 0;
+        joyVector.y = 0;
+        joyHandle.style.transform = `translate(-50%, -50%)`;
+      };
+      window.addEventListener('touchend', (e) => {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          if (e.changedTouches[i].identifier === joyTouchId) resetJoy();
+        }
+      });
+      window.addEventListener('touchcancel', resetJoy);
+
+      function updateJoy(cx, cy) {
+        const dx = cx - j
