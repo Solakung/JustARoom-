@@ -234,6 +234,28 @@
       opacity: 0.35;
     }
 
+    /* มองผ่านช่องล็อคเกอร์ตอนซ่อนตัวในตู้ — บังบนล่างเหลือช่องแคบตรงกลาง + ขอบตู้เข้ม */
+    #locker-slit {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 12;
+      display: none;
+      pointer-events: none;
+      background:
+        linear-gradient(to right, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0) 6%, rgba(0,0,0,0) 94%, rgba(0,0,0,0.92) 100%),
+        linear-gradient(to bottom,
+          rgba(5,5,3,0.97) 0%,
+          rgba(5,5,3,0.97) 38%,
+          rgba(5,5,3,0) 44%,
+          rgba(5,5,3,0) 56%,
+          rgba(5,5,3,0.97) 62%,
+          rgba(5,5,3,0.97) 100%);
+      box-shadow: inset 0 0 90px rgba(0,0,0,0.9);
+    }
+
     /* Touch Controls */
     #joy-base {
       position: absolute;
@@ -479,6 +501,7 @@
   <div class="vhs"></div>
   <canvas id="noise-canvas"></canvas>
   <div id="jumpscare-strobe"></div>
+  <div id="locker-slit"></div>
   <div id="item-notification">+45% ENERGY RESTORED</div>
 
   <div class="hud">
@@ -533,11 +556,10 @@
       • ประตู EXIT ถูกล็อกไว้ ต้องเก็บ <b>บัตรผ่าน (Keycard) ให้ครบ 3 ใบ</b> ก่อนถึงจะออกได้<br>
       • ถ้าพลังงานใกล้หมด ให้แวะเก็บเครื่องดื่มตามทางเพื่อเติม <b>พลังงาน</b><br>
       • ระหว่างทางมีเอกสาร/โน้ตของเพื่อนร่วมงานวางทิ้งไว้ เก็บอ่านเล่นได้<br>
-      • ใช้ <b>ไฟฉาย</b> ช่วยให้มองเห็นทางเดินชัดขึ้น แต่จะทำให้ถูกสังเกตเห็นง่ายขึ้นด้วย<br>
-      • ถ้าเจอมอนสเตอร์ หลบเข้า <b>ตู้เอกสาร</b> เพื่อซ่อนตัว ลดโอกาสถูกสังเกตเห็นได้มาก<br><br>
+      • ใช้ <b>ไฟฉาย</b> ช่วยให้มองเห็นทางเดินชัดขึ้น<br><br>
       <b>การควบคุม:</b><br>
-      • <b>มือถือ:</b> จอยสติ๊กซ้ายเดิน | ปัดนิ้วฝั่งขวาหันมอง | ปุ่ม SPRINT วิ่ง | ปุ่ม FLASHLIGHT ปิด/เปิดไฟฉาย | ปุ่ม HIDE ซ่อนตัวที่ตู้เอกสาร<br>
-      • <b>PC:</b> W, A, S, D เดิน | คลิกเมาส์เพื่อหันมุมมอง | Shift หรือ Space วิ่ง | กด F ปิด/เปิดไฟฉาย | กด E ซ่อนตัวที่ตู้เอกสาร
+      • <b>มือถือ:</b> จอยสติ๊กซ้ายเดิน | ปัดนิ้วฝั่งขวาหันมอง | ปุ่ม SPRINT วิ่ง | ปุ่ม FLASHLIGHT ปิด/เปิดไฟฉาย<br>
+      • <b>PC:</b> W, A, S, D เดิน | คลิกเมาส์เพื่อหันมุมมอง | Shift หรือ Space วิ่ง | กด F ปิด/เปิดไฟฉาย
     </p>
     <button id="howto-back-btn" class="action-btn">ย้อนกลับ</button>
     <div class="hint-text">[ แตะที่ใดก็ได้เพื่อย้อนกลับ ]</div>
@@ -707,6 +729,23 @@
     let isHiding = false;
     const HIDE_INTERACT_DIST = 1.8;
     const HIDING_SPOTS_COUNT = 9;
+    // ตำแหน่ง/มุมกล้องก่อนเข้าไปซ่อน (ไว้ย้อนกลับตอนออกจากตู้)
+    const preHidePosition = new THREE.Vector3();
+    let preHideYaw = 0, preHidePitch = 0;
+    let hidingBaseYaw = 0; // มุมหันออกจากตู้ตอนแอบอยู่ ใช้จำกัดมุมมองผ่านช่องล็อคเกอร์
+    const HIDE_PEEK_YAW_RANGE = 0.4;   // แอบมองได้แค่แคบๆ ผ่านช่องล็อคเกอร์
+    const HIDE_PEEK_PITCH_RANGE = 0.22;
+
+    // "หาไปพักหนึ่งก่อนเลิกล่า" — พอคลาดกับผู้เล่น (เช่นผู้เล่นเพิ่งซ่อนตัว) มอนจะไม่หันหนีทันที
+    // แต่จะเดินไปวนดูจุดที่เห็นครั้งสุดท้ายก่อนสักพัก แล้วค่อยเลิกล่ากลับไปลาดตระเวนปกติ
+    const SEARCH_LINGER_MS = 4000;
+    const SEARCH_SPEED = 1.8;
+    let smilerLastKnownPos = new THREE.Vector3();
+    let smilerSearchUntil = 0;
+    let bacteriaLastKnownPos = new THREE.Vector3();
+    let bacteriaSearchUntil = 0;
+    let dullerLastKnownPos = new THREE.Vector3();
+    let dullerSearchUntil = 0;
 
     // -------------------------------------------------------------
     // 1. Procedural 70x70 Map Generator
@@ -1739,10 +1778,11 @@
       isHiding = false;
       document.getElementById('hide-prompt').style.display = 'none';
       document.getElementById('hide-btn').classList.remove('active');
+      if (lockerSlitEl) lockerSlitEl.style.display = 'none';
 
-      smilerSpeed = 1.4; smilerState = 'PATROL'; smilerWaypoint = null;
-      bacteriaSpeed = 1.2; bacteriaState = 'PATROL'; bacteriaWaypoint = null;
-      dullerSpeed = 1.3; dullerState = 'PATROL'; dullerWaypoint = null;
+      smilerSpeed = 1.4; smilerState = 'PATROL'; smilerWaypoint = null; smilerSearchUntil = 0;
+      bacteriaSpeed = 1.2; bacteriaState = 'PATROL'; bacteriaWaypoint = null; bacteriaSearchUntil = 0;
+      dullerSpeed = 1.3; dullerState = 'PATROL'; dullerWaypoint = null; dullerSearchUntil = 0;
 
       const restartNow = performance.now();
       smilerNextCheatTime = restartNow + 14000 + Math.random() * 8000;
@@ -1906,15 +1946,61 @@
       return best;
     }
 
+    function getNearestHidingSpot() {
+      let best = null, bestDist = Infinity;
+      for (const h of hidingSpots) {
+        const d = Math.hypot(camera.position.x - h.x, camera.position.z - h.z);
+        if (d < bestDist) { bestDist = d; best = h; }
+      }
+      return best;
+    }
+
+    const lockerSlitEl = document.getElementById('locker-slit');
+
     function toggleHiding() {
       if (!window.gameEngineStarted || isJumpscareActive) return;
+
       if (isHiding) {
+        // ออกจากตู้ — เด้งกลับไปตำแหน่ง/มุมมองเดิมก่อนเข้าไปซ่อน
         isHiding = false;
+        camera.position.copy(preHidePosition);
+        cameraYaw = preHideYaw;
+        cameraPitch = preHidePitch;
+        if (lockerSlitEl) lockerSlitEl.style.display = 'none';
         return;
       }
-      if (getNearestHidingDist() <= HIDE_INTERACT_DIST) {
-        isHiding = true;
-      }
+
+      const spot = getNearestHidingSpot();
+      if (!spot || getNearestHidingDist() > HIDE_INTERACT_DIST) return;
+
+      // จำตำแหน่ง/มุมมองก่อนเข้าไปซ่อนไว้ย้อนกลับตอนออก
+      preHidePosition.copy(camera.position);
+      preHideYaw = cameraYaw;
+      preHidePitch = cameraPitch;
+
+      // ขยับกล้องเข้าไป "อยู่ในตู้" จริงๆ แล้วหันหน้าออกไปทางที่เดินเข้ามา (มองผ่านช่องล็อคเกอร์)
+      const dx = camera.position.x - spot.x;
+      const dz = camera.position.z - spot.z;
+      const len = Math.max(0.001, Math.hypot(dx, dz));
+      const fx = dx / len, fz = dz / len;
+      camera.position.x = spot.x;
+      camera.position.z = spot.z;
+      camera.position.y = 1.55; // หมอบตัวลงนิดหน่อยเหมือนย่อแอบอยู่ในตู้
+      cameraYaw = Math.atan2(-fx, -fz);
+      cameraPitch = 0;
+      hidingBaseYaw = cameraYaw;
+
+      isHiding = true;
+      if (lockerSlitEl) lockerSlitEl.style.display = 'block';
+    }
+
+    // จำกัดมุมมองระหว่างซ่อนตัว ให้แอบมองได้แค่แคบๆ ผ่านช่องล็อคเกอร์เหมือนคนหมอบอยู่ในตู้
+    function clampHidingLook() {
+      if (!isHiding) return;
+      let rel = cameraYaw - hidingBaseYaw;
+      rel = Math.max(-HIDE_PEEK_YAW_RANGE, Math.min(HIDE_PEEK_YAW_RANGE, rel));
+      cameraYaw = hidingBaseYaw + rel;
+      cameraPitch = Math.max(-HIDE_PEEK_PITCH_RANGE, Math.min(HIDE_PEEK_PITCH_RANGE, cameraPitch));
     }
 
     // -------------------------------------------------------------
@@ -1975,6 +2061,7 @@
         cameraYaw -= e.movementX * 0.0024;
         cameraPitch -= e.movementY * 0.0024;
         cameraPitch = Math.max(-1.3, Math.min(1.3, cameraPitch));
+        clampHidingLook();
       }
     });
 
@@ -2051,6 +2138,7 @@
           cameraYaw -= dx * 0.005;
           cameraPitch -= dy * 0.005;
           cameraPitch = Math.max(-1.3, Math.min(1.3, cameraPitch));
+          clampHidingLook();
         }
       }
     }, { passive: false });
@@ -2432,12 +2520,16 @@
         // =========================================================
         const distSmiler = smilerRig.position.distanceTo(camera.position);
 
-        // ปิดไฟฉาย = ระยะที่ entity สังเกตเห็นผู้เล่นลดลง / ซ่อนตัวในตู้เอกสาร = แทบไม่ถูกสังเกตเห็นเลย
-        const detectMult = isHiding ? 0.045 : (flashlightOn ? 1.0 : 0.62);
-        if (distSmiler < 20 * detectMult) {
+        // ปิดไฟฉาย = ระยะที่ entity สังเกตเห็นผู้เล่นลดลง / ซ่อนตัวในตู้เอกสาร = มองไม่เห็นผู้เล่นเลย ไม่ว่าระยะจะใกล้แค่ไหน
+        const detectMult = flashlightOn ? 1.0 : 0.62;
+        if (!isHiding && distSmiler < 20 * detectMult) {
           smilerState = 'CHASE';
           playerEnergy = Math.max(0, playerEnergy - 1.2 * dt);
           smilerSpeed = (distSmiler < 9.0) ? 4.45 : (isBlackout ? 3.4 : 2.3);
+
+          // จำจุดที่เห็นผู้เล่นล่าสุดไว้ เผื่อคลาดกัน (เช่นผู้เล่นซ่อนตัว) จะได้ไปวนหาก่อนเลิกล่า
+          smilerLastKnownPos.copy(camera.position);
+          smilerSearchUntil = now + SEARCH_LINGER_MS;
 
           if (monsterSoundGain && audioCtx && audioCtx.state === 'running') {
             const mVol = (1 - distSmiler / 20) * 0.28;
@@ -2460,26 +2552,36 @@
           }
         } else {
           smilerState = 'PATROL';
-          smilerSpeed = 1.3;
           if (monsterSoundGain && audioCtx && audioCtx.state === 'running') {
             monsterSoundGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
           }
 
-          // แอบโกง: ถึงเวลาแล้ววาปมาป้วนเปี้ยนใกล้ๆผู้เล่นบ้าง (ไม่โกงตอนผู้เล่นซ่อนตัวอยู่)
-          if (!isHiding && now > smilerNextCheatTime) {
-            const cheatSpot = getRandomFloorCellNear(camera.position.x, camera.position.z, CHEAT_MIN_DIST, CHEAT_MAX_DIST);
-            if (cheatSpot) {
-              smilerRig.position.x = cheatSpot.x;
-              smilerRig.position.z = cheatSpot.z;
+          if (now < smilerSearchUntil) {
+            // เพิ่งคลาดกับผู้เล่น — เดินวนดูจุดที่เห็นล่าสุดก่อนสักพัก แทนที่จะเปลี่ยนทิศหนีไปเลยทันที
+            smilerSpeed = SEARCH_SPEED;
+            if (!smilerWaypoint || smilerRig.position.distanceTo(smilerWaypoint) < 2.0) {
+              smilerWaypoint = getRandomFloorCellNear(smilerLastKnownPos.x, smilerLastKnownPos.z, 0, 5) || smilerLastKnownPos.clone();
+            }
+          } else {
+            smilerSpeed = 1.3;
+
+            // แอบโกง: ถึงเวลาแล้ววาปมาป้วนเปี้ยนใกล้ๆผู้เล่นบ้าง (ไม่โกงตอนผู้เล่นซ่อนตัวอยู่)
+            if (!isHiding && now > smilerNextCheatTime) {
+              const cheatSpot = getRandomFloorCellNear(camera.position.x, camera.position.z, CHEAT_MIN_DIST, CHEAT_MAX_DIST);
+              if (cheatSpot) {
+                smilerRig.position.x = cheatSpot.x;
+                smilerRig.position.z = cheatSpot.z;
+                smilerWaypoint = getRandomFloorCell();
+              }
+              smilerNextCheatTime = now + CHEAT_MIN_INTERVAL + Math.random() * (CHEAT_MAX_INTERVAL - CHEAT_MIN_INTERVAL);
+            }
+
+            // ลาดตระเวนสุ่มห้อง
+            if (!smilerWaypoint || smilerRig.position.distanceTo(smilerWaypoint) < 2.0) {
               smilerWaypoint = getRandomFloorCell();
             }
-            smilerNextCheatTime = now + CHEAT_MIN_INTERVAL + Math.random() * (CHEAT_MAX_INTERVAL - CHEAT_MIN_INTERVAL);
           }
 
-          // ลาดตระเวนสุ่มห้อง
-          if (!smilerWaypoint || smilerRig.position.distanceTo(smilerWaypoint) < 2.0) {
-            smilerWaypoint = getRandomFloorCell();
-          }
           const pDir = new THREE.Vector3().subVectors(smilerWaypoint, smilerRig.position).normalize();
           smilerRig.position.x += pDir.x * smilerSpeed * dt;
           smilerRig.position.z += pDir.z * smilerSpeed * dt;
@@ -2497,10 +2599,13 @@
         // =========================================================
         const distBacteria = bacteriaRig.position.distanceTo(camera.position);
 
-        if (distBacteria < 22 * detectMult) {
+        if (!isHiding && distBacteria < 22 * detectMult) {
           bacteriaState = 'CHASE';
           playerEnergy = Math.max(0, playerEnergy - 1.0 * dt);
           bacteriaSpeed = (distBacteria < 9.5) ? 4.25 : (isBlackout ? 3.0 : 2.1);
+
+          bacteriaLastKnownPos.copy(camera.position);
+          bacteriaSearchUntil = now + SEARCH_LINGER_MS;
 
           if (shadowSoundGain && audioCtx && audioCtx.state === 'running') {
             const sVol = (1 - distBacteria / 22) * 0.35;
@@ -2509,88 +2614,4 @@
           }
 
           const sDir = new THREE.Vector3().subVectors(camera.position, bacteriaRig.position).normalize();
-          bacteriaRig.position.x += sDir.x * bacteriaSpeed * dt;
-          bacteriaRig.position.z += sDir.z * bacteriaSpeed * dt;
-          bacteriaRig.lookAt(camera.position.x, bacteriaRig.position.y, camera.position.z);
-
-          if (distBacteria < 1.45) {
-            isJumpscareActive = true;
-            jumpscareTargetRig = bacteriaRig;
-            jumpscareStartTime = now;
-            playViolentJumpscareSound();
-            if (document.exitPointerLock) document.exitPointerLock();
-          }
-        } else {
-          bacteriaState = 'PATROL';
-          bacteriaSpeed = 1.2;
-          if (shadowSoundGain && audioCtx && audioCtx.state === 'running') {
-            shadowSoundGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
-          }
-
-          // แอบโกง: ถึงเวลาแล้ววาปมาป้วนเปี้ยนใกล้ๆผู้เล่นบ้าง (ไม่โกงตอนผู้เล่นซ่อนตัวอยู่)
-          if (!isHiding && now > bacteriaNextCheatTime) {
-            const cheatSpot = getRandomFloorCellNear(camera.position.x, camera.position.z, CHEAT_MIN_DIST, CHEAT_MAX_DIST);
-            if (cheatSpot) {
-              bacteriaRig.position.x = cheatSpot.x;
-              bacteriaRig.position.z = cheatSpot.z;
-              bacteriaWaypoint = getRandomFloorCell();
-            }
-            bacteriaNextCheatTime = now + CHEAT_MIN_INTERVAL + Math.random() * (CHEAT_MAX_INTERVAL - CHEAT_MIN_INTERVAL);
-          }
-
-          if (!bacteriaWaypoint || bacteriaRig.position.distanceTo(bacteriaWaypoint) < 2.0) {
-            bacteriaWaypoint = getRandomFloorCell();
-          }
-          const bDir = new THREE.Vector3().subVectors(bacteriaWaypoint, bacteriaRig.position).normalize();
-          bacteriaRig.position.x += bDir.x * bacteriaSpeed * dt;
-          bacteriaRig.position.z += bDir.z * bacteriaSpeed * dt;
-          bacteriaRig.lookAt(bacteriaWaypoint.x, bacteriaRig.position.y, bacteriaWaypoint.z);
-        }
-
-        // อนิเมชันการก้าวเดิน 3D ของ The Bacteria
-        bacteriaWalkCycle += dt * (bacteriaSpeed * 3.8);
-        bacteriaLeftLeg.rotation.x = Math.sin(bacteriaWalkCycle) * 0.65;
-        bacteriaRightLeg.rotation.x = -Math.sin(bacteriaWalkCycle) * 0.65;
-        bacteriaLeftArm.rotation.x = -Math.sin(bacteriaWalkCycle) * 0.55;
-        bacteriaRightArm.rotation.x = Math.sin(bacteriaWalkCycle) * 0.55;
-        bacteriaTorso.rotation.z = Math.sin(bacteriaWalkCycle) * 0.1;
-        bacteriaRig.position.y = Math.abs(Math.sin(bacteriaWalkCycle * 2)) * 0.08;
-
-        // =========================================================
-        // AI 3: The Duller (3D Rig คลาน 4 ขาตามพื้นพรม)
-        // =========================================================
-        const distDuller = dullerRig.position.distanceTo(camera.position);
-
-        if (distDuller < 18 * detectMult) {
-          dullerState = 'CHASE';
-          playerEnergy = Math.max(0, playerEnergy - 0.9 * dt);
-          dullerSpeed = (distDuller < 8.0) ? 4.3 : 2.2;
-
-          if (dullerSoundGain && audioCtx && audioCtx.state === 'running') {
-            const dVol = (1 - distDuller / 18) * 0.25;
-            dullerSoundGain.gain.setValueAtTime(dVol, audioCtx.currentTime);
-            dullerOsc.frequency.setValueAtTime(130 + (18 - distDuller) * 8, audioCtx.currentTime);
-          }
-
-          const dDir = new THREE.Vector3().subVectors(camera.position, dullerRig.position).normalize();
-          dullerRig.position.x += dDir.x * dullerSpeed * dt;
-          dullerRig.position.z += dDir.z * dullerSpeed * dt;
-          dullerRig.lookAt(camera.position.x, dullerRig.position.y, camera.position.z);
-
-          if (distDuller < 1.45) {
-            isJumpscareActive = true;
-            jumpscareTargetRig = dullerRig;
-            jumpscareStartTime = now;
-            playViolentJumpscareSound();
-            if (document.exitPointerLock) document.exitPointerLock();
-          }
-        } else {
-          dullerState = 'PATROL';
-          dullerSpeed = 1.3;
-          if (dullerSoundGain && audioCtx && audioCtx.state === 'running') {
-            dullerSoundGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
-          }
-
-          // แอบโกง: ถึงเวลาแล้ววาปมาป้วนเปี้ยนใกล้ๆผู้เล่นบ้าง (ไม่โกงตอนผู้เล่นซ่อนตัวอยู่)
-          if (!isHiding && now > dullerNextCheatTime) {
-            const cheatSpot = getRandom
+          bacteriaRi
