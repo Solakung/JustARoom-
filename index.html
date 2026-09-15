@@ -221,6 +221,32 @@
       opacity: 0;
       transition: opacity 0.08s ease;
     }
+    /* จอเหลืองซีดๆ ป่วยๆ แบบ backrooms — ไล่เข้ามาจากขอบจอเรื่อยๆ ไม่ใช่แค่ตอนไฟดับ/ถูกไล่ล่า ให้รู้สึก "ผิดที่ผิดทาง" ตลอดเวลา */
+    #dread-vignette {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 4;
+      pointer-events: none;
+      opacity: 0;
+      background: radial-gradient(circle, rgba(80,70,10,0) 38%, rgba(120,105,20,0.35) 78%, rgba(40,35,5,0.65) 100%);
+      mix-blend-mode: multiply;
+      transition: opacity 0.4s ease;
+    }
+    /* แฟลชจอวาบสั้นๆ ตอนเกิด ambient dread event — เหมือนเห็นอะไรผ่านขอบตาแวบเดียว */
+    #subliminal-flash {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 21;
+      pointer-events: none;
+      opacity: 0;
+      background: radial-gradient(circle, rgba(10,8,4,0.9) 0%, rgba(0,0,0,0.98) 100%);
+    }
     #jumpscare-strobe {
       position: absolute;
       top: 0;
@@ -509,13 +535,15 @@
 <body>
   <div id="viewport"></div>
   <div class="vhs"></div>
+  <div id="dread-vignette"></div>
   <canvas id="noise-canvas"></canvas>
+  <div id="subliminal-flash"></div>
   <div id="jumpscare-strobe"></div>
   <div id="locker-slit"></div>
   <div id="item-notification">+45% ENERGY RESTORED</div>
 
   <div class="hud">
-    <div><span class="rec">● CAM-04</span> [LIVE] 22:48:12</div>
+    <div><span class="rec">● CAM-04</span> [LIVE] <span id="cctv-clock">22:48:12</span></div>
     <div id="hud-subtitle" style="font-size: 11px; margin-top: 3px; opacity: 0.7;">BLDG-A: 4F // OFFICE FLOOR</div>
     <div id="objective-text" style="font-size: 11px; margin-top: 3px; color: #8fc4ff;">บัตรผ่าน: 0/3</div>
     <div class="energy-container">
@@ -604,6 +632,7 @@
 
     let GRID = [];
     let audioCtx = null, humGain = null;
+    let liminalHumOsc = null, liminalHumGain = null, liminalHumStarted = false;
     let monsterSoundGain = null, monsterOsc1 = null, monsterOsc2 = null;
     let shadowSoundGain = null, shadowOsc = null;
     let dullerSoundGain = null, dullerOsc = null;
@@ -611,6 +640,24 @@
     let camera, scene, renderer, flashlight, ambientLight;
     let wallInstancedMesh = null;
     let ceilingLights = [], lampMeshes = [], stairMeshes = [];
+    let lastLightCullTime = 0;
+
+    // เพดานไฟมีเป็นร้อยดวงทั่วแมพ 70x70 ถ้าปล่อยให้ทุกดวง "active" พร้อมกัน
+    // shader ของวัตถุที่ใช้แสง (พื้น/ผนัง/เพดาน MeshLambertMaterial) ต้องวนคำนวณแสงทุกดวงต่อพิกเซล
+    // ทำให้เครื่องมือถือกระตุกหนักมาก ฟังก์ชันนี้จะปิด (visible=false) เฉพาะดวงที่อยู่ไกลผู้เล่นเกินระยะที่มองเห็นแสงจริงๆ
+    // เหลือไว้ให้ทำงานจริงเฉพาะดวงที่อยู่ใกล้ๆ กล้อง (แสงไกลๆ มืดจนมองไม่ออกอยู่แล้วเพราะมี fog หนาด้วย)
+    const LIGHT_CULL_RADIUS = 26;
+    function updateLightCulling(now) {
+      if (now - lastLightCullTime < 300) return; // throttle ทุก 300ms พอ ไม่ต้องเช็คทุกเฟรม
+      lastLightCullTime = now;
+      if (!camera) return;
+      const cx = camera.position.x, cz = camera.position.z;
+      for (let i = 0; i < ceilingLights.length; i++) {
+        const l = ceilingLights[i];
+        const dx = l.position.x - cx, dz = l.position.z - cz;
+        l.visible = (dx * dx + dz * dz) < (LIGHT_CULL_RADIUS * LIGHT_CULL_RADIUS);
+      }
+    }
 
     // =============================================================
     // 3D Procedural Animated Entity Rigs (โครงสร้างขยับได้จริง)
@@ -623,6 +670,7 @@
     let smilerState = 'PATROL'; // PATROL, ALERT, CHASE
     let smilerWaypoint = null, smilerWaitTimer = 0;
     let smilerEnraged = false, smilerTimer = 0, smilerCooldown = 0;
+    let smilerNextTwitchTime = performance.now() + 4000 + Math.random() * 6000, smilerTwitchUntil = 0;
 
     // Entity 2: The Bacteria (หุ่นกิ่งไม้ 3D ขยับแขนขาเดินจริง)
     let bacteriaRig, bacteriaLeftLeg, bacteriaRightLeg, bacteriaLeftArm, bacteriaRightArm, bacteriaTorso, bacteriaLight, bacteriaJawMesh, bacteriaFaceAnchor;
@@ -632,6 +680,7 @@
     let bacteriaWaypoint = null, bacteriaWaitTimer = 0;
     let bacteriaWalkCycle = 0;
     let bacteriaEnraged = false, bacteriaTimer = 0, bacteriaCooldown = 0;
+    let bacteriaNextTwitchTime = performance.now() + 6000 + Math.random() * 7000, bacteriaTwitchUntil = 0;
 
     // Entity 3: The Duller (สัตว์ประหลาดสี่ขา คลานติดพื้นจริง)
     let dullerRig, dullerLegs = [], dullerTorso, dullerLight, dullerJawMesh, dullerFaceAnchor;
@@ -640,6 +689,7 @@
     let dullerState = 'PATROL';
     let dullerWaypoint = null, dullerWaitTimer = 0;
     let dullerCrawlCycle = 0;
+    let dullerNextTwitchTime = performance.now() + 5000 + Math.random() * 6000, dullerTwitchUntil = 0;
 
     // กระป๋อง Almond Milk ทั่วแมป
     let almondBottles = [];
@@ -692,9 +742,15 @@
 
     let wallMat, floorMat, ceilingMat, boxGeo;
     let officeWallTex, backroomsWallTex;
+    let officeFloorTex, backroomsFloorTex, officeCeilingTex, backroomsCeilingTex;
     let isTouchDevice = false;
     const OFFICE_AMBIENT_COLOR = 0xf3f0e6;
     const BACKROOMS_AMBIENT_COLOR = 0xd4c278;
+    // สีหมอก/พื้นหลังฉาก: โทนเทาสว่างแบบแสงฟลูออเรสเซนต์ตอนยังเป็นออฟฟิศปกติ
+    // เปลี่ยนเป็นเหลืองอมน้ำตาลแบบ backrooms ก็ต่อเมื่อไฟดับครั้งแรกจบลงเท่านั้น
+    const OFFICE_FOG_COLOR = 0xb9b6ab;
+    const BACKROOMS_FOG_COLOR = 0x8a7b3c;
+    const OFFICE_FOG_DENSITY = 0.010;
 
     // -------------------------------------------------------------
     // Lore Notes (เอกสารเก็บได้ เล่าเรื่องราวของออฟฟิศ)
@@ -732,12 +788,12 @@
     // -------------------------------------------------------------
     // Flashlight Toggle (ปิดไฟฉายเพื่อลดโอกาสถูกสังเกตเห็น แลกกับมองเห็นน้อยลง)
     // -------------------------------------------------------------
-    let flashlightOn = true;
+    let flashlightOn = false; // เริ่มเกมไฟออฟฟิศยังติดปกติ ไม่มีเหตุผลต้องใช้ไฟฉาย จะเปิดใช้ได้ตอนไฟดับครั้งแรก
     let flashlightBattery = 100;
     let flashlightDead = false; // แบตหมดสนิท ถูกบังคับปิดจนกว่าจะชาร์จถึงเกณฑ์ขั้นต่ำ
     const FLASHLIGHT_DRAIN_PER_SEC = 3.4;   // ใช้ต่อเนื่องได้ ~30 วิ
-    const FLASHLIGHT_REGEN_PER_SEC = 6.0;   // ปิดพัก ฟื้นเร็วกว่าใช้ ~2 เท่า
-    const FLASHLIGHT_MIN_TO_REUSE = 15;     // แบตต้องฟื้นถึงระดับนี้ก่อนเปิดใหม่ได้หลังหมด
+    const FLASHLIGHT_REGEN_PER_SEC = 1.4;   // ฟื้นช้ากว่าใช้ ~2.4 เท่า — ปิดๆเปิดๆ สลับก็ยังกินแบตสุทธิ ไม่ใช่รีเซ็ตฟรี
+    const FLASHLIGHT_MIN_TO_REUSE = 35;     // แบตต้องฟื้นถึงระดับนี้ก่อนเปิดใหม่ได้หลังหมด (~25 วิจริงๆ กว่าจะใช้ได้อีกครั้ง)
 
     // เสียงที่ผู้เล่นสร้างขึ้น (สปรินท์ / คลิกไฟฉาย) — The Duller ไม่สนแสง แต่ไวต่อเสียงมาก
     let recentNoise = null; // { x, z, radius, time }
@@ -749,6 +805,8 @@
     // Safe-zone / จุดซ่อนตัว (ตู้เอกสาร) — กด/แตะเพื่อหลบ ลดโอกาสถูกสังเกตเห็นเกือบเป็นศูนย์
     // -------------------------------------------------------------
     let hidingSpots = [];
+    let officeFurniture = [];   // ของตกแต่งออฟฟิศปกติ (โต๊ะ/เก้าอี้/ตู้เอกสาร/ต้นไม้) — ยืนยันว่านี่คือออฟฟิศ ก่อนไฟดับครั้งแรก
+    let anomalyMeshes = [];     // สำเนา/ของผิดปกติที่โผล่มาเสริมตอนไฟดับครั้งแรก ต้องเคลียร์ทิ้งตอนรีสตาร์ท
     let isHiding = false;
     const HIDE_INTERACT_DIST = 1.8;
     const HIDING_SPOTS_COUNT = 9;
@@ -793,7 +851,9 @@
       }
 
       const sectorSize = 7;
-      const sectorsCount = Math.floor((MAP_SIZE - 2) / sectorSize);
+      // เดิมใช้ Math.floor ทำให้ตัดเศษ sector สุดท้ายทิ้งไปเลย — แถบขอบแมพลึกๆ (แถว/คอลัมน์ท้ายๆ)
+      // เลยไม่มี sector คลุมถึง กลายเป็นพื้นที่โล่งไม่มีผนัง/เสา/คลัตเตอร์ใดๆ ทั้งที่ควรมีห้องเหมือนที่อื่น
+      const sectorsCount = Math.ceil((MAP_SIZE - 2) / sectorSize);
 
       for (let sr = 0; sr < sectorsCount; sr++) {
         for (let sc = 0; sc < sectorsCount; sc++) {
@@ -1091,7 +1151,46 @@
         noise.buffer = buffer;
         noise.connect(audioCtx.destination);
         noise.start(now);
+
+        // เสียงกรีดร้องบิดเบี้ยว (pitch สวิงขึ้นเร็วแล้วร่วงลง) ผ่าน WaveShaper ให้แตกพร่าฟังแล้วขนลุกกว่าเสียง synth เพียวๆ
+        const shriek = audioCtx.createOscillator();
+        shriek.type = 'sawtooth';
+        shriek.frequency.setValueAtTime(320, now);
+        shriek.frequency.exponentialRampToValueAtTime(1500, now + 0.12);
+        shriek.frequency.exponentialRampToValueAtTime(180, now + 0.85);
+        const shaper = audioCtx.createWaveShaper();
+        const curve = new Float32Array(256);
+        for (let i = 0; i < 256; i++) {
+          const x = (i / 255) * 2 - 1;
+          curve[i] = Math.tanh(x * 6); // บิดคลื่นให้แตกพร่า (distortion)
+        }
+        shaper.curve = curve;
+        const shriekGain = audioCtx.createGain();
+        shriekGain.gain.setValueAtTime(0.001, now);
+        shriekGain.gain.linearRampToValueAtTime(0.5, now + 0.06);
+        shriekGain.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
+        shriek.connect(shaper); shaper.connect(shriekGain); shriekGain.connect(audioCtx.destination);
+        shriek.start(now); shriek.stop(now + 1.05);
       } catch(e) {}
+    }
+
+    // เสียงหึ่งความถี่ต่ำแบบ "liminal space" เปิดครั้งเดียวตอนไฟดับครั้งแรก แล้วค่อยๆ ไล่ระดับขึ้นแผ่วๆ
+    // ผสมกับเสียงนีออนหึ่งเดิม (humGain) ให้บรรยากาศรู้สึกอึดอัด/ผิดที่ผิดทางกว่าตอนเป็นออฟฟิศปกติ
+    function startLiminalHum() {
+      try {
+        if (liminalHumStarted || !audioCtx) return;
+        liminalHumStarted = true;
+        liminalHumOsc = audioCtx.createOscillator();
+        liminalHumOsc.type = 'sine';
+        liminalHumOsc.frequency.value = 48;
+        const lf = audioCtx.createBiquadFilter();
+        lf.type = 'lowpass'; lf.frequency.value = 120;
+        liminalHumGain = audioCtx.createGain();
+        liminalHumGain.gain.value = 0.0001;
+        liminalHumOsc.connect(lf); lf.connect(liminalHumGain); liminalHumGain.connect(audioCtx.destination);
+        liminalHumOsc.start();
+        liminalHumGain.gain.linearRampToValueAtTime(0.10, audioCtx.currentTime + 4);
+      } catch (e) {}
     }
 
     // -------------------------------------------------------------
@@ -1165,6 +1264,68 @@
       return t;
     }
 
+    // พรมออฟฟิศปกติ โทนเทาอมฟ้าสะอาดๆ ใช้ก่อนไฟดับครั้งแรก
+    // ผิวหน้าโต๊ะทำงานไม้ลามิเนต แบบโต๊ะออฟฟิศทั่วไป
+    function genDeskTopTex() {
+      const c = document.createElement('canvas');
+      c.width = 128; c.height = 128;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#a9835a'; ctx.fillRect(0, 0, 128, 128);
+      ctx.strokeStyle = 'rgba(90, 62, 35, 0.35)'; ctx.lineWidth = 1;
+      for (let y = 6; y < 128; y += 9) {
+        ctx.beginPath();
+        ctx.moveTo(0, y + Math.sin(y) * 2);
+        ctx.lineTo(128, y + Math.cos(y) * 2);
+        ctx.stroke();
+      }
+      const t = new THREE.CanvasTexture(c);
+      return t;
+    }
+
+    // หน้าตู้เอกสารเหล็ก มีรอยลิ้นชักและรอยขีดข่วนจางๆ
+    function genCabinetTex() {
+      const c = document.createElement('canvas');
+      c.width = 128; c.height = 256;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#8a8f96'; ctx.fillRect(0, 0, 128, 256);
+      ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 3;
+      for (let y = 0; y < 256; y += 64) {
+        ctx.strokeRect(4, y + 4, 120, 56);
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.fillRect(56, y + 26, 16, 6); // มือจับลิ้นชัก
+      }
+      const t = new THREE.CanvasTexture(c);
+      return t;
+    }
+
+    function genOfficeCarpetTex() {
+      const c = document.createElement('canvas');
+      c.width = 256; c.height = 256;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#6b7078'; ctx.fillRect(0, 0, 256, 256);
+
+      ctx.fillStyle = 'rgba(255,255,255,0.05)';
+      for (let x = 0; x < 256; x += 4) {
+        for (let y = 0; y < 256; y += 4) {
+          if ((x + y) % 8 === 0) ctx.fillRect(x, y, 2, 2);
+        }
+      }
+
+      // เส้นตารางพรมไทล์แบบออฟฟิศทั่วไป เรียบร้อยเป็นระเบียบ
+      ctx.strokeStyle = 'rgba(0,0,0,0.08)'; ctx.lineWidth = 1;
+      for (let x = 0; x < 256; x += 64) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 256); ctx.stroke();
+      }
+      for (let y = 0; y < 256; y += 64) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(256, y); ctx.stroke();
+      }
+
+      const t = new THREE.CanvasTexture(c);
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(70, 70);
+      return t;
+    }
+
     function genAuthenticCarpetTex() {
       const c = document.createElement('canvas');
       c.width = 256; c.height = 256;
@@ -1207,6 +1368,35 @@
       ctx.beginPath();
       ctx.arc(180, 80, 35, 0, Math.PI * 2);
       ctx.stroke();
+
+      const t = new THREE.CanvasTexture(c);
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(70, 70);
+      return t;
+    }
+
+    // เพดานเวอร์ชัน "ป่วย" ของ backrooms — คราบน้ำเยอะขึ้น สีหม่นลง ใช้หลังไฟดับครั้งแรก
+    function genSickCeilingTex() {
+      const c = document.createElement('canvas');
+      c.width = 256; c.height = 256;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#cdbf8e'; ctx.fillRect(0, 0, 256, 256);
+
+      ctx.strokeStyle = '#7a6c3f'; ctx.lineWidth = 4;
+      ctx.strokeRect(0, 0, 256, 256);
+      ctx.beginPath();
+      ctx.moveTo(128, 0); ctx.lineTo(128, 256);
+      ctx.moveTo(0, 128); ctx.lineTo(256, 128);
+      ctx.stroke();
+
+      // คราบน้ำสีเข้มกระจายหลายจุด ดูทรุดโทรมกว่าเพดานออฟฟิศปกติ
+      ctx.fillStyle = 'rgba(60, 45, 10, 0.28)';
+      for (let i = 0; i < 5; i++) {
+        const sx = 30 + Math.random() * 196, sy = 30 + Math.random() * 196;
+        ctx.beginPath();
+        ctx.arc(sx, sy, 18 + Math.random() * 24, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
       const t = new THREE.CanvasTexture(c);
       t.wrapS = t.wrapT = THREE.RepeatWrapping;
@@ -1295,8 +1485,11 @@
     // สร้าง The Bacteria (เงามนุษย์กิ่งไม้ยักษ์ ขยับแขนขาแบบ 3D Rig)
     function createBacteria3DRig() {
       const rig = new THREE.Group();
-      const darkMat = new THREE.MeshBasicMaterial({ color: 0x080808 });
-      const limbMat = new THREE.MeshBasicMaterial({ color: 0x0a0a0a });
+      // แก้บั๊ก: เดิมใช้ MeshBasicMaterial (ไม่รับแสงเลย) สีเกือบดำสนิท (0x080808)
+      // ทำให้ไฟฉายส่องยังไงก็มองไม่เห็นตัว กลายเป็นล่องหนกลืนไปกับความมืด ไม่น่ากลัวเพราะมองไม่เห็น
+      // เปลี่ยนเป็น MeshLambertMaterial ให้รับแสงไฟฉาย/ไฟเพดานจริง เวลาไฟส่องโดนจะเห็นเงาชัดน่ากลัวขึ้นมาก
+      const darkMat = new THREE.MeshLambertMaterial({ color: 0x18140f });
+      const limbMat = new THREE.MeshLambertMaterial({ color: 0x1c1812 });
 
       // ลำตัวกระดูกสันหลังบิดเบี้ยว
       bacteriaTorso = new THREE.Group();
@@ -1383,7 +1576,9 @@
     // สร้าง The Duller (สัตว์ประหลาด 4 ขาคลานติดพื้น)
     function createDuller3DRig() {
       const rig = new THREE.Group();
-      const dullMat = new THREE.MeshBasicMaterial({ color: 0x1f2022 });
+      // แก้บั๊กเดียวกับ Bacteria: เปลี่ยนจาก MeshBasicMaterial เป็น MeshLambertMaterial
+      // ให้ตัวรับแสงไฟฉายได้จริง ไม่ใช่มืดทึบคงที่ตลอดจนมองไม่ออกว่ามีตัวอะไรคลานอยู่
+      const dullMat = new THREE.MeshLambertMaterial({ color: 0x26282b });
 
       dullerTorso = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 1.4, 6), dullMat);
       dullerTorso.rotation.x = Math.PI / 2;
@@ -1404,8 +1599,8 @@
       rig.add(rEye);
 
       const dullMouthMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
-      dullerJawMesh = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), dullMouthMat);
-      dullerJawMesh.scale.set(1.0, 0.6, 0.5);
+      dullerJawMesh = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 8), dullMouthMat);
+      dullerJawMesh.scale.set(1.35, 0.6, 0.5); // ปากกว้างเกินสัดส่วนหน้า ผิดรูปแบบตั้งแต่ยามพัก
       dullerJawMesh.position.set(0, 0.4, 1.0);
       rig.add(dullerJawMesh);
 
@@ -1451,8 +1646,10 @@
 
       // กลุ่มกะโหลกท่อนบน + ดวงตา (ยืดหัวเล็กน้อยให้ดูผิดรูปมากกว่าทรงกลมสวยๆ)
       const headGroup = new THREE.Group();
-      const voidBg = new THREE.Mesh(new THREE.SphereGeometry(0.8, 12, 12), darkMat);
-      voidBg.scale.set(0.92, 1.15, 1.0);
+      const voidBg = new THREE.Mesh(new THREE.SphereGeometry(0.82, 12, 12), darkMat);
+      // ยืดหัวเบี้ยวแรงขึ้นกว่าเดิม + เอียงเล็กน้อย ให้ผิดสัดส่วนจากหัวคนมากขึ้น ไม่สมมาตรแบบน่ากลัว
+      voidBg.scale.set(0.88, 1.32, 0.96);
+      voidBg.rotation.z = 0.06;
       headGroup.add(voidBg);
 
       // ตาโต 2 ข้าง เยื้องขนาด/ตำแหน่งไม่เท่ากันเล็กน้อย + รูม่านตาดำเยื้องศูนย์ + เส้นเลือดแดงรอบตา ให้ดูจ้องไม่โฟกัส
@@ -1462,19 +1659,22 @@
 
       const lEye = new THREE.Mesh(eyeGeo, whiteMat);
       lEye.position.set(-0.35, 0.2, 0.78);
-      lEye.scale.set(1.0, 1.1, 0.6);
+      lEye.scale.set(1.0, 1.35, 0.6); // ตาข้างซ้ายยืดเป็นวงรีแนวตั้งผิดปกติ ไม่กลมเหมือนตาคนจริง
       const lPupil = new THREE.Mesh(pupilGeo, pupilMat);
-      lPupil.position.set(-0.38, 0.16, 0.86);
+      lPupil.position.set(-0.38, 0.1, 0.86); // รูม่านตาเยื้องต่ำลง เหมือนกำลังจ้องขึ้นตลอดเวลา
+      lPupil.scale.setScalar(0.7);
       const lVein = new THREE.Mesh(veinGeo, veinMat);
       lVein.position.set(-0.35, 0.2, 0.8);
 
       const rEye = new THREE.Mesh(eyeGeo, whiteMat);
-      rEye.position.set(0.35, 0.22, 0.78);
-      rEye.scale.set(1.15, 1.0, 0.6);
+      rEye.position.set(0.34, 0.22, 0.78);
+      rEye.scale.set(1.55, 0.85, 0.6); // ตาข้างขวาแบนกว้างผิดสัดส่วนไปอีกทาง ให้สองข้างไม่เท่ากันชัดเจน
       const rPupil = new THREE.Mesh(pupilGeo, pupilMat);
-      rPupil.position.set(0.31, 0.19, 0.87);
+      rPupil.position.set(0.24, 0.19, 0.87);
+      rPupil.scale.setScalar(1.5); // รูม่านตาขวาขยายโตผิดปกติ
       const rVein = new THREE.Mesh(veinGeo, veinMat);
-      rVein.position.set(0.35, 0.22, 0.8);
+      rVein.position.set(0.34, 0.22, 0.8);
+      rVein.scale.setScalar(1.2);
 
       headGroup.add(lEye, lPupil, lVein, rEye, rPupil, rVein);
 
@@ -1490,14 +1690,15 @@
       headGroup.add(mouthVoid);
 
       // ฟันบน แถวไม่เท่ากัน ทิ่มเอียงสุ่ม ให้ดูแหลมคมไม่เป็นระเบียบ
-      const toothGeo = new THREE.ConeGeometry(0.045, 0.17, 4);
+      const toothGeo = new THREE.ConeGeometry(0.045, 0.19, 4);
       toothGeo.rotateX(Math.PI);
-      for (let i = -5; i <= 5; i++) {
+      for (let i = -7; i <= 7; i++) {
         const t = new THREE.Mesh(toothGeo, whiteMat);
-        const jitter = (Math.random() - 0.5) * 0.03;
-        t.position.set(i * 0.1, -0.03 + jitter, 0.8 - Math.abs(i) * 0.04);
-        t.rotation.z = (Math.random() - 0.5) * 0.35;
-        t.scale.setScalar(0.8 + Math.random() * 0.5);
+        const jitter = (Math.random() - 0.5) * 0.04;
+        t.position.set(i * 0.075, -0.03 + jitter, 0.8 - Math.abs(i) * 0.03);
+        t.rotation.z = (Math.random() - 0.5) * 0.5;
+        t.rotation.x = (Math.random() - 0.5) * 0.3; // เอียงหน้า-หลังสุ่ม ให้ดูงอกทะลุเหงือกมั่วๆ ไม่เป็นแถว
+        t.scale.setScalar(0.75 + Math.random() * 0.7);
         headGroup.add(t);
       }
 
@@ -1505,16 +1706,18 @@
 
       // ขากรรไกรล่าง (อ้าหุบได้จริง) ฟันซี่ไม่เท่ากันเช่นกัน
       smilerJawMesh = new THREE.Group();
-      const jawToothGeo = new THREE.ConeGeometry(0.04, 0.19, 4);
-      for (let i = -5; i <= 5; i++) {
+      const jawToothGeo = new THREE.ConeGeometry(0.04, 0.21, 4);
+      for (let i = -7; i <= 7; i++) {
         const t = new THREE.Mesh(jawToothGeo, whiteMat);
-        const jitter = (Math.random() - 0.5) * 0.03;
-        t.position.set(i * 0.09, 0.05 + jitter, 0.78 - Math.abs(i) * 0.04);
-        t.rotation.z = (Math.random() - 0.5) * 0.35;
-        t.scale.setScalar(0.8 + Math.random() * 0.5);
+        const jitter = (Math.random() - 0.5) * 0.04;
+        t.position.set(i * 0.065, 0.05 + jitter, 0.78 - Math.abs(i) * 0.03);
+        t.rotation.z = (Math.random() - 0.5) * 0.5;
+        t.rotation.x = (Math.random() - 0.5) * 0.3;
+        t.scale.setScalar(0.75 + Math.random() * 0.7);
         smilerJawMesh.add(t);
       }
-      smilerJawMesh.position.y = -0.3;
+      // ปากไม่ปิดสนิทแม้ยามพัก อ้าเป็นรอยยิ้มบางๆ ตลอดเวลา (เดิมปิดสนิทดูเป็นทรงกลมเฉยๆ)
+      smilerJawMesh.position.y = -0.16;
       rig.add(smilerJawMesh);
 
       smilerLight = new THREE.PointLight(0xfff5cc, 1.8, 9, 2);
@@ -1529,24 +1732,39 @@
     // -------------------------------------------------------------
     // 5. World Setup
     // -------------------------------------------------------------
+    // บางเบราเซอร์มือถือ (โดยเฉพาะที่มีแถบ address bar ที่ยังยุบตัวไม่เสร็จตอนสคริปต์รัน)
+    // window.innerWidth/innerHeight ตอน setupWorld() เริ่มทำงานอาจยังไม่ใช่ขนาดจอจริง
+    // ทำให้ canvas ถูกล็อกขนาดเล็กไปตลอดเกม (เพราะ renderer.setSize ใส่ inline style เป็น px ตายตัว)
+    // ใช้ visualViewport เมื่อมี เพราะรายงานขนาดจอที่ "มองเห็นจริง" แม่นกว่า innerWidth/innerHeight เสมอ
+    function getViewportSize() {
+      if (window.visualViewport) {
+        return {
+          w: Math.round(window.visualViewport.width) || window.innerWidth || 360,
+          h: Math.round(window.visualViewport.height) || window.innerHeight || 640
+        };
+      }
+      return { w: window.innerWidth || 360, h: window.innerHeight || 640 };
+    }
+
     function setupWorld() {
       const container = document.getElementById('viewport');
-      const w = window.innerWidth || 360;
-      const h = window.innerHeight || 640;
+      const { w, h } = getViewportSize();
 
       scene = new THREE.Scene();
-      scene.fog = new THREE.FogExp2(0x8a7b3c, 0.028);
+      // เริ่มเกมด้วยหมอกโทนเทาสว่างแบบแสงฟลูออเรสเซนต์ในออฟฟิศ บางมาก (แทบมองไม่เห็น)
+      // ค่อยเปลี่ยนเป็นสีเหลือง backrooms หนาขึ้นตอนไฟดับครั้งแรก ไม่ใช่ตั้งแต่ต้นเกม
+      scene.fog = new THREE.FogExp2(OFFICE_FOG_COLOR, OFFICE_FOG_DENSITY);
 
       camera = new THREE.PerspectiveCamera(72, w / h, 0.1, 85);
       renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'default' });
       renderer.setSize(w, h);
-      renderer.setClearColor(0x8a7b3c);
+      renderer.setClearColor(OFFICE_FOG_COLOR);
       container.appendChild(renderer.domElement);
 
       ambientLight = new THREE.AmbientLight(OFFICE_AMBIENT_COLOR, 0.9);
       scene.add(ambientLight);
 
-      flashlight = new THREE.SpotLight(0xfff8e7, 1.2, 26, Math.PI * 0.25, 0.6, 1.1);
+      flashlight = new THREE.SpotLight(0xfff8e7, 0, 26, Math.PI * 0.25, 0.6, 1.1);
       camera.add(flashlight);
       flashlight.position.set(0, 0, 0.1);
       flashlight.target = camera;
@@ -1554,20 +1772,26 @@
 
       officeWallTex = genOfficeWallTex();
       backroomsWallTex = genAuthenticWallTex();
+      officeFloorTex = genOfficeCarpetTex();
+      backroomsFloorTex = genAuthenticCarpetTex();
+      officeCeilingTex = genAuthenticCeilingTex();
+      backroomsCeilingTex = genSickCeilingTex();
       wallMat = new THREE.MeshLambertMaterial({ map: officeWallTex });
-      floorMat = new THREE.MeshLambertMaterial({ map: genAuthenticCarpetTex() });
-      ceilingMat = new THREE.MeshLambertMaterial({ map: genAuthenticCeilingTex() });
+      floorMat = new THREE.MeshLambertMaterial({ map: officeFloorTex });
+      ceilingMat = new THREE.MeshLambertMaterial({ map: officeCeilingTex });
       boxGeo = new THREE.BoxGeometry(CELL, HEIGHT, CELL);
 
-      // วอร์มอัพเทกซ์เจอร์ผนัง Backrooms ขึ้น GPU ล่วงหน้าตั้งแต่ตอนโหลดเกม
+      // วอร์มอัพเทกซ์เจอร์ผนัง/พื้น/เพดานฝั่ง Backrooms ขึ้น GPU ล่วงหน้าตั้งแต่ตอนโหลดเกม
       // กันไม่ให้กระตุกตอนสลับผนังตอนไฟดับครั้งแรก (การอัปโหลดเทกซ์เจอร์ใหม่ครั้งแรกกินเฟรมพอสมควร)
-      const wallTexWarmup = new THREE.Mesh(
-        new THREE.PlaneGeometry(0.01, 0.01),
-        new THREE.MeshBasicMaterial({ map: backroomsWallTex })
-      );
-      wallTexWarmup.frustumCulled = false;
-      wallTexWarmup.position.set(0, -500, 0);
-      scene.add(wallTexWarmup);
+      [backroomsWallTex, backroomsFloorTex, backroomsCeilingTex].forEach(tex => {
+        const warmup = new THREE.Mesh(
+          new THREE.PlaneGeometry(0.01, 0.01),
+          new THREE.MeshBasicMaterial({ map: tex })
+        );
+        warmup.frustumCulled = false;
+        warmup.position.set(0, -500, 0);
+        scene.add(warmup);
+      });
 
       const mapW = MAP_SIZE * CELL;
       const mapH = MAP_SIZE * CELL;
@@ -1597,13 +1821,221 @@
         isTouchDevice = true;
         document.getElementById('joy-base').style.display = 'block';
         document.getElementById('touch-look').style.display = 'block';
-        // ไฟฉายมีแบตต้องคุมตั้งแต่ต้นเกม ปุ่มนี้เลยโผล่ได้ตั้งแต่แรก
-        // ส่วนปุ่ม SPRINT / HIDE ยังไม่โผล่ก่อนไฟดับครั้งแรก กันหลุด hint ว่ามีอะไรผิดปกติ
-        document.getElementById('flash-btn').style.display = 'flex';
+        // ปุ่ม FLASHLIGHT / SPRINT / HIDE ทั้งหมดยังไม่โผล่ก่อนไฟดับครั้งแรก กันหลุด hint ว่ามีอะไรผิดปกติ
+        // (จะโผล่พร้อมกันตอนไฟดับครั้งแรกเกิดขึ้นจริง)
       }
 
       buildProceduralLevel();
       requestAnimationFrame(renderLoop);
+    }
+
+    // -------------------------------------------------------------
+    // 4.5 Office Furniture — สิ่งที่บ่งบอกว่านี่คือออฟฟิศจริงๆ ก่อนไฟดับครั้งแรก
+    // เก็บ basePos/baseRot ของแต่ละชิ้นไว้ เพื่อให้ "บิดเบี้ยว" ตอนไฟดับครั้งแรก แล้วรีเซ็ตกลับได้ตอนเริ่มใหม่
+    // -------------------------------------------------------------
+    let deskTopMat, cabinetSideMat;
+
+    function makeDesk() {
+      const g = new THREE.Group();
+      if (!deskTopMat) deskTopMat = new THREE.MeshLambertMaterial({ map: genDeskTopTex() });
+      const top = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.06, 0.65), deskTopMat);
+      top.position.y = 0.74;
+      g.add(top);
+      const legMat = new THREE.MeshLambertMaterial({ color: 0x2e2e2e });
+      const legGeo = new THREE.BoxGeometry(0.05, 0.74, 0.05);
+      [[-0.58, -0.27], [0.58, -0.27], [-0.58, 0.27], [0.58, 0.27]].forEach(([x, z]) => {
+        const leg = new THREE.Mesh(legGeo, legMat);
+        leg.position.set(x, 0.37, z);
+        g.add(leg);
+      });
+      const monMat = new THREE.MeshLambertMaterial({ color: 0x151515 });
+      const mon = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.28, 0.03), monMat);
+      mon.position.set(0, 0.74 + 0.16, -0.18);
+      g.add(mon);
+      const standMon = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.1, 0.05), monMat);
+      standMon.position.set(0, 0.74 + 0.03, -0.18);
+      g.add(standMon);
+      g.userData.type = 'desk';
+      return g;
+    }
+
+    function makeChair() {
+      const g = new THREE.Group();
+      const chairMat = new THREE.MeshLambertMaterial({ color: 0x33363c });
+      const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.06, 10), chairMat);
+      seat.position.y = 0.46;
+      g.add(seat);
+      const back = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.45, 0.06), chairMat);
+      back.position.set(0, 0.72, -0.2);
+      g.add(back);
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.42, 6), new THREE.MeshLambertMaterial({ color: 0x1c1c1c }));
+      pole.position.y = 0.22;
+      g.add(pole);
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.03, 10), new THREE.MeshLambertMaterial({ color: 0x1c1c1c }));
+      base.position.y = 0.02;
+      g.add(base);
+      g.userData.type = 'chair';
+      return g;
+    }
+
+    function makeFilingCabinet() {
+      if (!cabinetSideMat) cabinetSideMat = new THREE.MeshLambertMaterial({ map: genCabinetTex() });
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.75, 1.3, 0.55), cabinetSideMat);
+      body.position.y = 0.65;
+      g.add(body);
+      g.userData.type = 'cabinet';
+      g.userData.bodyMesh = body;
+      return g;
+    }
+
+    function makePlant() {
+      const g = new THREE.Group();
+      const potMat = new THREE.MeshLambertMaterial({ color: 0x6b4a35 });
+      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.16, 0.3, 8), potMat);
+      pot.position.y = 0.15;
+      g.add(pot);
+      const leafMat = new THREE.MeshLambertMaterial({ color: 0x4c7a3e });
+      const leaves = [];
+      for (let i = 0; i < 5; i++) {
+        const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.55, 5), leafMat);
+        const ang = (i / 5) * Math.PI * 2;
+        leaf.position.set(Math.cos(ang) * 0.08, 0.55, Math.sin(ang) * 0.08);
+        leaf.rotation.z = Math.cos(ang) * 0.25;
+        leaf.rotation.x = Math.sin(ang) * 0.25;
+        g.add(leaf);
+        leaves.push(leaf);
+      }
+      g.userData.type = 'plant';
+      g.userData.leafMat = leafMat;
+      return g;
+    }
+
+    // วางเฟอร์นิเจอร์สำนักงานกระจายทั่วแมป ต่อจากตำแหน่งจุดซ่อนตัว (ใช้ floor cell list เดียวกัน กันซ้อนกับของอื่น)
+    function placeOfficeFurniture(floorCells, startIdx) {
+      officeFurniture = [];
+      const count = Math.min(46, Math.max(0, floorCells.length - startIdx));
+      const types = ['desk_chair', 'desk_chair', 'cabinet', 'plant', 'desk_chair', 'cabinet'];
+      for (let i = 0; i < count; i++) {
+        const { wx, wz } = floorCells[startIdx + i];
+        const kind = types[i % types.length];
+        const rot = Math.floor(Math.random() * 4) * (Math.PI / 2); // หันตามแนวแกน ดูเป็นระเบียบแบบออฟฟิศ
+
+        const addItem = (mesh, offX, offZ) => {
+          mesh.position.set(wx + offX, 0, wz + offZ);
+          mesh.rotation.y = rot;
+          scene.add(mesh);
+          officeFurniture.push({
+            mesh,
+            type: mesh.userData.type,
+            basePos: mesh.position.clone(),
+            baseRot: rot
+          });
+        };
+
+        if (kind === 'desk_chair') {
+          addItem(makeDesk(), 0, 0);
+          const chairOff = new THREE.Vector3(0, 0, 0.5).applyAxisAngle(new THREE.Vector3(0, 1, 0), rot);
+          addItem(makeChair(), chairOff.x, chairOff.z);
+        } else if (kind === 'cabinet') {
+          addItem(makeFilingCabinet(), 0, 0);
+        } else if (kind === 'plant') {
+          addItem(makePlant(), 0, 0);
+        }
+      }
+    }
+
+    // ไฟดับครั้งแรกจบลง = ของในออฟฟิศเริ่ม "ผิดที่ผิดทาง" — เก้าอี้ล้ม โต๊ะเอียงไม่ตรงแนว
+    // ต้นไม้ตาย ตู้เอกสารสนิมเขรอะ และมีสำเนาของบางชิ้นโผล่ซ้อนแบบไม่ควรมีอยู่จริง (backrooms อยากซ้ำของเดิมไปเรื่อยๆ)
+    function corruptOfficeFurniture() {
+      for (const item of officeFurniture) {
+        if (item.type === 'chair' && Math.random() < 0.4) {
+          item.mesh.rotation.x = Math.PI * 0.42;
+          item.mesh.position.y -= 0.35;
+        } else if (item.type === 'desk' && Math.random() < 0.3) {
+          item.mesh.rotation.y += (Math.random() - 0.5) * 0.7;
+          item.mesh.position.x += (Math.random() - 0.5) * 0.4;
+          item.mesh.position.z += (Math.random() - 0.5) * 0.4;
+        } else if (item.type === 'cabinet') {
+          item.mesh.userData.bodyMesh.material = item.mesh.userData.bodyMesh.material.clone();
+          item.mesh.userData.bodyMesh.material.color.setHex(0x5c5548);
+        } else if (item.type === 'plant') {
+          item.mesh.userData.leafMat.color.setHex(0x5a4a2e);
+        }
+      }
+
+      // สุ่มโคลนโต๊ะ 5-7 ตัวไปวางซ้อนใกล้ๆ ของเดิม เอียงมุมแปลกๆ — ให้รู้สึกว่าของบางอย่าง "ซ้ำ" เกินจริง
+      const desks = officeFurniture.filter(f => f.type === 'desk');
+      const dupeCount = Math.min(desks.length, 5 + Math.floor(Math.random() * 3));
+      for (let i = 0; i < dupeCount; i++) {
+        const src = desks[Math.floor(Math.random() * desks.length)];
+        const clone = makeDesk();
+        clone.position.copy(src.basePos);
+        clone.position.x += (Math.random() - 0.5) * 1.2;
+        clone.position.z += (Math.random() - 0.5) * 1.2;
+        clone.position.y += 0.02 + Math.random() * 0.5;
+        clone.rotation.y = Math.random() * Math.PI * 2;
+        clone.rotation.z = (Math.random() - 0.5) * 0.6;
+        scene.add(clone);
+        anomalyMeshes.push(clone);
+      }
+    }
+
+    // รีเซ็ตเฟอร์นิเจอร์กลับตำแหน่ง/สภาพปกติ + ลบของผิดปกติที่โผล่มาตอนไฟดับ (ใช้ตอนเริ่มเกมใหม่)
+    function resetOfficeFurniture() {
+      for (const item of officeFurniture) {
+        item.mesh.position.copy(item.basePos);
+        item.mesh.rotation.set(0, item.baseRot, 0);
+        if (item.type === 'cabinet') {
+          item.mesh.userData.bodyMesh.material = cabinetSideMat;
+        } else if (item.type === 'plant') {
+          item.mesh.userData.leafMat.color.setHex(0x4c7a3e);
+        }
+      }
+      for (const m of anomalyMeshes) scene.remove(m);
+      anomalyMeshes = [];
+    }
+
+    // โต๊ะทำงานของผู้เล่นเองในห้องเริ่มต้น จัดตายตัว (ไม่สุ่มเหมือนโต๊ะอื่นในแมพ)
+    // ให้ฟีลว่า "พึ่งลุกจากโต๊ะไปเมื่อกี้" — เก้าอี้ถูกดันออกเอียงๆ ไม่เก็บเข้าที่ ไม่ใช่วางเป๊ะแบบโต๊ะทั่วไป
+    function placeSpawnDesk() {
+      const deskPos = new THREE.Vector3(9.0, 0, 9.0); // ศูนย์กลางห้องเริ่มต้น (แถว/คอลัมน์ 2)
+      const deskRot = Math.PI / 4; // เอียง 45 องศา หันหน้าเข้าหาจุดเกิดของผู้เล่น ไม่ใช่ขนานกำแพง
+
+      const desk = makeDesk();
+      desk.position.copy(deskPos);
+      desk.rotation.y = deskRot;
+      scene.add(desk);
+      officeFurniture.push({ mesh: desk, type: 'desk', basePos: desk.position.clone(), baseRot: deskRot });
+
+      // เก้าอี้ถูกดันออกจากโต๊ะและเอียง ไม่ได้เก็บตรงเป๊ะ เหมือนพึ่งลุกขึ้นอย่างรีบร้อน
+      const chair = makeChair();
+      const chairOffset = new THREE.Vector3(0, 0, 0.85).applyAxisAngle(new THREE.Vector3(0, 1, 0), deskRot);
+      chair.position.set(deskPos.x + chairOffset.x, 0, deskPos.z + chairOffset.z);
+      chair.rotation.y = deskRot + 0.5;
+      scene.add(chair);
+      officeFurniture.push({ mesh: chair, type: 'chair', basePos: chair.position.clone(), baseRot: deskRot + 0.5 });
+
+      // แก้วกาแฟค้างอยู่บนโต๊ะ + กระดาษกองเล็กๆ ที่ทำค้างไว้
+      const mugMat = new THREE.MeshLambertMaterial({ color: 0xdedede });
+      const mug = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.1, 8), mugMat);
+      const mugLocalOff = new THREE.Vector3(0.35, 0.79, 0.1).applyAxisAngle(new THREE.Vector3(0, 1, 0), deskRot);
+      mug.position.set(deskPos.x + mugLocalOff.x, mugLocalOff.y, deskPos.z + mugLocalOff.z);
+      scene.add(mug);
+
+      const paperMat = new THREE.MeshLambertMaterial({ color: 0xf2f0e8 });
+      const paper = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.01, 0.3), paperMat);
+      const paperLocalOff = new THREE.Vector3(-0.25, 0.775, 0.12).applyAxisAngle(new THREE.Vector3(0, 1, 0), deskRot);
+      paper.position.set(deskPos.x + paperLocalOff.x, paperLocalOff.y, deskPos.z + paperLocalOff.z);
+      paper.rotation.y = deskRot + 0.3;
+      scene.add(paper);
+
+      // ตู้เอกสารเล็กๆ ริมมุมห้อง ให้ห้องดูสมบูรณ์แบบพื้นที่ทำงานจริง ไม่ใช่มีแค่โต๊ะตัวเดียวลอยๆ
+      const cabinet = makeFilingCabinet();
+      cabinet.position.set(4.5, 0, 12.6);
+      cabinet.rotation.y = Math.PI / 2;
+      scene.add(cabinet);
+      officeFurniture.push({ mesh: cabinet, type: 'cabinet', basePos: cabinet.position.clone(), baseRot: Math.PI / 2 });
     }
 
     function buildProceduralLevel() {
@@ -1632,6 +2064,11 @@
       isHiding = false;
       document.getElementById('hide-prompt').style.display = 'none';
       document.getElementById('hide-btn').classList.remove('active');
+
+      for (const f of officeFurniture) scene.remove(f.mesh);
+      officeFurniture = [];
+      for (const m of anomalyMeshes) scene.remove(m);
+      anomalyMeshes = [];
 
       GRID = generateSolvableOfficeMap();
 
@@ -1680,7 +2117,9 @@
               lampMeshes.push(lamp);
             }
 
-            if (val === 0) floorCellsForBottles.push({ wx, wz });
+            // ยกเว้นห้องเริ่มต้น (แถว/คอลัมน์ 1-3) ไม่เอาไปสุ่มวางขวดนม/โน้ต/บัตรผ่าน/เฟอร์นิเจอร์ทั่วไป
+            // เพราะห้องนี้จะจัดโต๊ะทำงานแบบตายตัวไว้ให้ดูเหมือนพึ่งลุกจากโต๊ะไป ไม่อยากให้ของสุ่มไปแทรกจนรก
+            if (val === 0 && !(r <= 3 && c <= 3)) floorCellsForBottles.push({ wx, wz });
 
             if (val === 2) playerSpawn.set(wx, 1.5, wz);
             if (val === 3) {
@@ -1776,6 +2215,11 @@
         hidingSpots.push({ mesh: cabinet, x: wx, z: wz });
       }
 
+      // วางเฟอร์นิเจอร์ออฟฟิศ (โต๊ะ/เก้าอี้/ตู้เอกสาร/ต้นไม้) ต่อจากตำแหน่งจุดซ่อนตัว — สิ่งที่บ่งบอกว่าที่นี่คือออฟฟิศ
+      placeOfficeFurniture(floorCellsForBottles, hideStart + hideTarget);
+      // โต๊ะทำงานของผู้เล่นเองในห้องเริ่มต้น จัดตายตัวแยกจากของสุ่มด้านบน
+      placeSpawnDesk();
+
       window.resetBackroomsPlayer();
     }
 
@@ -1786,7 +2230,8 @@
     window.resetBackroomsPlayer = function() {
       if (!camera) return;
       camera.position.copy(playerSpawn);
-      cameraYaw = 0;
+      // หันหน้าเข้าไปในห้อง (มุมทแยงเข้าหาโต๊ะทำงาน) แทนที่จะเป็น yaw=0 ซึ่งหันตรงเข้ากำแพงด้านหลังจุดเกิดพอดี
+      cameraYaw = -3 * Math.PI / 4;
       cameraPitch = 0;
 
       playerEnergy = 100;
@@ -1806,6 +2251,11 @@
       for (let k in keys) keys[k] = false;
       joyVector.x = 0;
       joyVector.y = 0;
+      smoothMoveFwd = 0;
+      smoothMoveSide = 0;
+      pendingLookDX = 0;
+      pendingLookDY = 0;
+      lookTouchId = null;
 
       isHiding = false;
       document.getElementById('hide-prompt').style.display = 'none';
@@ -1820,6 +2270,9 @@
       smilerNextCheatTime = restartNow + 14000 + Math.random() * 8000;
       bacteriaNextCheatTime = restartNow + 20000 + Math.random() * 8000;
       dullerNextCheatTime = restartNow + 26000 + Math.random() * 8000;
+      nextBaselineFlickerTime = restartNow + 6000 + Math.random() * 6000;
+      if (dreadVignetteEl) dreadVignetteEl.style.opacity = 0;
+      if (subliminalFlashEl) subliminalFlashEl.style.opacity = 0;
 
       isSprintBoost = false;
       sprintBoostEndTime = 0;
@@ -1842,13 +2295,33 @@
         wallMat.map = officeWallTex;
         wallMat.needsUpdate = true;
       }
+      if (floorMat && officeFloorTex) {
+        floorMat.map = officeFloorTex;
+        floorMat.needsUpdate = true;
+      }
+      if (ceilingMat && officeCeilingTex) {
+        ceilingMat.map = officeCeilingTex;
+        ceilingMat.needsUpdate = true;
+      }
       if (ambientLight) {
         ambientLight.color.setHex(OFFICE_AMBIENT_COLOR);
         ambientLight.intensity = 0.9;
       }
+      if (scene && scene.fog) {
+        scene.fog.color.setHex(OFFICE_FOG_COLOR);
+        scene.fog.density = OFFICE_FOG_DENSITY;
+      }
+      if (renderer) renderer.setClearColor(OFFICE_FOG_COLOR);
+      if (camera) { camera.fov = 72; camera.updateProjectionMatrix(); }
+      if (liminalHumGain && audioCtx) {
+        liminalHumGain.gain.cancelScheduledValues(audioCtx.currentTime);
+        liminalHumGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+      }
+      liminalHumStarted = false;
+      resetOfficeFurniture();
       if (isTouchDevice) {
         document.getElementById('sprint-btn').style.display = 'none';
-        document.getElementById('flash-btn').style.display = 'flex';
+        document.getElementById('flash-btn').style.display = 'none';
         document.getElementById('hide-btn').style.display = 'none';
       }
 
@@ -1856,7 +2329,7 @@
       flashlightBattery = 100;
       flashlightDead = false;
       recentNoise = null;
-      setFlashlight(true);
+      setFlashlight(false); // ไฟฉายจะใช้ได้ก็ต่อเมื่อไฟดับครั้งแรกเกิดขึ้น
       const noteOverlay = document.getElementById('note-overlay');
       if (noteOverlay) noteOverlay.style.display = 'none';
       lastExitLockedNoticeTime = 0;
@@ -1945,21 +2418,56 @@
         const light = ceilingLights[Math.floor(Math.random() * ceilingLights.length)];
         const originalIntensity = light.intensity;
         let flickers = 0;
+        const totalFlickers = 5 + Math.floor(Math.random() * 4); // จำนวนกระพริบสุ่มไม่เท่ากันทุกครั้ง
         const flickerStep = () => {
           light.intensity = (flickers % 2 === 0) ? 0 : originalIntensity;
           flickers++;
-          if (flickers < 5) setTimeout(flickerStep, 110);
+          if (flickers < totalFlickers) setTimeout(flickerStep, 60 + Math.random() * 130); // จังหวะกระพริบไม่สม่ำเสมอ
           else light.intensity = originalIntensity;
         };
         flickerStep();
       }
-      if (Math.random() < 0.5) playDistantKnock(); else playDistantWhisper();
+      const roll = Math.random();
+      if (roll < 0.4) playDistantKnock();
+      else if (roll < 0.75) playDistantWhisper();
+      else playDistantGrowl();
+
+      // บางครั้ง (ไม่ทุกครั้ง กันเบื่อ) แถมจอวาบมืดแวบเดียวแบบไม่มีสาเหตุ — เหมือนกระพริบตาแล้วเห็นอะไรแวบนึง
+      if (Math.random() < 0.35 && subliminalFlashEl) {
+        subliminalFlashEl.style.transition = 'none';
+        subliminalFlashEl.style.opacity = '0.9';
+        setTimeout(() => {
+          subliminalFlashEl.style.transition = 'opacity 0.5s ease';
+          subliminalFlashEl.style.opacity = '0';
+        }, 55 + Math.random() * 40);
+      }
+    }
+
+    function playDistantGrowl() {
+      // เสียงคำรามทุ้มต่ำแว่วมาไกลๆ ไม่รู้ทิศทาง — สร้างความระแวงว่ามีบางอย่างอยู่ใกล้กว่าที่คิด
+      if (!audioCtx || audioCtx.state !== 'running') return;
+      try {
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(45, now);
+        osc.frequency.linearRampToValueAtTime(32, now + 1.4);
+        const f = audioCtx.createBiquadFilter();
+        f.type = 'lowpass'; f.frequency.value = 180;
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(0.22, now + 0.3);
+        gain.gain.linearRampToValueAtTime(0.001, now + 1.5);
+        osc.connect(f); f.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(now); osc.stop(now + 1.55);
+      } catch(e) {}
     }
 
     // -------------------------------------------------------------
     // Flashlight Toggle (ปิดไฟฉายลดโอกาสถูกสังเกตเห็น แลกกับมองเห็นทางน้อยลง)
     // -------------------------------------------------------------
     function setFlashlight(on) {
+      if (on && !firstBlackoutOccurred) return; // ยังไม่มีเหตุผลต้องใช้ไฟฉายก่อนไฟดับครั้งแรก
       if (on && (flashlightDead || flashlightBattery <= 0.5)) return; // แบตไม่พอ เปิดไม่ติด
       flashlightOn = on;
       if (flashlight) flashlight.intensity = on ? 1.2 : 0;
@@ -1968,7 +2476,7 @@
       updateFlashlightIndicator();
     }
     function toggleFlashlight() {
-      if (!window.gameEngineStarted || isJumpscareActive || isHiding) return;
+      if (!window.gameEngineStarted || isJumpscareActive || isHiding || !firstBlackoutOccurred) return;
       const goingOn = !flashlightOn;
       setFlashlight(goingOn);
       // เสียงคลิกไฟฉาย + เสียงเปิด/ปิดตัวมันเอง ดึงความสนใจ The Duller ได้จากระยะไกล
@@ -1977,6 +2485,10 @@
     function updateFlashlightIndicator() {
       const indicator = document.getElementById('flashlight-indicator');
       if (!indicator) return;
+      if (!firstBlackoutOccurred) {
+        indicator.style.display = 'none'; // ยังไม่มีไฟฉายให้ใช้ก่อนไฟดับครั้งแรก
+        return;
+      }
       if (flashlightDead) {
         indicator.style.color = '#ff5555';
         indicator.innerText = `แบตไฟฉายหมด — กำลังชาร์จ ${Math.floor(flashlightBattery)}%`;
@@ -2130,6 +2642,7 @@
 
     joyBase.addEventListener('touchstart', (e) => {
       if (isJumpscareActive) return;
+      e.preventDefault();
       const touch = e.changedTouches[0];
       joyTouchId = touch.identifier;
       const rect = joyBase.getBoundingClientRect();
@@ -2141,7 +2654,7 @@
       if (isJumpscareActive) return;
       for (let i = 0; i < e.changedTouches.length; i++) {
         const touch = e.changedTouches[i];
-        if (touch.identifier === joyTouchId) updateJoy(touch.clientX, touch.clientY);
+        if (touch.identifier === joyTouchId) { e.preventDefault(); updateJoy(touch.clientX, touch.clientY); }
       }
     }, { passive: false });
 
@@ -2175,9 +2688,15 @@
     const touchLook = document.getElementById('touch-look');
     let lookTouchId = null;
     let lastLookX = 0, lastLookY = 0;
+    // เดิมค่า dx/dy จากทัชจะถูกยัดเข้า cameraYaw/Pitch ทันทีในตัว touchmove event เอง
+    // ปัญหาคือตอนอีกมือถือจอยสติ๊กพร้อมกัน เบราว์เซอร์มือถือจะยิง touchmove ของนิ้วทั้งสองมาไม่สม่ำเสมอ/เป็นชุดๆ (coalesced)
+    // ทำให้กล้องหมุนกระตุกเป็นห้วงๆ แทนที่จะลื่นตามเฟรม — แก้โดยแค่ "สะสม" ค่า dx/dy ไว้ในตัวแปรนี้
+    // แล้วไปใช้ทีเดียวในลูปเรนเดอร์ (เฟรมละครั้งเท่านั้น) ให้ camera sync กับจังหวะเฟรมเสมอ ไม่ว่า touch event จะมาถี่/ห่างแค่ไหน
+    let pendingLookDX = 0, pendingLookDY = 0;
 
     touchLook.addEventListener('touchstart', (e) => {
       if (isJumpscareActive) return;
+      e.preventDefault();
       const touch = e.changedTouches[0];
       lookTouchId = touch.identifier;
       lastLookX = touch.clientX;
@@ -2186,22 +2705,19 @@
 
     touchLook.addEventListener('touchmove', (e) => {
       if (isJumpscareActive) return;
+      e.preventDefault();
       for (let i = 0; i < e.changedTouches.length; i++) {
         const touch = e.changedTouches[i];
         if (touch.identifier === lookTouchId) {
-          const dx = touch.clientX - lastLookX;
-          const dy = touch.clientY - lastLookY;
+          pendingLookDX += touch.clientX - lastLookX;
+          pendingLookDY += touch.clientY - lastLookY;
           lastLookX = touch.clientX;
           lastLookY = touch.clientY;
-          cameraYaw -= dx * 0.005;
-          cameraPitch -= dy * 0.005;
-          cameraPitch = Math.max(-1.3, Math.min(1.3, cameraPitch));
-          clampHidingLook();
         }
       }
     }, { passive: false });
 
-    touchLook.addEventListener('touchend', () => { lookTouchId = null; });
+    touchLook.addEventListener('touchend', () => { lookTouchId = null; pendingLookDX = 0; pendingLookDY = 0; });
 
     function isWall(x, z, r = 0.44) {
       const d = r * 0.707;
@@ -2247,10 +2763,32 @@
     }
 
     let lastTime = performance.now();
+
+    // นาฬิกา CCTV มุมจอ — เดินตามเวลาจริงไปเรื่อยๆ ตั้งแต่โหลดหน้าเว็บ ไม่ผูกกับสถานะเกม
+    // (ของเดิมเป็นข้อความ hardcode 22:48:12 เฉยๆ ไม่มีอะไรอัพเดตเลย)
+    (function startCctvClock() {
+      const el = document.getElementById('cctv-clock');
+      if (!el) return;
+      let secs = 22 * 3600 + 48 * 60 + 12; // เริ่มที่ 22:48:12
+      setInterval(() => {
+        secs = (secs + 1) % 86400;
+        const h = String(Math.floor(secs / 3600)).padStart(2, '0');
+        const m = String(Math.floor((secs % 3600) / 60)).padStart(2, '0');
+        const s = String(secs % 60).padStart(2, '0');
+        el.textContent = `${h}:${m}:${s}`;
+      }, 1000);
+    })();
     let footstepDist = 0;
+    // ค่าที่ smooth ไว้ระหว่างเฟรม ทำให้เร่ง/หยุดเดินนุ่มขึ้น แต่ยังคงจังหวะก้าวเดิน (ไม่ล่องลอย)
+    let smoothMoveFwd = 0, smoothMoveSide = 0;
+    const MOVE_ACCEL_RATE = 14; // ยิ่งสูงยิ่งตอบสนองไว (ต่ำ = ลื่น/หน่วงมาก)
     const staticCanvas = document.getElementById('noise-canvas');
     const staticCtx = staticCanvas.getContext('2d');
     staticCanvas.width = 160; staticCanvas.height = 120;
+    const dreadVignetteEl = document.getElementById('dread-vignette');
+    const subliminalFlashEl = document.getElementById('subliminal-flash');
+    const baseFogDensity = 0.028;
+    let nextBaselineFlickerTime = performance.now() + 6000 + Math.random() * 6000;
 
     function renderNoise() {
       const imgData = staticCtx.createImageData(160, 120);
@@ -2269,6 +2807,19 @@
       const now = performance.now();
       const dt = Math.min((now - lastTime) / 1000, 0.1);
       lastTime = now;
+
+      updateLightCulling(now); // ลดจำนวนไฟที่ active พร้อมกัน กันเครื่องมือถือกระตุก
+
+      // ใช้ dx/dy ที่สะสมไว้จากทัชมุมกล้อง "เฟรมละครั้งเดียว" ให้ตรงจังหวะกับ render loop เป๊ะๆ
+      // กันอาการกระตุกตอนอีกมือถือจอยสติ๊กพร้อมกัน (touch event ของสองนิ้วมาไม่สม่ำเสมอ)
+      if (pendingLookDX !== 0 || pendingLookDY !== 0) {
+        cameraYaw -= pendingLookDX * 0.005;
+        cameraPitch -= pendingLookDY * 0.005;
+        cameraPitch = Math.max(-1.3, Math.min(1.3, cameraPitch));
+        clampHidingLook();
+        pendingLookDX = 0;
+        pendingLookDY = 0;
+      }
 
       if (window.gameEngineStarted) {
 
@@ -2290,12 +2841,12 @@
           }
           camera.lookAt(faceWorldPos.x, faceWorldPos.y, faceWorldPos.z);
           
-          // รักษาระยะห่าง 1.35 เมตร ไม่ให้ทับเลนส์กล้อง
-          const targetDist = 1.35;
+          // รักษาระยะห่าง 1.05 เมตร (เดิม 1.35) — จ่อประชิดหน้ากล้องมากขึ้น เห็นรายละเอียดหน้าชัดแบบกดดัน
+          const targetDist = 1.05;
           const toCam = new THREE.Vector3().subVectors(camera.position, jumpscareTargetRig.position);
           toCam.y = 0;
           if (toCam.length() > targetDist) {
-            jumpscareTargetRig.position.addScaledVector(toCam.normalize(), 6.5 * dt);
+            jumpscareTargetRig.position.addScaledVector(toCam.normalize(), 9.0 * dt);
           }
 
           // อนิเมชันกระตุกและอ้าปากขย้ำ
@@ -2316,26 +2867,29 @@
             }
           }
 
-          camera.position.x += (Math.random() - 0.5) * 0.09;
-          camera.position.y += (Math.random() - 0.5) * 0.09;
+          camera.position.x += (Math.random() - 0.5) * 0.16;
+          camera.position.y += (Math.random() - 0.5) * 0.16;
+          camera.rotation.z = (Math.random() - 0.5) * 0.12; // กล้องเอียงสั่นแรงขึ้น เพิ่มความอึดอัดไร้ทิศทาง
 
           const strobe = document.getElementById('jumpscare-strobe');
           const jsElapsed = now - jumpscareStartTime;
-          if (jsElapsed < 90) {
+          if (jsElapsed < 110) {
             // เฟรมแรกแฟลชขาวจ้าเต็มจอทันทีที่โดนจับตัว (สไตล์ jump scare แบบ FNAF)
             strobe.style.background = '#ffffff';
             strobe.style.opacity = '1';
             strobe.style.display = 'block';
           } else {
-            strobe.style.background = '#4a0000';
-            strobe.style.opacity = '0.35';
-            strobe.style.display = (Math.random() < 0.55) ? 'block' : 'none';
+            // แฟลชแดงถี่และจัดขึ้นกว่าเดิม สลับดำสนิทเป็นจังหวะ ให้รู้สึกเหมือนภาพกระตุกขาดหาย
+            const flick = Math.random();
+            strobe.style.background = flick < 0.15 ? '#000000' : '#6a0000';
+            strobe.style.opacity = flick < 0.15 ? '1' : '0.5';
+            strobe.style.display = (flick < 0.75) ? 'block' : 'none';
           }
 
-          staticCanvas.style.opacity = Math.min(0.85, 0.12 + (jsElapsed / 1350) * 0.5);
+          staticCanvas.style.opacity = Math.min(0.92, 0.12 + (jsElapsed / 1600) * 0.6);
           renderNoise();
 
-          if (jsElapsed > 1350) {
+          if (jsElapsed > 1600) {
             isJumpscareActive = false;
             window.gameEngineStarted = false;
             strobe.style.display = 'none';
@@ -2361,7 +2915,20 @@
           moveSide += joyVector.x;
         }
 
-        const moveLen = Math.hypot(moveFwd, moveSide);
+        // เร่ง/หน่วงความเร็วแบบนุ่มนวลเข้าหาค่าที่ผู้เล่นกำลังกด (frame-rate independent)
+        // แทนที่จะสแนปความเร็วเต็ม/ศูนย์ทันที ยังคงจังหวะก้าวเดิน/head bob ไว้เหมือนเดิม
+        if (isHiding) {
+          smoothMoveFwd = 0;
+          smoothMoveSide = 0;
+        } else {
+          const smoothT = 1 - Math.exp(-MOVE_ACCEL_RATE * dt);
+          smoothMoveFwd += (moveFwd - smoothMoveFwd) * smoothT;
+          smoothMoveSide += (moveSide - smoothMoveSide) * smoothT;
+          if (Math.abs(smoothMoveFwd) < 0.001) smoothMoveFwd = 0;
+          if (Math.abs(smoothMoveSide) < 0.001) smoothMoveSide = 0;
+        }
+
+        const moveLen = Math.hypot(smoothMoveFwd, smoothMoveSide);
 
         if (isSprintBoost && now > sprintBoostEndTime) {
           isSprintBoost = false; // หมดช่วงวิ่งพุ่ง กลับความเร็วปกติ
@@ -2376,8 +2943,8 @@
         }
 
         if (moveLen > 0.05) {
-          const normFwd = moveFwd / Math.max(1, moveLen);
-          const normSide = moveSide / Math.max(1, moveLen);
+          const normFwd = smoothMoveFwd / Math.max(1, moveLen);
+          const normSide = smoothMoveSide / Math.max(1, moveLen);
 
           const cosY = Math.cos(cameraYaw);
           const sinY = Math.sin(cameraYaw);
@@ -2528,6 +3095,9 @@
           ambientLight.intensity = 0.04;
           if (humGain && audioCtx) humGain.gain.setValueAtTime(0.02, audioCtx.currentTime);
           for (let i = 0; i < ceilingLights.length; i++) ceilingLights[i].intensity = 0;
+          // มุมมองบิดเบี้ยวเล็กน้อยตอนไฟดับ ให้รู้สึกพื้นที่ผิดปกติ ไม่ใช่แค่มืดเฉยๆ
+          camera.fov = 76;
+          camera.updateProjectionMatrix();
 
           if (!hasRevealedSanity) {
             hasRevealedSanity = true;
@@ -2544,23 +3114,41 @@
             ambientLight.intensity = 0.82;
             if (humGain && audioCtx) humGain.gain.setValueAtTime(0.18, audioCtx.currentTime);
             for (let i = 0; i < ceilingLights.length; i++) ceilingLights[i].intensity = 0.85;
+            camera.fov = 72;
+            camera.updateProjectionMatrix();
 
             if (!firstBlackoutOccurred) {
               firstBlackoutOccurred = true; // ไฟกลับมาติดครั้งแรก — entity เริ่มปรากฏและทำงานตามปกติ
               nextAmbientEventTime = now + 8000 + Math.random() * 6000;
 
-              // เปลี่ยนผนังจากสีออฟฟิศปกติเป็นลาย Backrooms + โทนไฟอุ่นวาบๆ
+              // เปลี่ยนผนัง/พื้น/เพดานจากลายออฟฟิศปกติเป็นลาย Backrooms + โทนไฟอุ่นวาบๆ
               if (wallMat && backroomsWallTex) {
                 wallMat.map = backroomsWallTex;
                 wallMat.needsUpdate = true;
               }
+              if (floorMat && backroomsFloorTex) {
+                floorMat.map = backroomsFloorTex;
+                floorMat.needsUpdate = true;
+              }
+              if (ceilingMat && backroomsCeilingTex) {
+                ceilingMat.map = backroomsCeilingTex;
+                ceilingMat.needsUpdate = true;
+              }
               ambientLight.color.setHex(BACKROOMS_AMBIENT_COLOR);
+              // หมอกเปลี่ยนจากเทาสว่างจางๆ เป็นเหลืองอมน้ำตาลหนาขึ้นทันทีที่โลกเริ่มผิดปกติ
+              if (scene.fog) scene.fog.color.setHex(BACKROOMS_FOG_COLOR);
+              renderer.setClearColor(BACKROOMS_FOG_COLOR);
+              startLiminalHum();
+              corruptOfficeFurniture();
 
-              // ปุ่ม SPRINT / HIDE บนมือถือ เพิ่งโผล่ตอนนี้ที่เริ่มมีอะไรผิดปกติจริงๆ (FLASHLIGHT โผล่ตั้งแต่ต้นเกมแล้ว)
+              // ปุ่ม FLASHLIGHT / SPRINT / HIDE บนมือถือ เพิ่งโผล่ตอนนี้ที่เริ่มมีอะไรผิดปกติจริงๆ
               if (isTouchDevice) {
+                document.getElementById('flash-btn').style.display = 'flex';
                 document.getElementById('sprint-btn').style.display = 'flex';
                 document.getElementById('hide-btn').style.display = 'flex';
               }
+              // ไฟดับครั้งแรก = มืดจริง เปิดไฟฉายให้อัตโนมัติ (ผู้เล่นยังกด F/ปุ่มปิดเองได้ตามปกติ)
+              setFlashlight(true);
 
               // ตั้งคิวเวลา "โกง" วาปเข้าใกล้ผู้เล่นใหม่ทั้งหมด ณ จุดที่ entity เริ่มทำงานจริง
               // (ถ้าไม่ตั้งใหม่ตรงนี้ ตัวจับเวลาเดิมที่นับมาตั้งแต่ต้นเกมจะหมดอายุพร้อมกันหมด
@@ -2575,7 +3163,24 @@
         // เหตุการณ์หลอนแบบ ambient (ไฟกระพริบ/เสียงไกลๆ) ไม่ผูกกับระยะห่างจาก entity — เริ่มหลังไฟกลับมาติดครั้งแรกเท่านั้น
         if (firstBlackoutOccurred && now > nextAmbientEventTime) {
           triggerAmbientDreadEvent();
-          nextAmbientEventTime = now + 16000 + Math.random() * 14000;
+          nextAmbientEventTime = now + 11000 + Math.random() * 10000;
+        }
+
+        // หมอก "หายใจ" เบาๆ ตลอดเวลาหลังเข้าโหมด backrooms — ความหนาแน่นสั่นขึ้นลงช้าๆ ผสมคลื่นสองความถี่
+        // ให้รู้สึกว่าทางเดินยืด/หดแบบไม่รู้ตัว ไม่ใช่หมอกนิ่งๆ ธรรมดา
+        if (scene && scene.fog && firstBlackoutOccurred) {
+          const breathe = Math.sin(now * 0.00035) * 0.006 + Math.sin(now * 0.0011) * 0.003;
+          scene.fog.density = baseFogDensity + breathe + (isBlackout ? 0.014 : 0);
+        }
+
+        // ไฟเพดานกระพริบแผ่วๆ แบบสุ่มเป็นระยะๆ ตลอดเกม (คนละชุดกับ triggerAmbientDreadEvent ที่เป็นอีเวนต์ใหญ่)
+        // ให้บรรยากาศรู้สึกไม่มั่นคงตลอดเวลา ไม่ใช่แค่ตอนมีอีเวนต์เกิดขึ้นเท่านั้น
+        if (firstBlackoutOccurred && !isBlackout && ceilingLights.length > 0 && now > nextBaselineFlickerTime) {
+          const l = ceilingLights[Math.floor(Math.random() * ceilingLights.length)];
+          const orig = l.intensity;
+          l.intensity = orig * (0.15 + Math.random() * 0.25);
+          setTimeout(() => { if (l) l.intensity = orig; }, 70 + Math.random() * 120);
+          nextBaselineFlickerTime = now + 2500 + Math.random() * 5500;
         }
 
         // ก่อนไฟดับครั้งแรก entity ยังไม่ปรากฏตัวและไม่ขยับเลย
@@ -2584,6 +3189,7 @@
           if (bacteriaRig) bacteriaRig.visible = false;
           if (dullerRig) dullerRig.visible = false;
           staticCanvas.style.opacity = 0;
+          dreadVignetteEl.style.opacity = 0;
         } else {
         if (smilerRig) smilerRig.visible = true;
         if (bacteriaRig) bacteriaRig.visible = true;
@@ -2676,9 +3282,27 @@
 
         // อนิเมชันอ้าขากรรไกรและลอยเคว้ง
         if (smilerJawMesh) {
-          smilerJawMesh.position.y = -0.3 - Math.abs(Math.sin(now * 0.006)) * 0.2;
+          // ปากขยับกระตุกๆ แบบไม่สม่ำเสมอ (ผสมคลื่นสองความถี่ต่างกัน) แทนอ้าหุบสม่ำเสมอน่าเบื่อ
+          smilerJawMesh.position.y = -0.16 - Math.abs(Math.sin(now * 0.006) * 0.6 + Math.sin(now * 0.021) * 0.4) * 0.22;
         }
         smilerRig.position.y = 1.4 + Math.sin(now * 0.005) * 0.15;
+
+        // "หยุดนิ่งแล้วสะบัดหน้าจ้อง" — ระหว่างลาดตระเวน มันจะหยุดหันมองตรงมาที่ผู้เล่นเป็นเสี้ยววินาทีแบบไร้สาเหตุ
+        // ก่อนหันกลับไปเดินต่อเหมือนไม่มีอะไรเกิดขึ้น (ไม่กระทบระยะ/ตำแหน่งจริง แค่หลอนสายตา)
+        if (smilerState === 'PATROL' && !isJumpscareActive) {
+          if (now > smilerNextTwitchTime) {
+            smilerTwitchUntil = now + 260 + Math.random() * 220;
+            smilerNextTwitchTime = now + 5000 + Math.random() * 9000;
+            // แวบไฟจ้าขึ้นเสี้ยววินาทีพร้อมจังหวะที่มันหันมาจ้อง — ให้ความรู้สึกสะดุ้งพร้อมภาพ ไม่ใช่แค่หันหน้ามาเฉยๆ
+            if (smilerLight) {
+              smilerLight.intensity = 3.2;
+              setTimeout(() => { if (smilerLight) smilerLight.intensity = 1.8; }, 90);
+            }
+          }
+          if (now < smilerTwitchUntil) {
+            smilerRig.lookAt(camera.position.x, smilerRig.position.y, camera.position.z);
+          }
+        }
 
         // =========================================================
         // AI 2: The Bacteria (3D Rig ก้าวขาเดินจริง + โยกตัว)
@@ -2754,6 +3378,26 @@
         bacteriaRightArm.rotation.x = Math.sin(bacteriaWalkCycle) * 0.55;
         bacteriaTorso.rotation.z = Math.sin(bacteriaWalkCycle) * 0.1;
         bacteriaRig.position.y = Math.abs(Math.sin(bacteriaWalkCycle * 2)) * 0.08;
+
+        // อาการกระตุกทั้งตัวแบบสัตว์ป่วย — หยุดเดินนิ่งเสี้ยววินาทีแล้วสะบัดคอ/แขนกระตุกแรงๆ ก่อนเดินต่อเหมือนไม่มีอะไรเกิดขึ้น
+        if (bacteriaState === 'PATROL' && !isJumpscareActive) {
+          if (now > bacteriaNextTwitchTime) {
+            bacteriaTwitchUntil = now + 180 + Math.random() * 200;
+            bacteriaNextTwitchTime = now + 6000 + Math.random() * 8000;
+            // ไฟแดงเรืองแรงขึ้นชั่วครู่ตอนสะบัดตัว ให้ดูเหมือนมันกำลังเจ็บปวด/ผิดปกติมากกว่าแค่ขยับแขน
+            if (bacteriaLight) {
+              bacteriaLight.intensity = 2.6;
+              setTimeout(() => { if (bacteriaLight) bacteriaLight.intensity = 1.4; }, 100);
+            }
+          }
+          if (now < bacteriaTwitchUntil) {
+            const jerk = Math.sin(now * 0.09) * 0.5;
+            bacteriaTorso.rotation.z = jerk;
+            bacteriaTorso.rotation.x = jerk * 0.4;
+            bacteriaLeftArm.rotation.x = jerk * 2.2;
+            bacteriaRightArm.rotation.x = -jerk * 2.2;
+          }
+        }
 
         // =========================================================
         // AI 3: The Duller (3D Rig คลาน 4 ขาตามพื้นพรม)
@@ -2835,6 +3479,23 @@
           dullerLegs[2].rotation.x = -Math.sin(dullerCrawlCycle) * 0.7;
         }
 
+        // อาการสะดุ้งกระตุกแบบไร้สาเหตุ ตัวมันจะหยุดคลานฉับพลันแล้วสั่นทั้งตัวเร็วๆ ก่อนคลานต่อ (ยิ่งน่ากลัวเพราะมันตาบอด ไม่รู้ว่ามันสะดุ้งเพราะอะไร)
+        if (dullerState === 'PATROL' && !isJumpscareActive) {
+          if (now > dullerNextTwitchTime) {
+            dullerTwitchUntil = now + 150 + Math.random() * 180;
+            dullerNextTwitchTime = now + 7000 + Math.random() * 9000;
+            if (dullerLight) {
+              dullerLight.intensity = 2.0;
+              setTimeout(() => { if (dullerLight) dullerLight.intensity = 1.0; }, 80);
+            }
+          }
+          if (now < dullerTwitchUntil) {
+            dullerRig.rotation.z = (Math.random() - 0.5) * 0.35;
+            dullerRig.rotation.x = (Math.random() - 0.5) * 0.2;
+            if (dullerJawMesh) dullerJawMesh.scale.y = 0.6 + Math.random() * 1.2;
+          }
+        }
+
         // เสียงหัวใจเต้น (คงระยะเดิมไว้ให้ยังรู้สึกได้ว่ามีอะไรเข้าใกล้)
         const closestDist = Math.min(distSmiler, distBacteria, distDuller);
         if (closestDist < 18) {
@@ -2853,6 +3514,13 @@
           renderNoise();
         } else {
           staticCanvas.style.opacity = 0;
+        }
+
+        // จอเหลืองป่วยๆ ของ backrooms: มีระดับพื้นฐานเบาๆ ตลอดเวลาหลังไฟดับครั้งแรก แล้วไล่เข้มขึ้นเรื่อยๆ
+        // ตามระยะห่างจาก entity ที่ใกล้ที่สุด — ให้รู้สึกบีบเข้ามาก่อนจะโดนไล่จริงๆ ไม่ใช่โผล่ปุ๊บจัดปั๊บ
+        {
+          const proximityDread = closestDist < 16 ? Math.pow(1 - Math.min(closestDist, 16) / 16, 1.4) * 0.55 : 0;
+          dreadVignetteEl.style.opacity = Math.min(0.7, 0.12 + proximityDread + (isBlackout ? 0.15 : 0));
         }
         } // จบเงื่อนไข firstBlackoutOccurred: ปิดการทำงานของ entity ทั้งหมดก่อนไฟดับครั้งแรก
 
@@ -2881,14 +3549,28 @@
       renderer.render(scene, camera);
     }
 
-    window.addEventListener('resize', () => {
+    function applyViewportSize() {
       if (!camera || !renderer) return;
-      const w = window.innerWidth;
-      const h = window.innerHeight;
+      const { w, h } = getViewportSize();
+      // กันกรณีเบราเซอร์ยิง event ตอน layout ยังไม่นิ่ง แล้วได้ค่า 0 หรือเล็กผิดปกติมา
+      if (!w || !h) return;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       renderer.setSize(w, h);
+    }
+
+    window.addEventListener('resize', applyViewportSize);
+    window.addEventListener('orientationchange', () => {
+      // แถบ address bar / navigation bar บางรุ่นใช้เวลาสักครู่กว่าจะยุบ/ขยายเสร็จหลังหมุนจอ
+      applyViewportSize();
+      setTimeout(applyViewportSize, 250);
+      setTimeout(applyViewportSize, 600);
     });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', applyViewportSize);
+    }
+    // เช็คซ้ำอีกครั้งหลังโหลดหน้าเสร็จจริง เผื่อค่าตอน setupWorld() ยังไม่ใช่ขนาดจอสุดท้าย
+    window.addEventListener('load', () => setTimeout(applyViewportSize, 300));
 
     function startInitLoop() {
       if (typeof THREE !== 'undefined') {
