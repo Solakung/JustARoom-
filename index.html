@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>The Backrooms: Level 0</title>
+  <title>The Backrooms: Level 0 (The Lobby)</title>
   
   <style>
     * {
@@ -36,8 +36,8 @@
       height: 100%;
       pointer-events: none;
       z-index: 5;
-      background: radial-gradient(circle, rgba(0,0,0,0) 40%, rgba(12,14,6,0.7) 100%);
-      box-shadow: inset 0 0 90px rgba(0,0,0,0.85);
+      background: radial-gradient(circle, rgba(0,0,0,0) 35%, rgba(15,18,7,0.72) 100%);
+      box-shadow: inset 0 0 95px rgba(0,0,0,0.85);
     }
     .hud {
       position: absolute;
@@ -68,7 +68,7 @@
       pointer-events: none;
     }
 
-    /* เมนูเลเยอร์หน้าจอ (รองรับการแตะทั้งจอ) */
+    /* เมนู Start / Game Over / Win */
     .dialog-layer {
       position: absolute;
       top: 0;
@@ -81,7 +81,7 @@
       justify-content: center;
       align-items: center;
       color: #dfd89d;
-      z-index: 1000; /* อยู่บนสุดแน่นอน */
+      z-index: 1000;
       padding: 24px;
       text-align: center;
       cursor: pointer;
@@ -192,13 +192,10 @@
     }
   </style>
 
-  <!-- ประกาศคำสั่งเริ่มเกมทันทีใน HEAD -->
   <script>
     window.gameEngineStarted = false;
     window.doStartGame = function(e) {
-      if (e) {
-        e.stopPropagation();
-      }
+      if (e) e.stopPropagation();
       const menu = document.getElementById('start-menu');
       if (menu) menu.style.display = 'none';
 
@@ -218,7 +215,6 @@
       window.gameEngineStarted = true;
     };
 
-    // ตัวดัก Error แสดงผลบนจอ
     window.onerror = function(msg, url, line) {
       const b = document.getElementById('error-banner');
       if (b) {
@@ -228,7 +224,6 @@
     };
   </script>
 
-  <!-- Three.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 </head>
 <body>
@@ -239,7 +234,7 @@
 
   <div class="hud">
     <div><span class="rec">● REC</span> [PLAY] SP 00:04:12</div>
-    <div style="font-size: 11px; margin-top: 3px; opacity: 0.7;">LEVEL 0: THE LOBBY</div>
+    <div style="font-size: 11px; margin-top: 3px; opacity: 0.7;">LEVEL 0: THE LOBBY // LIMINAL ZONE</div>
   </div>
   <div id="crosshair"></div>
 
@@ -247,16 +242,16 @@
   <div id="joy-base"><div id="joy-handle"></div></div>
   <div id="touch-look"></div>
 
-  <!-- Start Menu (แตะตรงปุ่ม หรือแตะที่ใดก็ได้บนจอเพื่อเข้าเกม) -->
+  <!-- Start Menu -->
   <div id="start-menu" class="dialog-layer" onpointerdown="doStartGame(event)" onclick="doStartGame(event)" ontouchend="doStartGame(event)">
     <h1>THE BACKROOMS</h1>
     <p>
       <b>Level 0: The Lobby</b><br>
-      กลิ่นพรมชื้น แสงสีเหลืองหม่น และเสียงหึ่งของหลอดไฟนีออน<br><br>
+      ห้องโถงสำนักงานว่างเปล่าไม่รู้จบ พรมชื้นเก่า แสงสีเหลืองหม่น และเสียงหึ่งของหลอดไฟนีออน<br><br>
       <b>การควบคุม:</b><br>
       • <b>มือถือ:</b> จอยสติ๊กซ้ายเดิน | ปัดนิ้วฝั่งขวาหันมอง<br>
       • <b>PC:</b> W, A, S, D เดิน | คลิกเมาส์เพื่อหันมุมมอง<br><br>
-      <i>เป้าหมาย: หาทางออกฉุกเฉินสีแดง (EXIT) และหนี Entity</i>
+      <i>เป้าหมาย: เดินสำรวจห้องโถง ค้นหาบันไดหนีไฟสีแดง (EXIT) และระวัง Entity</i>
     </p>
     <button id="start-btn" class="action-btn">TAP TO ENTER</button>
     <div class="hint-text">[ แตะที่ปุ่มหรือแตะที่ใดก็ได้บนจอเพื่อเริ่ม ]</div>
@@ -264,53 +259,69 @@
 
   <div id="over-menu" class="dialog-layer" style="display: none;" onpointerdown="doRestartGame(event)" onclick="doRestartGame(event)">
     <h1 style="color: #ff4a4a; text-shadow: 0 0 15px #f00;">SIGNAL LOST</h1>
-    <p>คุณถูก Entity ในเงามืดเข้าประชิดตัว...</p>
+    <p>คุณถูกบางสิ่งในเงามืดกลืนกิน...</p>
     <button id="retry-btn" class="action-btn">TRY AGAIN</button>
     <div class="hint-text">[ แตะที่ใดก็ได้เพื่อเล่นใหม่ ]</div>
   </div>
 
   <div id="win-menu" class="dialog-layer" style="display: none;" onpointerdown="doRestartGame(event)" onclick="doRestartGame(event)">
     <h1 style="color: #6ed66e; text-shadow: 0 0 15px #0f0;">YOU ESCAPED</h1>
-    <p>คุณก้าวขึ้นบันไดทางออกและหนีพ้นจาก Level 0 ได้สำเร็จ!</p>
+    <p>คุณพบทางออกฉุกเฉินและหลุดพ้นจาก Level 0 สำเร็จ!</p>
     <button id="replay-btn" class="action-btn">ENTER AGAIN</button>
     <div class="hint-text">[ แตะที่ใดก็ได้เพื่อเริ่มอีกครั้ง ]</div>
   </div>
 
   <script>
+    /* =============================================================
+       1. ผังห้องแบบ Liminal Space ของ Backrooms Level 0 (24x24)
+       - ไม่ใช่เขาวงกตแคบๆ แต่เป็น "ห้องโถงเปิดโล่งขนาดใหญ่" สลับกับ
+       - เสาสี่เหลี่ยมลอยกลางห้อง (Standalone Pillars)
+       - ผนังพาร์ติชันกั้นห้องครึ่งๆ กลางๆ (Partitions) และช่องทางเดินกว้าง
+       0 = ทางเดิน/ห้องโล่ง, 1 = ผนัง/เสา, 2 = จุดเกิดผู้เล่น, 3 = ทางออก, 4 = Entity
+       ============================================================= */
     const GRID = [
-      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-      [1,2,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,1],
-      [1,0,1,0,1,0,1,1,0,1,0,1,1,1,1,1,0,1],
-      [1,0,1,0,0,0,0,1,0,0,0,1,0,0,0,1,0,1],
-      [1,0,1,1,1,1,0,1,1,1,0,1,0,1,0,1,0,1],
-      [1,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1],
-      [1,1,1,1,0,1,1,1,0,1,1,1,1,1,1,1,0,1],
-      [1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,1],
-      [1,0,1,1,1,1,0,1,1,1,1,0,1,1,0,1,0,1],
-      [1,0,1,0,0,0,0,0,0,0,1,0,0,1,0,0,0,1],
-      [1,0,1,0,1,1,1,1,1,0,1,1,0,1,1,1,0,1],
-      [1,0,0,0,1,4,0,0,1,0,0,0,0,0,0,1,0,1],
-      [1,1,1,0,1,1,1,0,1,1,1,1,1,1,0,1,0,1],
-      [1,0,0,0,0,0,1,0,0,0,0,0,0,1,0,1,0,1],
-      [1,0,1,1,1,0,1,1,1,1,1,1,0,1,0,0,0,1],
-      [1,0,1,0,0,0,0,0,0,0,0,1,0,1,1,1,0,1],
-      [1,0,0,0,1,1,1,1,1,1,0,0,0,0,0,1,3,1],
-      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [1,2,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1],
+      [1,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,1],
+      [1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1],
+      [1,0,0,0,0,0,0,1,0,0,0,0,1,0,0,1,0,0,1,1,1,0,0,1],
+      [1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,0,0,0,0,1,0,0,1],
+      [1,1,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,0,0,1,0,0,1,1,1,0,0,1,1,1,1,1,0,0,0,0,0,0,1],
+      [1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,1],
+      [1,0,0,0,0,0,0,1,0,0,1,0,0,1,0,0,1,0,0,0,0,0,0,1],
+      [1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,0,0,0,0,0,0,0,0,0,4,0,0,0,0,1,0,0,1,0,0,0,1],
+      [1,1,1,0,0,1,1,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1],
+      [1,0,0,0,0,0,0,1,0,0,1,1,1,0,0,0,1,1,1,0,0,1,1,1],
+      [1,0,0,1,0,0,0,1,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,1],
+      [1,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,1,0,0,1,0,1],
+      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,1,1,1,0,0,1,1,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,1],
+      [1,0,0,0,0,0,0,1,0,0,1,0,0,1,0,0,1,0,0,0,0,0,0,1],
+      [1,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,1],
+      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,0,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,1],
+      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,3,1],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
     ];
-    const CELL = 4;
-    const HEIGHT = 3.6;
+    const CELL = 3.6; // ระยะขนาดสเกลห้องในโลกจริง
+    const HEIGHT = 3.0; // ความสูงเพดานสำนักงานมาตรฐาน (3 เมตร)
 
     let audioCtx = null, humGain = null, alarmGain = null, alarmOsc = null;
     let camera, scene, renderer, entity;
     const flickerLights = [];
-    let playerSpawn = new THREE.Vector3(6, 1.6, 6);
+    let playerSpawn = new THREE.Vector3(5, 1.5, 5);
     let exitPos = new THREE.Vector3(0, 0, 0);
-    let entitySpawn = new THREE.Vector3(20, 1.5, 20);
+    let entitySpawn = new THREE.Vector3(40, 1.4, 40);
 
     const keys = { KeyW: false, KeyS: false, KeyA: false, KeyD: false };
     const joyVector = { x: 0, y: 0 };
     let cameraPitch = 0, cameraYaw = 0;
 
+    // -------------------------------------------------------------
+    // 2. Web Audio API
+    // -------------------------------------------------------------
     window.initAudioContextSafely = function() {
       try {
         const AudioClass = window.AudioContext || window.webkitAudioContext;
@@ -377,49 +388,112 @@
       } catch(e) {}
     }
 
-    function genWallTex() {
+    // -------------------------------------------------------------
+    // 3. Procedural Canvas Textures (ปรับปรุงความสมจริงของ Backrooms)
+    // -------------------------------------------------------------
+    
+    // วอลเปเปอร์สีเหลืองหม่น พร้อม "บัวเชิงผนังสีน้ำตาลเข้ม" ด้านล่าง
+    function genBackroomsWallTex() {
+      const c = document.createElement('canvas');
+      c.width = 512; c.height = 512;
+      const ctx = c.getContext('2d');
+
+      // สีพื้นวอลเปเปอร์สีเหลืองหม่น (Mono-Yellow)
+      ctx.fillStyle = '#c7ae59';
+      ctx.fillRect(0, 0, 512, 512);
+
+      // ลายทางแนวตั้งวินเทจจางๆ (Subtle Vintage Stripes)
+      ctx.strokeStyle = '#b29845';
+      ctx.lineWidth = 3;
+      for (let x = 0; x < 512; x += 16) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, 512);
+        ctx.stroke();
+      }
+
+      // คราบฝุ่นและรอยชื้นแบบเกรเดียนท์
+      const grad = ctx.createLinearGradient(0, 0, 0, 512);
+      grad.addColorStop(0, 'rgba(40, 35, 10, 0.25)'); // ขอบบนติดฝ้ามืดลง
+      grad.addColorStop(0.3, 'rgba(0,0,0,0)');
+      grad.addColorStop(0.85, 'rgba(0,0,0,0)');
+      grad.addColorStop(1, 'rgba(30, 25, 10, 0.35)'); // คราบชื้นด้านล่าง
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 512, 512);
+
+      // บัวเชิงผนัง (Baseboard Skirting) 12% ด้านล่าง
+      const baseH = 46;
+      ctx.fillStyle = '#3a2b1a'; // สีไม้มืด
+      ctx.fillRect(0, 512 - baseH, 512, baseH);
+      ctx.fillStyle = '#241a0e';
+      ctx.fillRect(0, 512 - baseH, 512, 4); // คิ้วขอบบนบัว
+      ctx.fillRect(0, 512 - 6, 512, 6); // ขอบล่างติดพรม
+
+      const t = new THREE.CanvasTexture(c);
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      return t;
+    }
+
+    // พรมเปียกชื้น (Moist & Stained Carpet)
+    function genBackroomsCarpetTex() {
       const c = document.createElement('canvas');
       c.width = 256; c.height = 256;
       const ctx = c.getContext('2d');
-      ctx.fillStyle = '#b79e54'; ctx.fillRect(0, 0, 256, 256);
-      ctx.strokeStyle = '#9c8442'; ctx.lineWidth = 1.5;
-      for (let x = 0; x < 256; x += 16) {
-        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 256); ctx.stroke();
-      }
-      ctx.fillStyle = 'rgba(0,0,0,0.06)';
-      for (let y = 0; y < 256; y += 32) ctx.fillRect(0, y, 256, 2);
-      const t = new THREE.CanvasTexture(c);
-      t.wrapS = t.wrapT = THREE.RepeatWrapping;
-      return t;
-    }
 
-    function genCarpetTex() {
-      const c = document.createElement('canvas');
-      c.width = 128; c.height = 128;
-      const ctx = c.getContext('2d');
-      ctx.fillStyle = '#615a3a'; ctx.fillRect(0, 0, 128, 128);
+      // พื้นพรมสีเหลืองหม่นอมน้ำตาล
+      ctx.fillStyle = '#5c5436';
+      ctx.fillRect(0, 0, 256, 256);
+
+      // เกรนพรมเส้นใยทอ
       ctx.fillStyle = 'rgba(0,0,0,0.12)';
-      for (let x = 0; x < 128; x += 4) {
-        for (let y = 0; y < 128; y += 4) {
+      for (let x = 0; x < 256; x += 4) {
+        for (let y = 0; y < 256; y += 4) {
           if ((x + y) % 8 === 0) ctx.fillRect(x, y, 2, 2);
         }
       }
+
+      // รอยเปียกชื้นคล้ำ (Water stains)
+      ctx.fillStyle = 'rgba(25, 22, 10, 0.28)';
+      ctx.beginPath();
+      ctx.arc(80, 80, 50, 0, Math.PI * 2);
+      ctx.arc(180, 160, 65, 0, Math.PI * 2);
+      ctx.fill();
+
       const t = new THREE.CanvasTexture(c);
       t.wrapS = t.wrapT = THREE.RepeatWrapping;
-      t.repeat.set(18, 18);
+      t.repeat.set(24, 24);
       return t;
     }
 
-    function genCeilingTex() {
+    // ฝ้าเพดานทีบาร์สำนักงาน (Office Acoustic Drop Ceiling)
+    function genBackroomsCeilingTex() {
       const c = document.createElement('canvas');
-      c.width = 128; c.height = 128;
+      c.width = 256; c.height = 256;
       const ctx = c.getContext('2d');
-      ctx.fillStyle = '#d5ceb6'; ctx.fillRect(0, 0, 128, 128);
-      ctx.strokeStyle = '#857e6a'; ctx.lineWidth = 2;
-      ctx.strokeRect(0, 0, 128, 128);
+
+      ctx.fillStyle = '#dcd5be';
+      ctx.fillRect(0, 0, 256, 256);
+
+      // โครงกริดรางอะลูมิเนียม (T-bar grid)
+      ctx.strokeStyle = '#827c68';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(0, 0, 256, 256);
+      ctx.beginPath();
+      ctx.moveTo(128, 0); ctx.lineTo(128, 256);
+      ctx.moveTo(0, 128); ctx.lineTo(256, 128);
+      ctx.stroke();
+
+      // ลายรูพรุนซับเสียง (Porous texture)
+      ctx.fillStyle = 'rgba(0,0,0,0.06)';
+      for (let i = 0; i < 256; i += 8) {
+        for (let j = 0; j < 256; j += 8) {
+          ctx.fillRect(i + (j % 4), j, 2, 1);
+        }
+      }
+
       const t = new THREE.CanvasTexture(c);
       t.wrapS = t.wrapT = THREE.RepeatWrapping;
-      t.repeat.set(18, 18);
+      t.repeat.set(24, 24);
       return t;
     }
 
@@ -446,7 +520,7 @@
     }
 
     // -------------------------------------------------------------
-    // เริ่มสร้าง Scene & World 3D
+    // 4. สร้างโลก Backrooms ใน Three.js
     // -------------------------------------------------------------
     function setupWorld() {
       const container = document.getElementById('viewport');
@@ -454,24 +528,26 @@
       const h = window.innerHeight || 640;
 
       scene = new THREE.Scene();
-      scene.fog = new THREE.FogExp2(0x232213, 0.075);
+      // หมอกสีเหลืองมัสตาร์ดสลัวสไตล์ Backrooms
+      scene.fog = new THREE.FogExp2(0x272412, 0.08);
 
       camera = new THREE.PerspectiveCamera(72, w / h, 0.1, 80);
       renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'default' });
       renderer.setSize(w, h);
-      renderer.setClearColor(0x232213);
+      renderer.setClearColor(0x272412);
       container.appendChild(renderer.domElement);
 
-      const ambientLight = new THREE.AmbientLight(0xd9c87d, 0.45);
+      const ambientLight = new THREE.AmbientLight(0xd9c87d, 0.42);
       scene.add(ambientLight);
 
-      const wallMat = new THREE.MeshLambertMaterial({ map: genWallTex() });
-      const floorMat = new THREE.MeshLambertMaterial({ map: genCarpetTex() });
-      const ceilingMat = new THREE.MeshLambertMaterial({ map: genCeilingTex() });
+      const wallMat = new THREE.MeshLambertMaterial({ map: genBackroomsWallTex() });
+      const floorMat = new THREE.MeshLambertMaterial({ map: genBackroomsCarpetTex() });
+      const ceilingMat = new THREE.MeshLambertMaterial({ map: genBackroomsCeilingTex() });
 
       const mapW = GRID[0].length * CELL;
       const mapH = GRID.length * CELL;
 
+      // พื้นและเพดานสำนักงาน
       const planeGeo = new THREE.PlaneGeometry(mapW, mapH);
       const floor = new THREE.Mesh(planeGeo, floorMat);
       floor.rotation.x = -Math.PI / 2;
@@ -492,25 +568,31 @@
           const wz = r * CELL + CELL / 2;
 
           if (val === 1) {
+            // กำแพง หรือ เสากลางห้อง
             const wall = new THREE.Mesh(boxGeo, wallMat);
             wall.position.set(wx, HEIGHT / 2, wz);
             scene.add(wall);
           } else {
+            // ไฟนีออนกล่องยาวบนเพดานทุกๆ 3 บล็อก
             if ((r % 3 === 1) && (c % 3 === 1)) {
-              const light = new THREE.PointLight(0xffecc0, 0.75, 12, 1.8);
+              const light = new THREE.PointLight(0xfff2c2, 0.8, 12, 1.8);
               light.position.set(wx, HEIGHT - 0.2, wz);
               scene.add(light);
               flickerLights.push(light);
 
-              const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 0.4), new THREE.MeshBasicMaterial({ color: 0xfff6cf }));
-              lamp.position.set(wx, HEIGHT - 0.05, wz);
+              // โคมไฟนีออนแบบฝังฝ้า (Troffer)
+              const lamp = new THREE.Mesh(
+                new THREE.BoxGeometry(1.6, 0.05, 0.6),
+                new THREE.MeshBasicMaterial({ color: 0xfff9e0 })
+              );
+              lamp.position.set(wx, HEIGHT - 0.03, wz);
               scene.add(lamp);
             }
 
-            if (val === 2) playerSpawn.set(wx, 1.6, wz);
+            if (val === 2) playerSpawn.set(wx, 1.5, wz);
             if (val === 3) {
               exitPos.set(wx, 0.5, wz);
-              const exitLight = new THREE.PointLight(0xff2222, 1.5, 9);
+              const exitLight = new THREE.PointLight(0xff2222, 1.6, 9);
               exitLight.position.set(wx, 1.8, wz);
               scene.add(exitLight);
 
@@ -520,16 +602,19 @@
                 step.position.set(wx, 0.125 + s * 0.25, wz - 1 + s * 0.5);
                 scene.add(step);
               }
-              const sign = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.4, 0.1), new THREE.MeshBasicMaterial({ color: 0xff3333 }));
-              sign.position.set(wx, 2.5, wz);
+              const sign = new THREE.Mesh(
+                new THREE.BoxGeometry(1.2, 0.4, 0.1),
+                new THREE.MeshBasicMaterial({ color: 0xff3333 })
+              );
+              sign.position.set(wx, 2.3, wz);
               scene.add(sign);
             }
-            if (val === 4) entitySpawn.set(wx, 1.5, wz);
+            if (val === 4) entitySpawn.set(wx, 1.4, wz);
           }
         }
       }
 
-      // Entity Smiler
+      // Entity (The Smiler)
       const smilerMat = new THREE.SpriteMaterial({
         map: genSmilerTex(),
         color: 0xffffff,
@@ -541,7 +626,6 @@
       entity.position.copy(entitySpawn);
       scene.add(entity);
 
-      // เปิด Touch Controls บนมือถือ
       if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
         document.getElementById('joy-base').style.display = 'block';
         document.getElementById('touch-look').style.display = 'block';
@@ -562,7 +646,7 @@
     };
 
     // -------------------------------------------------------------
-    // Joystick & Controls
+    // 5. Controls & Events
     // -------------------------------------------------------------
     window.addEventListener('keydown', (e) => { if (keys.hasOwnProperty(e.code)) keys[e.code] = true; });
     window.addEventListener('keyup', (e) => { if (keys.hasOwnProperty(e.code)) keys[e.code] = false; });
@@ -656,6 +740,7 @@
 
     touchLook.addEventListener('touchend', () => { lookTouchId = null; });
 
+    // ตรวจสอบการชนผนังและเสา
     function isWall(x, z, r = 0.42) {
       const points = [
         [x - r, z - r], [x + r, z - r],
@@ -726,17 +811,19 @@
           }
         }
 
+        // กะพริบไฟนีออน
         if (Math.random() < 0.04 && flickerLights.length > 0) {
           const l = flickerLights[Math.floor(Math.random() * flickerLights.length)];
-          l.intensity = Math.random() < 0.5 ? 0.1 : 0.8;
+          l.intensity = Math.random() < 0.5 ? 0.15 : 0.85;
         }
 
+        // Entity AI Chasing
         const distToPlayer = entity.position.distanceTo(camera.position);
-        if (distToPlayer < 14) {
+        if (distToPlayer < 15) {
           if (alarmGain && audioCtx && audioCtx.state === 'running') {
-            const vol = (1 - distToPlayer / 14) * 0.18;
+            const vol = (1 - distToPlayer / 15) * 0.18;
             alarmGain.gain.setValueAtTime(vol, audioCtx.currentTime);
-            alarmOsc.frequency.setValueAtTime(450 + (14 - distToPlayer) * 35, audioCtx.currentTime);
+            alarmOsc.frequency.setValueAtTime(450 + (15 - distToPlayer) * 35, audioCtx.currentTime);
           }
 
           const dir = new THREE.Vector3().subVectors(camera.position, entity.position).normalize();
@@ -782,7 +869,6 @@
       renderer.setSize(w, h);
     });
 
-    // เริ่มต้นระบบ
     function startInitLoop() {
       if (typeof THREE !== 'undefined') {
         setupWorld();
