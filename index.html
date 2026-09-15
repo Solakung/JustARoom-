@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>The Backrooms: Level 0 (The Lobby)</title>
+  <title>Office Escape 3D</title>
   
   <style>
     * {
@@ -36,8 +36,8 @@
       height: 100%;
       pointer-events: none;
       z-index: 5;
-      background: radial-gradient(circle, rgba(0,0,0,0) 35%, rgba(15,18,7,0.72) 100%);
-      box-shadow: inset 0 0 95px rgba(0,0,0,0.85);
+      background: radial-gradient(circle, rgba(0,0,0,0) 40%, rgba(12,14,6,0.65) 100%);
+      box-shadow: inset 0 0 80px rgba(0,0,0,0.8);
     }
     .hud {
       position: absolute;
@@ -75,7 +75,7 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(10, 11, 7, 0.92);
+      background: rgba(12, 14, 9, 0.94);
       display: flex;
       flex-direction: column;
       justify-content: center;
@@ -107,7 +107,7 @@
       background: #2b2f1c;
       color: #f0e6a8;
       border: 2px solid #8c864d;
-      padding: 16px 36px;
+      padding: 16px 38px;
       font-size: 16px;
       font-family: inherit;
       letter-spacing: 2px;
@@ -232,9 +232,10 @@
   <div class="vhs"></div>
   <canvas id="noise-canvas"></canvas>
 
+  <!-- HUD แบบกล้องวงจรปิดอาคาร -->
   <div class="hud">
-    <div><span class="rec">● REC</span> [PLAY] SP 00:04:12</div>
-    <div style="font-size: 11px; margin-top: 3px; opacity: 0.7;">LEVEL 0: THE LOBBY // LIMINAL ZONE</div>
+    <div><span class="rec">● CAM-04</span> [LIVE] 22:48:12</div>
+    <div style="font-size: 11px; margin-top: 3px; opacity: 0.7;">BLDG-A: 4F // FIND EMERGENCY EXIT</div>
   </div>
   <div id="crosshair"></div>
 
@@ -242,43 +243,39 @@
   <div id="joy-base"><div id="joy-handle"></div></div>
   <div id="touch-look"></div>
 
-  <!-- Start Menu -->
+  <!-- Start Menu: ปรับข้อความเป็นเกมหาทางออกธรรมดา -->
   <div id="start-menu" class="dialog-layer" onpointerdown="doStartGame(event)" onclick="doStartGame(event)" ontouchend="doStartGame(event)">
-    <h1>THE BACKROOMS</h1>
+    <h1>OFFICE ESCAPE 3D</h1>
     <p>
-      <b>Level 0: The Lobby</b><br>
-      ห้องโถงสำนักงานว่างเปล่าไม่รู้จบ พรมชื้นเก่า แสงสีเหลืองหม่น และเสียงหึ่งของหลอดไฟนีออน<br><br>
+      <b>ภารกิจ: ค้นหาทางออกฉุกเฉิน</b><br>
+      คุณทำงานล่วงเวลาจนอาคารสำนักงานปิดระบบหลัก<br>
+      เดินสำรวจห้องต่างๆ เพื่อค้นหา <b>บันไดหนีไฟสีแดง (EXIT)</b> เพื่อออกจากอาคาร<br><br>
       <b>การควบคุม:</b><br>
       • <b>มือถือ:</b> จอยสติ๊กซ้ายเดิน | ปัดนิ้วฝั่งขวาหันมอง<br>
       • <b>PC:</b> W, A, S, D เดิน | คลิกเมาส์เพื่อหันมุมมอง<br><br>
-      <i>เป้าหมาย: เดินสำรวจห้องโถง ค้นหาบันไดหนีไฟสีแดง (EXIT) และระวัง Entity</i>
+      <i>เป้าหมาย: เดินหาประตูทางออกฉุกเฉินสีแดงให้พบ</i>
     </p>
-    <button id="start-btn" class="action-btn">TAP TO ENTER</button>
-    <div class="hint-text">[ แตะที่ปุ่มหรือแตะที่ใดก็ได้บนจอเพื่อเริ่ม ]</div>
+    <button id="start-btn" class="action-btn">START GAME</button>
+    <div class="hint-text">[ แตะที่ปุ่มหรือแตะตรงไหนก็ได้บนจอเพื่อเริ่ม ]</div>
   </div>
 
+  <!-- Game Over Screen (จุดเฉลยความจริงเมื่อถูกจับ) -->
   <div id="over-menu" class="dialog-layer" style="display: none;" onpointerdown="doRestartGame(event)" onclick="doRestartGame(event)">
     <h1 style="color: #ff4a4a; text-shadow: 0 0 15px #f00;">SIGNAL LOST</h1>
-    <p>คุณถูกบางสิ่งในเงามืดกลืนกิน...</p>
+    <p>ที่นี่... ไม่ใช่อาคารสำนักงานธรรมดาอีกต่อไป<br>คุณถูกบางสิ่งในเงามืดกลืนกิน...</p>
     <button id="retry-btn" class="action-btn">TRY AGAIN</button>
-    <div class="hint-text">[ แตะที่ใดก็ได้เพื่อเล่นใหม่ ]</div>
+    <div class="hint-text">[ แตะที่ใดก็ได้เพื่อลองใหม่ ]</div>
   </div>
 
+  <!-- Win Screen -->
   <div id="win-menu" class="dialog-layer" style="display: none;" onpointerdown="doRestartGame(event)" onclick="doRestartGame(event)">
     <h1 style="color: #6ed66e; text-shadow: 0 0 15px #0f0;">YOU ESCAPED</h1>
-    <p>คุณพบทางออกฉุกเฉินและหลุดพ้นจาก Level 0 สำเร็จ!</p>
-    <button id="replay-btn" class="action-btn">ENTER AGAIN</button>
-    <div class="hint-text">[ แตะที่ใดก็ได้เพื่อเริ่มอีกครั้ง ]</div>
+    <p>คุณพบทางออกฉุกเฉินและหลบหนีออกจากอาคารได้สำเร็จ!</p>
+    <button id="replay-btn" class="action-btn">PLAY AGAIN</button>
+    <div class="hint-text">[ แตะที่ใดก็ได้เพื่อเริ่มใหม่อีกครั้ง ]</div>
   </div>
 
   <script>
-    /* =============================================================
-       1. ผังห้องแบบ Liminal Space ของ Backrooms Level 0 (24x24)
-       - ไม่ใช่เขาวงกตแคบๆ แต่เป็น "ห้องโถงเปิดโล่งขนาดใหญ่" สลับกับ
-       - เสาสี่เหลี่ยมลอยกลางห้อง (Standalone Pillars)
-       - ผนังพาร์ติชันกั้นห้องครึ่งๆ กลางๆ (Partitions) และช่องทางเดินกว้าง
-       0 = ทางเดิน/ห้องโล่ง, 1 = ผนัง/เสา, 2 = จุดเกิดผู้เล่น, 3 = ทางออก, 4 = Entity
-       ============================================================= */
     const GRID = [
       [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
       [1,2,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1],
@@ -305,8 +302,8 @@
       [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,3,1],
       [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
     ];
-    const CELL = 3.6; // ระยะขนาดสเกลห้องในโลกจริง
-    const HEIGHT = 3.0; // ความสูงเพดานสำนักงานมาตรฐาน (3 เมตร)
+    const CELL = 3.6;
+    const HEIGHT = 3.0;
 
     let audioCtx = null, humGain = null, alarmGain = null, alarmOsc = null;
     let camera, scene, renderer, entity;
@@ -319,9 +316,6 @@
     const joyVector = { x: 0, y: 0 };
     let cameraPitch = 0, cameraYaw = 0;
 
-    // -------------------------------------------------------------
-    // 2. Web Audio API
-    // -------------------------------------------------------------
     window.initAudioContextSafely = function() {
       try {
         const AudioClass = window.AudioContext || window.webkitAudioContext;
@@ -388,63 +382,47 @@
       } catch(e) {}
     }
 
-    // -------------------------------------------------------------
-    // 3. Procedural Canvas Textures (ปรับปรุงความสมจริงของ Backrooms)
-    // -------------------------------------------------------------
-    
-    // วอลเปเปอร์สีเหลืองหม่น พร้อม "บัวเชิงผนังสีน้ำตาลเข้ม" ด้านล่าง
-    function genBackroomsWallTex() {
+    function genWallTex() {
       const c = document.createElement('canvas');
       c.width = 512; c.height = 512;
       const ctx = c.getContext('2d');
-
-      // สีพื้นวอลเปเปอร์สีเหลืองหม่น (Mono-Yellow)
       ctx.fillStyle = '#c7ae59';
       ctx.fillRect(0, 0, 512, 512);
 
-      // ลายทางแนวตั้งวินเทจจางๆ (Subtle Vintage Stripes)
       ctx.strokeStyle = '#b29845';
       ctx.lineWidth = 3;
       for (let x = 0; x < 512; x += 16) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, 512);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 512); ctx.stroke();
       }
 
-      // คราบฝุ่นและรอยชื้นแบบเกรเดียนท์
       const grad = ctx.createLinearGradient(0, 0, 0, 512);
-      grad.addColorStop(0, 'rgba(40, 35, 10, 0.25)'); // ขอบบนติดฝ้ามืดลง
+      grad.addColorStop(0, 'rgba(40, 35, 10, 0.25)');
       grad.addColorStop(0.3, 'rgba(0,0,0,0)');
       grad.addColorStop(0.85, 'rgba(0,0,0,0)');
-      grad.addColorStop(1, 'rgba(30, 25, 10, 0.35)'); // คราบชื้นด้านล่าง
+      grad.addColorStop(1, 'rgba(30, 25, 10, 0.35)');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, 512, 512);
 
-      // บัวเชิงผนัง (Baseboard Skirting) 12% ด้านล่าง
+      // บัวเชิงผนังล่าง (Baseboard)
       const baseH = 46;
-      ctx.fillStyle = '#3a2b1a'; // สีไม้มืด
+      ctx.fillStyle = '#3a2b1a';
       ctx.fillRect(0, 512 - baseH, 512, baseH);
       ctx.fillStyle = '#241a0e';
-      ctx.fillRect(0, 512 - baseH, 512, 4); // คิ้วขอบบนบัว
-      ctx.fillRect(0, 512 - 6, 512, 6); // ขอบล่างติดพรม
+      ctx.fillRect(0, 512 - baseH, 512, 4);
+      ctx.fillRect(0, 512 - 6, 512, 6);
 
       const t = new THREE.CanvasTexture(c);
       t.wrapS = t.wrapT = THREE.RepeatWrapping;
       return t;
     }
 
-    // พรมเปียกชื้น (Moist & Stained Carpet)
-    function genBackroomsCarpetTex() {
+    function genCarpetTex() {
       const c = document.createElement('canvas');
       c.width = 256; c.height = 256;
       const ctx = c.getContext('2d');
-
-      // พื้นพรมสีเหลืองหม่นอมน้ำตาล
       ctx.fillStyle = '#5c5436';
       ctx.fillRect(0, 0, 256, 256);
 
-      // เกรนพรมเส้นใยทอ
       ctx.fillStyle = 'rgba(0,0,0,0.12)';
       for (let x = 0; x < 256; x += 4) {
         for (let y = 0; y < 256; y += 4) {
@@ -452,7 +430,6 @@
         }
       }
 
-      // รอยเปียกชื้นคล้ำ (Water stains)
       ctx.fillStyle = 'rgba(25, 22, 10, 0.28)';
       ctx.beginPath();
       ctx.arc(80, 80, 50, 0, Math.PI * 2);
@@ -465,16 +442,13 @@
       return t;
     }
 
-    // ฝ้าเพดานทีบาร์สำนักงาน (Office Acoustic Drop Ceiling)
-    function genBackroomsCeilingTex() {
+    function genCeilingTex() {
       const c = document.createElement('canvas');
       c.width = 256; c.height = 256;
       const ctx = c.getContext('2d');
-
       ctx.fillStyle = '#dcd5be';
       ctx.fillRect(0, 0, 256, 256);
 
-      // โครงกริดรางอะลูมิเนียม (T-bar grid)
       ctx.strokeStyle = '#827c68';
       ctx.lineWidth = 4;
       ctx.strokeRect(0, 0, 256, 256);
@@ -483,7 +457,6 @@
       ctx.moveTo(0, 128); ctx.lineTo(256, 128);
       ctx.stroke();
 
-      // ลายรูพรุนซับเสียง (Porous texture)
       ctx.fillStyle = 'rgba(0,0,0,0.06)';
       for (let i = 0; i < 256; i += 8) {
         for (let j = 0; j < 256; j += 8) {
@@ -519,16 +492,12 @@
       return new THREE.CanvasTexture(c);
     }
 
-    // -------------------------------------------------------------
-    // 4. สร้างโลก Backrooms ใน Three.js
-    // -------------------------------------------------------------
     function setupWorld() {
       const container = document.getElementById('viewport');
       const w = window.innerWidth || 360;
       const h = window.innerHeight || 640;
 
       scene = new THREE.Scene();
-      // หมอกสีเหลืองมัสตาร์ดสลัวสไตล์ Backrooms
       scene.fog = new THREE.FogExp2(0x272412, 0.08);
 
       camera = new THREE.PerspectiveCamera(72, w / h, 0.1, 80);
@@ -540,14 +509,13 @@
       const ambientLight = new THREE.AmbientLight(0xd9c87d, 0.42);
       scene.add(ambientLight);
 
-      const wallMat = new THREE.MeshLambertMaterial({ map: genBackroomsWallTex() });
-      const floorMat = new THREE.MeshLambertMaterial({ map: genBackroomsCarpetTex() });
-      const ceilingMat = new THREE.MeshLambertMaterial({ map: genBackroomsCeilingTex() });
+      const wallMat = new THREE.MeshLambertMaterial({ map: genWallTex() });
+      const floorMat = new THREE.MeshLambertMaterial({ map: genCarpetTex() });
+      const ceilingMat = new THREE.MeshLambertMaterial({ map: genCeilingTex() });
 
       const mapW = GRID[0].length * CELL;
       const mapH = GRID.length * CELL;
 
-      // พื้นและเพดานสำนักงาน
       const planeGeo = new THREE.PlaneGeometry(mapW, mapH);
       const floor = new THREE.Mesh(planeGeo, floorMat);
       floor.rotation.x = -Math.PI / 2;
@@ -568,19 +536,16 @@
           const wz = r * CELL + CELL / 2;
 
           if (val === 1) {
-            // กำแพง หรือ เสากลางห้อง
             const wall = new THREE.Mesh(boxGeo, wallMat);
             wall.position.set(wx, HEIGHT / 2, wz);
             scene.add(wall);
           } else {
-            // ไฟนีออนกล่องยาวบนเพดานทุกๆ 3 บล็อก
             if ((r % 3 === 1) && (c % 3 === 1)) {
               const light = new THREE.PointLight(0xfff2c2, 0.8, 12, 1.8);
               light.position.set(wx, HEIGHT - 0.2, wz);
               scene.add(light);
               flickerLights.push(light);
 
-              // โคมไฟนีออนแบบฝังฝ้า (Troffer)
               const lamp = new THREE.Mesh(
                 new THREE.BoxGeometry(1.6, 0.05, 0.6),
                 new THREE.MeshBasicMaterial({ color: 0xfff9e0 })
@@ -614,7 +579,6 @@
         }
       }
 
-      // Entity (The Smiler)
       const smilerMat = new THREE.SpriteMaterial({
         map: genSmilerTex(),
         color: 0xffffff,
@@ -645,9 +609,6 @@
       if (alarmGain && audioCtx) alarmGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
     };
 
-    // -------------------------------------------------------------
-    // 5. Controls & Events
-    // -------------------------------------------------------------
     window.addEventListener('keydown', (e) => { if (keys.hasOwnProperty(e.code)) keys[e.code] = true; });
     window.addEventListener('keyup', (e) => { if (keys.hasOwnProperty(e.code)) keys[e.code] = false; });
 
@@ -740,7 +701,6 @@
 
     touchLook.addEventListener('touchend', () => { lookTouchId = null; });
 
-    // ตรวจสอบการชนผนังและเสา
     function isWall(x, z, r = 0.42) {
       const points = [
         [x - r, z - r], [x + r, z - r],
@@ -811,13 +771,11 @@
           }
         }
 
-        // กะพริบไฟนีออน
         if (Math.random() < 0.04 && flickerLights.length > 0) {
           const l = flickerLights[Math.floor(Math.random() * flickerLights.length)];
           l.intensity = Math.random() < 0.5 ? 0.15 : 0.85;
         }
 
-        // Entity AI Chasing
         const distToPlayer = entity.position.distanceTo(camera.position);
         if (distToPlayer < 15) {
           if (alarmGain && audioCtx && audioCtx.state === 'running') {
