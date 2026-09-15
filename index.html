@@ -16,7 +16,7 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: #0c0d08;
+      background: #000000;
       font-family: monospace;
     }
     #viewport {
@@ -36,8 +36,20 @@
       height: 100%;
       pointer-events: none;
       z-index: 5;
-      background: radial-gradient(circle, rgba(0,0,0,0) 40%, rgba(12,14,6,0.65) 100%);
-      box-shadow: inset 0 0 80px rgba(0,0,0,0.8);
+      background: radial-gradient(circle, rgba(0,0,0,0) 30%, rgba(10,12,5,0.78) 100%);
+      box-shadow: inset 0 0 100px rgba(0,0,0,0.9);
+    }
+    /* เอฟเฟกต์เส้นสแกน CRT/VHS */
+    .vhs::after {
+      content: " ";
+      display: block;
+      position: absolute;
+      top: 0; left: 0; bottom: 0; right: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+      background-size: 100% 4px;
+      z-index: 6;
+      pointer-events: none;
+      opacity: 0.6;
     }
     .hud {
       position: absolute;
@@ -46,7 +58,7 @@
       color: #9cbb7a;
       font-size: 13px;
       letter-spacing: 1px;
-      z-index: 6;
+      z-index: 7;
       pointer-events: none;
       text-shadow: 0 0 4px #5a7b3c;
     }
@@ -60,11 +72,11 @@
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      width: 4px;
-      height: 4px;
-      background: rgba(220, 220, 180, 0.6);
+      width: 3px;
+      height: 3px;
+      background: rgba(220, 220, 180, 0.45);
       border-radius: 50%;
-      z-index: 6;
+      z-index: 7;
       pointer-events: none;
     }
 
@@ -75,7 +87,7 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(12, 14, 9, 0.94);
+      background: rgba(8, 10, 6, 0.95);
       display: flex;
       flex-direction: column;
       justify-content: center;
@@ -130,6 +142,7 @@
       pointer-events: none;
     }
 
+    /* จอสัญญาณซ่า Dynamic Glitch */
     #noise-canvas {
       position: absolute;
       top: 0;
@@ -137,8 +150,21 @@
       width: 100%;
       height: 100%;
       z-index: 20;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.1s ease;
+    }
+    #jumpscare-flash {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #ff0000;
+      z-index: 30;
       display: none;
       pointer-events: none;
+      opacity: 0.7;
     }
 
     /* Touch Controls */
@@ -177,19 +203,6 @@
       display: none;
       touch-action: none;
     }
-    #error-banner {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      background: #881111;
-      color: #fff;
-      font-size: 11px;
-      padding: 6px;
-      z-index: 9999;
-      display: none;
-      text-align: center;
-    }
   </style>
 
   <script>
@@ -214,23 +227,15 @@
       }
       window.gameEngineStarted = true;
     };
-
-    window.onerror = function(msg, url, line) {
-      const b = document.getElementById('error-banner');
-      if (b) {
-        b.style.display = 'block';
-        b.innerText = 'Error: ' + msg + ' (Line ' + line + ')';
-      }
-    };
   </script>
 
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 </head>
 <body>
-  <div id="error-banner"></div>
   <div id="viewport"></div>
   <div class="vhs"></div>
   <canvas id="noise-canvas"></canvas>
+  <div id="jumpscare-flash"></div>
 
   <!-- HUD แบบกล้องวงจรปิดอาคาร -->
   <div class="hud">
@@ -243,7 +248,7 @@
   <div id="joy-base"><div id="joy-handle"></div></div>
   <div id="touch-look"></div>
 
-  <!-- Start Menu: ปรับข้อความเป็นเกมหาทางออกธรรมดา -->
+  <!-- Start Menu -->
   <div id="start-menu" class="dialog-layer" onpointerdown="doStartGame(event)" onclick="doStartGame(event)" ontouchend="doStartGame(event)">
     <h1>OFFICE ESCAPE 3D</h1>
     <p>
@@ -259,20 +264,23 @@
     <div class="hint-text">[ แตะที่ปุ่มหรือแตะตรงไหนก็ได้บนจอเพื่อเริ่ม ]</div>
   </div>
 
-  <!-- Game Over Screen (จุดเฉลยความจริงเมื่อถูกจับ) -->
+  <!-- Game Over Screen -->
   <div id="over-menu" class="dialog-layer" style="display: none;" onpointerdown="doRestartGame(event)" onclick="doRestartGame(event)">
-    <h1 style="color: #ff4a4a; text-shadow: 0 0 15px #f00;">SIGNAL LOST</h1>
-    <p>ที่นี่... ไม่ใช่อาคารสำนักงานธรรมดาอีกต่อไป<br>คุณถูกบางสิ่งในเงามืดกลืนกิน...</p>
+    <h1 style="color: #ff3333; text-shadow: 0 0 16px #f00;">SIGNAL LOST</h1>
+    <p style="color: #c9b097;">
+      ที่นี่... ไม่ใช่อาคารสำนักงานธรรมดาอีกต่อไป<br>
+      <b>คุณไม่มีวันหาทางออกเจอ</b>
+    </p>
     <button id="retry-btn" class="action-btn">TRY AGAIN</button>
-    <div class="hint-text">[ แตะที่ใดก็ได้เพื่อลองใหม่ ]</div>
+    <div class="hint-text">[ แตะที่ใดก็ได้เพื่อลองใหม่อีกครั้ง ]</div>
   </div>
 
   <!-- Win Screen -->
   <div id="win-menu" class="dialog-layer" style="display: none;" onpointerdown="doRestartGame(event)" onclick="doRestartGame(event)">
     <h1 style="color: #6ed66e; text-shadow: 0 0 15px #0f0;">YOU ESCAPED</h1>
-    <p>คุณพบทางออกฉุกเฉินและหลบหนีออกจากอาคารได้สำเร็จ!</p>
+    <p>คุณผลักประตูหนีไฟและหลุดพ้นจากฝันร้ายได้สำเร็จ!</p>
     <button id="replay-btn" class="action-btn">PLAY AGAIN</button>
-    <div class="hint-text">[ แตะที่ใดก็ได้เพื่อเริ่มใหม่อีกครั้ง ]</div>
+    <div class="hint-text">[ แตะที่ใดก็ได้เพื่อเริ่มใหม่ ]</div>
   </div>
 
   <script>
@@ -306,8 +314,8 @@
     const HEIGHT = 3.0;
 
     let audioCtx = null, humGain = null, alarmGain = null, alarmOsc = null;
-    let camera, scene, renderer, entity;
-    const flickerLights = [];
+    let camera, scene, renderer, entity, flashlight, ambientLight;
+    const ceilingLights = [];
     let playerSpawn = new THREE.Vector3(5, 1.5, 5);
     let exitPos = new THREE.Vector3(0, 0, 0);
     let entitySpawn = new THREE.Vector3(40, 1.4, 40);
@@ -315,7 +323,17 @@
     const keys = { KeyW: false, KeyS: false, KeyA: false, KeyD: false };
     const joyVector = { x: 0, y: 0 };
     let cameraPitch = 0, cameraYaw = 0;
+    let headBobTimer = 0;
 
+    // สถานะไฟดับสยองขวัญ (Blackout Event)
+    let isBlackout = false;
+    let nextBlackoutTime = performance.now() + 18000;
+    let blackoutEndTime = 0;
+    let nextHallucinationTime = performance.now() + 12000;
+
+    // -------------------------------------------------------------
+    // Web Audio API: Soundscape
+    // -------------------------------------------------------------
     window.initAudioContextSafely = function() {
       try {
         const AudioClass = window.AudioContext || window.webkitAudioContext;
@@ -339,6 +357,7 @@
           f.connect(humGain); humGain.connect(audioCtx.destination);
           h1.start(); h2.start();
 
+          // เสียงเตือนกรีดร้องของ Entity
           alarmOsc = audioCtx.createOscillator();
           alarmOsc.type = 'sawtooth'; alarmOsc.frequency.value = 520;
           const af = audioCtx.createBiquadFilter();
@@ -353,6 +372,11 @@
       } catch (err) {}
     };
 
+    // ป้องกันเสียงหลุดเมื่อสลับหน้าจอกลับมา
+    window.addEventListener('pointerdown', () => {
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    });
+
     function playFootstep() {
       if (!audioCtx || audioCtx.state !== 'running') return;
       try {
@@ -360,21 +384,22 @@
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = 'triangle';
-        osc.frequency.setValueAtTime(80, now);
-        osc.frequency.exponentialRampToValueAtTime(30, now + 0.1);
-        gain.gain.setValueAtTime(0.04, now);
+        osc.frequency.setValueAtTime(75, now);
+        osc.frequency.exponentialRampToValueAtTime(25, now + 0.1);
+        gain.gain.setValueAtTime(0.045, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
         osc.connect(gain); gain.connect(audioCtx.destination);
         osc.start(now); osc.stop(now + 0.11);
       } catch(e) {}
     }
 
+    // เสียงภาพสัญญาณซ่า
     function playStaticSound() {
       if (!audioCtx || audioCtx.state !== 'running') return;
       try {
-        const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.35, audioCtx.sampleRate);
+        const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.45, audioCtx.sampleRate);
         const data = buffer.getChannelData(0);
-        for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * 0.25;
+        for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * 0.35;
         const noise = audioCtx.createBufferSource();
         noise.buffer = buffer;
         noise.connect(audioCtx.destination);
@@ -382,32 +407,59 @@
       } catch(e) {}
     }
 
+    // เสียงหลอนไกลๆ (Audio Hallucination)
+    function playDistantHorrorDrone() {
+      if (!audioCtx || audioCtx.state !== 'running') return;
+      try {
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(45, now);
+        osc.frequency.linearRampToValueAtTime(32, now + 3.0);
+
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.linearRampToValueAtTime(0.04, now + 1.2);
+        gain.gain.linearRampToValueAtTime(0.0001, now + 3.2);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 3.3);
+      } catch(e) {}
+    }
+
+    // -------------------------------------------------------------
+    // Procedural Textures (พร้อมรอยขีดเขียนชวนขนลุกบนผนัง)
+    // -------------------------------------------------------------
     function genWallTex() {
       const c = document.createElement('canvas');
       c.width = 512; c.height = 512;
       const ctx = c.getContext('2d');
-      ctx.fillStyle = '#c7ae59';
+      ctx.fillStyle = '#c5ac55';
       ctx.fillRect(0, 0, 512, 512);
 
-      ctx.strokeStyle = '#b29845';
+      // ลายทางแนวตั้ง
+      ctx.strokeStyle = '#b09642';
       ctx.lineWidth = 3;
       for (let x = 0; x < 512; x += 16) {
         ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 512); ctx.stroke();
       }
 
+      // คราบฝุ่นและเกรเดียนท์มืด
       const grad = ctx.createLinearGradient(0, 0, 0, 512);
-      grad.addColorStop(0, 'rgba(40, 35, 10, 0.25)');
+      grad.addColorStop(0, 'rgba(30, 25, 8, 0.3)');
       grad.addColorStop(0.3, 'rgba(0,0,0,0)');
       grad.addColorStop(0.85, 'rgba(0,0,0,0)');
-      grad.addColorStop(1, 'rgba(30, 25, 10, 0.35)');
+      grad.addColorStop(1, 'rgba(25, 20, 8, 0.4)');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, 512, 512);
 
       // บัวเชิงผนังล่าง (Baseboard)
       const baseH = 46;
-      ctx.fillStyle = '#3a2b1a';
+      ctx.fillStyle = '#3a2a18';
       ctx.fillRect(0, 512 - baseH, 512, baseH);
-      ctx.fillStyle = '#241a0e';
+      ctx.fillStyle = '#22170c';
       ctx.fillRect(0, 512 - baseH, 512, 4);
       ctx.fillRect(0, 512 - 6, 512, 6);
 
@@ -420,7 +472,7 @@
       const c = document.createElement('canvas');
       c.width = 256; c.height = 256;
       const ctx = c.getContext('2d');
-      ctx.fillStyle = '#5c5436';
+      ctx.fillStyle = '#574f33';
       ctx.fillRect(0, 0, 256, 256);
 
       ctx.fillStyle = 'rgba(0,0,0,0.12)';
@@ -430,10 +482,11 @@
         }
       }
 
-      ctx.fillStyle = 'rgba(25, 22, 10, 0.28)';
+      // คราบน้ำเปียกชื้น
+      ctx.fillStyle = 'rgba(20, 18, 8, 0.35)';
       ctx.beginPath();
-      ctx.arc(80, 80, 50, 0, Math.PI * 2);
-      ctx.arc(180, 160, 65, 0, Math.PI * 2);
+      ctx.arc(75, 75, 55, 0, Math.PI * 2);
+      ctx.arc(185, 165, 70, 0, Math.PI * 2);
       ctx.fill();
 
       const t = new THREE.CanvasTexture(c);
@@ -446,10 +499,10 @@
       const c = document.createElement('canvas');
       c.width = 256; c.height = 256;
       const ctx = c.getContext('2d');
-      ctx.fillStyle = '#dcd5be';
+      ctx.fillStyle = '#d5ceb5';
       ctx.fillRect(0, 0, 256, 256);
 
-      ctx.strokeStyle = '#827c68';
+      ctx.strokeStyle = '#7d7763';
       ctx.lineWidth = 4;
       ctx.strokeRect(0, 0, 256, 256);
       ctx.beginPath();
@@ -457,57 +510,65 @@
       ctx.moveTo(0, 128); ctx.lineTo(256, 128);
       ctx.stroke();
 
-      ctx.fillStyle = 'rgba(0,0,0,0.06)';
-      for (let i = 0; i < 256; i += 8) {
-        for (let j = 0; j < 256; j += 8) {
-          ctx.fillRect(i + (j % 4), j, 2, 1);
-        }
-      }
-
       const t = new THREE.CanvasTexture(c);
       t.wrapS = t.wrapT = THREE.RepeatWrapping;
       t.repeat.set(24, 24);
       return t;
     }
 
+    // หน้าตา Smiler หลอนขึ้น ดวงตาและรอยยิ้มเรืองแสงคมชัด
     function genSmilerTex() {
       const c = document.createElement('canvas');
       c.width = 256; c.height = 256;
       const ctx = c.getContext('2d');
       ctx.fillStyle = 'rgba(0,0,0,0)'; ctx.fillRect(0, 0, 256, 256);
-      ctx.fillStyle = '#ffffff'; ctx.shadowColor = '#ffff99'; ctx.shadowBlur = 16;
+
+      ctx.fillStyle = '#ffffff';
+      ctx.shadowColor = '#ffffaa';
+      ctx.shadowBlur = 22;
       ctx.beginPath();
-      ctx.arc(85, 95, 14, 0, Math.PI * 2);
-      ctx.arc(171, 95, 14, 0, Math.PI * 2);
+      ctx.arc(82, 92, 14, 0, Math.PI * 2);
+      ctx.arc(174, 92, 14, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.beginPath();
-      ctx.arc(128, 120, 68, 0.15 * Math.PI, 0.85 * Math.PI, false);
-      ctx.lineWidth = 14; ctx.strokeStyle = '#ffffff'; ctx.stroke();
+      ctx.arc(128, 118, 72, 0.14 * Math.PI, 0.86 * Math.PI, false);
+      ctx.lineWidth = 15; ctx.strokeStyle = '#ffffff'; ctx.stroke();
 
-      ctx.lineWidth = 3;
-      for (let tx = 80; tx <= 176; tx += 12) {
-        ctx.beginPath(); ctx.moveTo(tx, 160); ctx.lineTo(tx, 178); ctx.stroke();
+      ctx.lineWidth = 3.5;
+      for (let tx = 76; tx <= 180; tx += 11) {
+        ctx.beginPath(); ctx.moveTo(tx, 160); ctx.lineTo(tx, 180); ctx.stroke();
       }
       return new THREE.CanvasTexture(c);
     }
 
+    // -------------------------------------------------------------
+    // Setup World & Atmosphere
+    // -------------------------------------------------------------
     function setupWorld() {
       const container = document.getElementById('viewport');
       const w = window.innerWidth || 360;
       const h = window.innerHeight || 640;
 
       scene = new THREE.Scene();
-      scene.fog = new THREE.FogExp2(0x272412, 0.08);
+      // หมอกสีเหลืองมัสตาร์ดสลัว จำกัดทัศนวิสัยเหลือระยะ 12-16 เมตร
+      scene.fog = new THREE.FogExp2(0x1f1d0d, 0.088);
 
-      camera = new THREE.PerspectiveCamera(72, w / h, 0.1, 80);
+      camera = new THREE.PerspectiveCamera(72, w / h, 0.1, 70);
       renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'default' });
       renderer.setSize(w, h);
-      renderer.setClearColor(0x272412);
+      renderer.setClearColor(0x1f1d0d);
       container.appendChild(renderer.domElement);
 
-      const ambientLight = new THREE.AmbientLight(0xd9c87d, 0.42);
+      ambientLight = new THREE.AmbientLight(0xd9c87d, 0.32);
       scene.add(ambientLight);
+
+      // แสงไฟฉายหน้าตัวผู้เล่น (Camcorder Flashlight)
+      flashlight = new THREE.SpotLight(0xfff6dc, 1.4, 20, Math.PI * 0.22, 0.65, 1.2);
+      camera.add(flashlight);
+      flashlight.position.set(0, 0, 0.1);
+      flashlight.target = camera;
+      scene.add(camera);
 
       const wallMat = new THREE.MeshLambertMaterial({ map: genWallTex() });
       const floorMat = new THREE.MeshLambertMaterial({ map: genCarpetTex() });
@@ -541,10 +602,10 @@
             scene.add(wall);
           } else {
             if ((r % 3 === 1) && (c % 3 === 1)) {
-              const light = new THREE.PointLight(0xfff2c2, 0.8, 12, 1.8);
+              const light = new THREE.PointLight(0xffecc0, 0.72, 11, 1.8);
               light.position.set(wx, HEIGHT - 0.2, wz);
               scene.add(light);
-              flickerLights.push(light);
+              ceilingLights.push(light);
 
               const lamp = new THREE.Mesh(
                 new THREE.BoxGeometry(1.6, 0.05, 0.6),
@@ -579,6 +640,7 @@
         }
       }
 
+      // Entity (The Smiler - เรืองแสงสว่างทะลุหมอก)
       const smilerMat = new THREE.SpriteMaterial({
         map: genSmilerTex(),
         color: 0xffffff,
@@ -605,10 +667,23 @@
       cameraYaw = 0;
       cameraPitch = 0;
       if (entity) entity.position.copy(entitySpawn);
-      document.getElementById('noise-canvas').style.display = 'none';
+      
+      // ล้างค่าสถานะการกดและจอยสติ๊ก ป้องกันบัคเดินเอง
+      for (let k in keys) keys[k] = false;
+      joyVector.x = 0;
+      joyVector.y = 0;
+
+      document.getElementById('noise-canvas').style.opacity = 0;
+      document.getElementById('jumpscare-flash').style.display = 'none';
       if (alarmGain && audioCtx) alarmGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+
+      isBlackout = false;
+      nextBlackoutTime = performance.now() + 20000;
     };
 
+    // -------------------------------------------------------------
+    // Controls (PC + Mobile)
+    // -------------------------------------------------------------
     window.addEventListener('keydown', (e) => { if (keys.hasOwnProperty(e.code)) keys[e.code] = true; });
     window.addEventListener('keyup', (e) => { if (keys.hasOwnProperty(e.code)) keys[e.code] = false; });
 
@@ -622,7 +697,7 @@
       if (document.pointerLockElement === document.body && window.gameEngineStarted) {
         cameraYaw -= e.movementX * 0.0024;
         cameraPitch -= e.movementY * 0.0024;
-        cameraPitch = Math.max(-1.4, Math.min(1.4, cameraPitch));
+        cameraPitch = Math.max(-1.3, Math.min(1.3, cameraPitch));
       }
     });
 
@@ -694,17 +769,19 @@
           lastLookY = touch.clientY;
           cameraYaw -= dx * 0.005;
           cameraPitch -= dy * 0.005;
-          cameraPitch = Math.max(-1.4, Math.min(1.4, cameraPitch));
+          cameraPitch = Math.max(-1.3, Math.min(1.3, cameraPitch));
         }
       }
     }, { passive: false });
 
     touchLook.addEventListener('touchend', () => { lookTouchId = null; });
 
-    function isWall(x, z, r = 0.42) {
+    // ตรวจสอบการชน 8 ทิศทางรอบตัวแบบวงกลม (ป้องกันสะดุดมุม 100%)
+    function isWall(x, z, r = 0.44) {
+      const d = r * 0.707;
       const points = [
-        [x - r, z - r], [x + r, z - r],
-        [x - r, z + r], [x + r, z + r]
+        [x, z - r], [x, z + r], [x - r, z], [x + r, z],
+        [x - d, z - d], [x + d, z - d], [x - d, z + d], [x + d, z + d]
       ];
       for (let i = 0; i < points.length; i++) {
         const col = Math.floor(points[i][0] / CELL);
@@ -728,6 +805,9 @@
       staticCtx.putImageData(imgData, 0, 0);
     }
 
+    // -------------------------------------------------------------
+    // Main Render Loop
+    // -------------------------------------------------------------
     function renderLoop() {
       requestAnimationFrame(renderLoop);
       if (!renderer || !scene || !camera) return;
@@ -737,10 +817,6 @@
       lastTime = now;
 
       if (window.gameEngineStarted) {
-        camera.rotation.order = 'YXZ';
-        camera.rotation.y = cameraYaw;
-        camera.rotation.x = cameraPitch;
-
         let moveFwd = 0, moveSide = 0;
         if (keys.KeyW) moveFwd += 1;
         if (keys.KeyS) moveFwd -= 1;
@@ -751,15 +827,17 @@
         moveSide += joyVector.x;
 
         const moveLen = Math.hypot(moveFwd, moveSide);
+        let currentSpeed = 0;
+
         if (moveLen > 0.05) {
           const normFwd = moveFwd / Math.max(1, moveLen);
           const normSide = moveSide / Math.max(1, moveLen);
-          const speed = 4.2;
+          currentSpeed = 4.0;
 
           const cosY = Math.cos(cameraYaw);
           const sinY = Math.sin(cameraYaw);
-          const vx = (-sinY * normFwd + cosY * normSide) * speed * dt;
-          const vz = (-cosY * normFwd - sinY * normSide) * speed * dt;
+          const vx = (-sinY * normFwd + cosY * normSide) * currentSpeed * dt;
+          const vz = (-cosY * normFwd - sinY * normSide) * currentSpeed * dt;
 
           if (!isWall(camera.position.x + vx, camera.position.z)) camera.position.x += vx;
           if (!isWall(camera.position.x, camera.position.z + vz)) camera.position.z += vz;
@@ -769,36 +847,90 @@
             footstepDist = 0;
             playFootstep();
           }
+
+          headBobTimer += dt * 9.5;
         }
 
-        if (Math.random() < 0.04 && flickerLights.length > 0) {
-          const l = flickerLights[Math.floor(Math.random() * flickerLights.length)];
-          l.intensity = Math.random() < 0.5 ? 0.15 : 0.85;
+        // Head Bobbing & Breathing Effect (โยกมุมมองกล้อง)
+        let bobY = 0, bobZ = 0;
+        if (moveLen > 0.05) {
+          bobY = Math.sin(headBobTimer) * 0.055;
+          bobZ = Math.cos(headBobTimer * 0.5) * 0.012; // เอียงข้างเล็กน้อย
+        } else {
+          bobY = Math.sin(now * 0.002) * 0.012; // หายใจช้าๆ ตอนอยู่นิ่ง
         }
 
+        camera.position.y = 1.5 + bobY;
+        camera.rotation.order = 'YXZ';
+        camera.rotation.y = cameraYaw;
+        camera.rotation.x = cameraPitch;
+        camera.rotation.z = bobZ;
+
+        // สุ่มเสียงสะท้อนหลอนไกลๆ ทุก 18-28 วินาที
+        if (now > nextHallucinationTime) {
+          playDistantHorrorDrone();
+          nextHallucinationTime = now + 18000 + Math.random() * 10000;
+        }
+
+        // ระบบไฟดับสยองขวัญ (Random Blackout)
+        if (!isBlackout && now > nextBlackoutTime) {
+          isBlackout = true;
+          blackoutEndTime = now + 1600; // ไฟดับ 1.6 วินาที
+          ambientLight.intensity = 0.05;
+          if (humGain && audioCtx) humGain.gain.setValueAtTime(0.01, audioCtx.currentTime);
+          for (let i = 0; i < ceilingLights.length; i++) ceilingLights[i].intensity = 0;
+        } else if (isBlackout) {
+          if (now > blackoutEndTime) {
+            isBlackout = false;
+            nextBlackoutTime = now + 24000 + Math.random() * 20000;
+            ambientLight.intensity = 0.32;
+            if (humGain && audioCtx) humGain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+            for (let i = 0; i < ceilingLights.length; i++) ceilingLights[i].intensity = 0.72;
+          }
+        } else {
+          // กะพริบไฟสุ่มตอนปกติ
+          if (Math.random() < 0.04 && ceilingLights.length > 0) {
+            const l = ceilingLights[Math.floor(Math.random() * ceilingLights.length)];
+            l.intensity = Math.random() < 0.5 ? 0.1 : 0.75;
+          }
+        }
+
+        // Entity AI & Proximity Screen Glitch
         const distToPlayer = entity.position.distanceTo(camera.position);
-        if (distToPlayer < 15) {
+
+        if (distToPlayer < 16) {
+          // จอสัญญาณแตกซ่าแรงขึ้นตามความใกล้
+          const glitchStrength = Math.pow(1 - distToPlayer / 16, 1.8);
+          staticCanvas.style.opacity = Math.min(0.75, glitchStrength * 0.85);
+          renderNoise();
+
           if (alarmGain && audioCtx && audioCtx.state === 'running') {
-            const vol = (1 - distToPlayer / 15) * 0.18;
+            const vol = (1 - distToPlayer / 16) * 0.22;
             alarmGain.gain.setValueAtTime(vol, audioCtx.currentTime);
-            alarmOsc.frequency.setValueAtTime(450 + (15 - distToPlayer) * 35, audioCtx.currentTime);
+            alarmOsc.frequency.setValueAtTime(460 + (16 - distToPlayer) * 45, audioCtx.currentTime);
           }
 
           const dir = new THREE.Vector3().subVectors(camera.position, entity.position).normalize();
-          entity.position.x += dir.x * 2.2 * dt;
-          entity.position.z += dir.z * 2.2 * dt;
-          entity.position.y = 1.4 + Math.sin(now * 0.005) * 0.15;
+          entity.position.x += dir.x * 2.35 * dt;
+          entity.position.z += dir.z * 2.35 * dt;
+          entity.position.y = 1.4 + Math.sin(now * 0.006) * 0.18;
 
+          // Jumpscare Moment (เมื่อสัมผัสตัว)
           if (distToPlayer < 1.1) {
             window.gameEngineStarted = false;
-            staticCanvas.style.display = 'block';
+            // แฟลชสีแดงกระชากมุมมอง
+            document.getElementById('jumpscare-flash').style.display = 'block';
+            staticCanvas.style.opacity = 0.95;
             playStaticSound();
             if (document.exitPointerLock) document.exitPointerLock();
+
             setTimeout(() => {
+              document.getElementById('jumpscare-flash').style.display = 'none';
               document.getElementById('over-menu').style.display = 'flex';
             }, 600);
           }
         } else {
+          staticCanvas.style.opacity = 0;
           if (alarmGain && audioCtx && audioCtx.state === 'running') {
             alarmGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
           }
