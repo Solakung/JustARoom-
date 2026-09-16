@@ -313,6 +313,19 @@
       background: radial-gradient(circle, rgba(140,220,30,0.15) 0%, rgba(90,160,10,0.55) 60%, rgba(40,70,0,0.75) 100%);
       mix-blend-mode: screen;
     }
+    /* จอบิดวาบตอนโดน The Gapped คว้าลากผ่านรอยแยก — โทนม่วง-ดำ วนเป็นเกลียวเข้าศูนย์กลาง ต่างจากสีแดงจั๊มสแกร์ตัวอื่น เพื่อสื่อว่าไม่ใช่การถูกฆ่า */
+    #gap-warp-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 16;
+      pointer-events: none;
+      opacity: 0;
+      background: radial-gradient(circle, rgba(20,10,35,0.4) 0%, rgba(60,20,90,0.55) 45%, rgba(5,2,10,0.95) 100%);
+      mix-blend-mode: normal;
+    }
     #jumpscare-strobe {
       position: absolute;
       top: 0;
@@ -618,6 +631,7 @@
   <div id="acid-splash-overlay"></div>
   <div id="chroma-aberration"></div>
   <div id="peripheral-glitch"><div class="figure"></div></div>
+  <div id="gap-warp-overlay"></div>
   <div id="jumpscare-strobe"></div>
   <div id="locker-slit"></div>
   <div id="item-notification">+45% ENERGY RESTORED</div>
