@@ -247,6 +247,19 @@
       opacity: 0;
       background: radial-gradient(circle, rgba(10,8,4,0.9) 0%, rgba(0,0,0,0.98) 100%);
     }
+    /* แฟลชขาววาบตอนกดถ่ายรูป — จำลองแสงแฟลชกล้องจริงๆ แทนไฟฉายส่องต่อเนื่อง */
+    #camera-flash-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 22;
+      pointer-events: none;
+      opacity: 0;
+      background: #ffffff;
+      transition: opacity 0.18s ease-out;
+    }
     #jumpscare-strobe {
       position: absolute;
       top: 0;
@@ -597,6 +610,7 @@
   <div id="dread-vignette"></div>
   <canvas id="noise-canvas"></canvas>
   <div id="subliminal-flash"></div>
+  <div id="camera-flash-overlay"></div>
   <div id="chroma-aberration"></div>
   <div id="peripheral-glitch"><div class="figure"></div></div>
   <div id="jumpscare-strobe"></div>
@@ -616,7 +630,7 @@
     </div>
   </div>
   <div id="crosshair"></div>
-  <div id="flashlight-indicator">FLASHLIGHT OFF</div>
+  <div id="flashlight-indicator" style="display:none;">CAMERA READY</div>
 
   <div id="note-overlay">
     <div class="note-card">
@@ -629,7 +643,7 @@
   <div id="joy-base"><div id="joy-handle"></div></div>
   <div id="touch-look"></div>
   <div id="sprint-btn">SPRINT</div>
-  <div id="flash-btn">FLASH<br>LIGHT</div>
+  <div id="flash-btn">📷<br>SHOT</div>
   <div id="hide-btn">HIDE</div>
   <div id="hide-prompt">[ กด E เพื่อซ่อนตัว ]</div>
 
@@ -655,10 +669,10 @@
       • ประตู EXIT ถูกล็อกไว้ ต้องเก็บ <b>บัตรผ่าน (Keycard) ให้ครบ 3 ใบ</b> ก่อนถึงจะออกได้<br>
       • ถ้าพลังงานใกล้หมด ให้แวะเก็บเครื่องดื่มตามทางเพื่อเติม <b>พลังงาน</b><br>
       • ระหว่างทางมีเอกสาร/โน้ตของเพื่อนร่วมงานวางทิ้งไว้ เก็บอ่านเล่นได้<br>
-      • ใช้ <b>ไฟฉาย</b> ช่วยให้มองเห็นทางเดินชัดขึ้น<br><br>
+      • ใช้ <b>กล้อง</b> ถ่ายรูปเพื่อสร้างแสงแฟลชวาบช่วยให้เห็นทางชัดขึ้นชั่วครู่<br><br>
       <b>การควบคุม:</b><br>
-      • <b>มือถือ:</b> จอยสติ๊กซ้ายเดิน | ปัดนิ้วฝั่งขวาหันมอง | ปุ่ม SPRINT วิ่ง | ปุ่ม FLASHLIGHT ปิด/เปิดไฟฉาย<br>
-      • <b>PC:</b> W, A, S, D เดิน | คลิกเมาส์เพื่อหันมุมมอง | Shift หรือ Space วิ่ง | กด F ปิด/เปิดไฟฉาย
+      • <b>มือถือ:</b> จอยสติ๊กซ้ายเดิน | ปัดนิ้วฝั่งขวาหันมอง | ปุ่ม SPRINT วิ่ง | ปุ่ม CAMERA ถ่ายภาพสร้างแสงแฟลช<br>
+      • <b>PC:</b> W, A, S, D เดิน | คลิกเมาส์เพื่อหันมุมมอง | Shift หรือ Space วิ่ง | กด F ถ่ายภาพสร้างแสงแฟลช
     </p>
     <button id="howto-back-btn" class="action-btn">ย้อนกลับ</button>
     <div class="hint-text">[ แตะที่ใดก็ได้เพื่อย้อนกลับ ]</div>
@@ -726,7 +740,7 @@
     // =============================================================
     
     // Entity 1: The Smiler (หัวลอย + ขากรรไกรอ้าหุบ 3D)
-    let smilerRig, smilerJawMesh, smilerEyesMesh, smilerLight, smilerFaceAnchor;
+    let smilerRig, smilerJawMesh, smilerEyesMesh, smilerLight, smilerFaceAnchor, smilerStalkMesh;
     let smilerSpawn = new THREE.Vector3(90, 1.4, 90);
     let smilerSpeed = 1.2;
     let smilerState = 'PATROL'; // PATROL, ALERT, CHASE
@@ -799,8 +813,8 @@
     let dullerNextCheatTime = performance.now() + 26000 + Math.random() * 8000;
     const CHEAT_MIN_INTERVAL = 22000;
     const CHEAT_MAX_INTERVAL = 38000;
-    const CHEAT_MIN_DIST = 17;   // ขยับให้ไกลขึ้น ผู้เล่นมีเวลาตั้งตัวก่อนเจอ
-    const CHEAT_MAX_DIST = 27;
+    const CHEAT_MIN_DIST = 24;   // เดิม 17 — ขยับให้ไกลขึ้นอีก ผู้เล่นมีเวลาตั้งตัว/ตอบสนองทันมากขึ้น
+    const CHEAT_MAX_DIST = 36;   // เดิม 27
 
     let wallMat, floorMat, ceilingMat, boxGeo;
     let officeWallTex, backroomsWallTex;
@@ -833,7 +847,7 @@
       "บันทึก 3/12 — ฉันได้ยินเสียงเคาะประตูห้องประชุมมาสามคืนติดแล้ว แต่ไม่มีใครอยู่ในนั้นเลย",
       "บันทึก 4/12 — อีเมลพิมพ์ออกมา: 'ห้ามเข้าชั้น 4 ฝั่งตะวันออกหลัง 20:00 น. โดยเด็ดขาด'",
       "บันทึก 5/12 — มีอะไรบางอย่างยืนนิ่งอยู่ปลายทางเดินตอนไฟกระพริบ พอไฟติดอีกทีมันหายไปแล้ว",
-      "บันทึก 6/12 — กระดาษโน้ตกาว: อย่าปิดไฟฉาย ถ้าเห็นอะไรยืนนิ่งอยู่ปลายทางเดิน อย่ามองมันนาน",
+      "บันทึก 6/12 — กระดาษโน้ตกาว: ถ่ายรูปเปิดแฟลชได้เรื่อยๆ แต่ถ้าเห็นอะไรยืนนิ่งอยู่ปลายทางเดิน อย่าถ่ายมันซ้ำ",
       "บันทึก 7/12 — รายงานซ่อมบำรุง: ระบบไฟดับเป็นช่วงๆ ทีมช่างแจ้งว่า 'หาสาเหตุไม่เจอ สายไฟไม่ได้ขาด'",
       "บันทึก 8/12 — หน้าไดอารี่ขาดๆ: มันยิ้มให้ฉัน... สิ่งที่ยืนอยู่ปลายทางเดินนั่นแหละ ฉันไม่แน่ใจว่ามันมีปากจริงๆ หรือฉันคิดไปเอง",
       "บันทึก 9/12 — ข้อความบนกระดานไวท์บอร์ด: TURN BACK. THIS IS NOT THE LOBBY ANYMORE.",
@@ -848,16 +862,17 @@
     let nextAmbientEventTime = performance.now() + 9000 + Math.random() * 6000;
 
     // -------------------------------------------------------------
-    // Flashlight Toggle (ปิดไฟฉายเพื่อลดโอกาสถูกสังเกตเห็น แลกกับมองเห็นน้อยลง)
+    // Camera Flash (เปลี่ยนจากไฟฉายส่องต่อเนื่อง เป็นกล้องถ่ายรูปที่ยิงแสงแฟลชวาบสั้นๆ ตามสั่ง)
     // -------------------------------------------------------------
-    let flashlightOn = false; // เริ่มเกมไฟออฟฟิศยังติดปกติ ไม่มีเหตุผลต้องใช้ไฟฉาย จะเปิดใช้ได้ตอนไฟดับครั้งแรก
-    let flashlightBattery = 100;
-    let flashlightDead = false; // แบตหมดสนิท ถูกบังคับปิดจนกว่าจะชาร์จถึงเกณฑ์ขั้นต่ำ
-    const FLASHLIGHT_DRAIN_PER_SEC = 3.4;   // ใช้ต่อเนื่องได้ ~30 วิ
-    const FLASHLIGHT_REGEN_PER_SEC = 1.4;   // ฟื้นช้ากว่าใช้ ~2.4 เท่า — ปิดๆเปิดๆ สลับก็ยังกินแบตสุทธิ ไม่ใช่รีเซ็ตฟรี
-    const FLASHLIGHT_MIN_TO_REUSE = 35;     // แบตต้องฟื้นถึงระดับนี้ก่อนเปิดใหม่ได้หลังหมด (~25 วิจริงๆ กว่าจะใช้ได้อีกครั้ง)
+    let cameraFlashActive = false; // true แค่ช่วงสั้นๆ ตอนแฟลชวาบ ใช้เช็ค detection/ทำให้ Smiler สะดุ้งถอย
+    let cameraCharge = 100;        // พลังงานกล้อง ถ่ายแต่ละครั้งใช้ไปก้อนหนึ่ง ค่อยๆ ฟื้นเองเมื่อเวลาผ่านไป
+    const CAMERA_FLASH_DURATION_MS = 220;  // ความยาวแฟลชแต่ละครั้ง สั้นแบบแฟลชกล้องจริง ไม่ใช่ไฟส่องค้าง
+    const CAMERA_FLASH_INTENSITY = 3.4;    // วาบสว่างจ้ากว่าไฟฉายเดิมมาก แต่อยู่แค่แป๊บเดียว
+    const CAMERA_CHARGE_COST = 24;         // ต่อการถ่าย 1 ครั้ง (~4 ครั้งจากเต็ม)
+    const CAMERA_CHARGE_REGEN_PER_SEC = 3.2; // ฟื้นเองเรื่อยๆ ไม่ต้องปิดรอเหมือนแบตไฟฉายเดิม
+    const CAMERA_MIN_CHARGE_TO_USE = 24;   // ต้องมีพลังงานอย่างน้อยเท่านี้ถึงจะกดถ่ายได้
 
-    // เสียงที่ผู้เล่นสร้างขึ้น (สปรินท์ / คลิกไฟฉาย) — The Duller ไม่สนแสง แต่ไวต่อเสียงมาก
+    // เสียงที่ผู้เล่นสร้างขึ้น (สปรินท์ / ชัตเตอร์กล้อง) — The Duller ไม่สนแสง แต่ไวต่อเสียงมาก
     let recentNoise = null; // { x, z, radius, time }
     function emitNoise(x, z, radius) {
       recentNoise = { x, z, radius, time: performance.now() };
@@ -1703,10 +1718,52 @@
       return rig;
     }
 
+    // เนื้อผิวหนังเน่าซีด: สีเหลืองหม่นด่างๆ + เส้นเลือดแตก ใช้กับหัว Smiler แทนสีทึบเรียบ
+    function genSmilerFleshTex() {
+      const c = document.createElement('canvas');
+      c.width = 256; c.height = 256;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#8f8768'; ctx.fillRect(0, 0, 256, 256);
+      // รอยด่างช้ำ/เน่า กระจายไม่สม่ำเสมอ
+      for (let i = 0; i < 160; i++) {
+        const x = Math.random() * 256, y = Math.random() * 256, r = 3 + Math.random() * 16;
+        ctx.fillStyle = Math.random() < 0.5 ? 'rgba(55,45,20,0.28)' : 'rgba(110,35,25,0.20)';
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      }
+      // เส้นเลือดฝอยแตกลายงา
+      ctx.strokeStyle = 'rgba(95,10,10,0.4)'; ctx.lineWidth = 1;
+      for (let i = 0; i < 50; i++) {
+        let x = Math.random() * 256, y = Math.random() * 256;
+        ctx.beginPath(); ctx.moveTo(x, y);
+        for (let j = 0; j < 5; j++) { x += (Math.random() - 0.5) * 22; y += (Math.random() - 0.5) * 22; ctx.lineTo(x, y); }
+        ctx.stroke();
+      }
+      const t = new THREE.CanvasTexture(c);
+      return t;
+    }
+
+    // ทำให้ทรงกลมเรียบๆ กลายเป็นก้อนเนื้อบวมนูนไม่เท่ากัน (ลบความรู้สึก "ลูกบอลมันวาว" ของเล่นออก)
+    function deformFleshGeo(geo, amp) {
+      const pos = geo.attributes.position;
+      const v = new THREE.Vector3();
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i);
+        const noise = Math.sin(v.x * 6.5) * Math.cos(v.y * 4.5) * Math.sin(v.z * 5.5);
+        const bump = 1 + noise * amp + (Math.random() - 0.5) * amp * 0.5;
+        v.multiplyScalar(bump);
+        pos.setXYZ(i, v.x, v.y, v.z);
+      }
+      geo.computeVertexNormals();
+    }
+
     // สร้าง The Smiler (หัวลอย + ขากรรไกร 3D อ้าหุบได้จริง)
     function createSmiler3DRig() {
       const rig = new THREE.Group();
-      const whiteMat = new THREE.MeshBasicMaterial({ color: 0xe8e2c8 });
+      const fleshTex = genSmilerFleshTex();
+      // เปลี่ยนจาก MeshBasicMaterial (สีทึบเรียบ ไม่รับแสง ดูเป็นของเล่นเรืองแสงเอง) เป็น MeshStandardMaterial
+      // ผิวด้าน + texture หนังเน่า ให้รับแสงไฟฉายจริง มีเงาในซอกริ้วรอย ไม่ใช่ก้อนเรียบมันวาว
+      const whiteMat = new THREE.MeshStandardMaterial({ map: fleshTex, color: 0xb8a878, roughness: 0.95, metalness: 0 });
+      const skullMat = new THREE.MeshStandardMaterial({ map: fleshTex, color: 0x6e6650, roughness: 1.0, metalness: 0 });
       const darkMat = new THREE.MeshBasicMaterial({ color: 0x020202 });
       const pupilMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
       const veinMat = new THREE.MeshBasicMaterial({ color: 0x5a0000 });
@@ -1714,34 +1771,58 @@
 
       // กลุ่มกะโหลกท่อนบน + ดวงตา (ยืดหัวเล็กน้อยให้ดูผิดรูปมากกว่าทรงกลมสวยๆ)
       const headGroup = new THREE.Group();
-      const voidBg = new THREE.Mesh(new THREE.SphereGeometry(0.82, 12, 12), darkMat);
+      const voidBgGeo = new THREE.SphereGeometry(0.82, 20, 20);
+      deformFleshGeo(voidBgGeo, 0.16); // ผิวบวมนูนไม่เท่ากัน ไม่ใช่ลูกบอลเรียบ
+      const voidBg = new THREE.Mesh(voidBgGeo, skullMat);
       // ยืดหัวเบี้ยวแรงขึ้นกว่าเดิม + เอียงเล็กน้อย ให้ผิดสัดส่วนจากหัวคนมากขึ้น ไม่สมมาตรแบบน่ากลัว
       voidBg.scale.set(0.88, 1.32, 0.96);
       voidBg.rotation.z = 0.06;
       headGroup.add(voidBg);
 
-      // ตาโต 2 ข้าง เยื้องขนาด/ตำแหน่งไม่เท่ากันเล็กน้อย + รูม่านตาดำเยื้องศูนย์ + เส้นเลือดแดงรอบตา ให้ดูจ้องไม่โฟกัส
+      // เนื้อเยื่อห้อยจากใต้คาง ลงไปสู่ความมืด — สื่อว่ามีบางอย่างต่ออยู่ข้างล่างที่มองไม่เห็นทั้งตัว
+      // (ตัดความรู้สึก "หัวลอยได้เฉยๆ แบบผีการ์ตูน" ออก ให้รู้สึกว่ากำลังมองเห็นแค่ส่วนบนของบางอย่างที่ใหญ่กว่า)
+      const stalkGeo = new THREE.CylinderGeometry(0.22, 0.09, 1.6, 8, 4);
+      deformFleshGeo(stalkGeo, 0.22);
+      const stalkMat = new THREE.MeshStandardMaterial({ map: fleshTex, color: 0x4a4436, roughness: 1.0, transparent: true, opacity: 0.88 });
+      const stalk = new THREE.Mesh(stalkGeo, stalkMat);
+      stalk.position.set(0, -1.35, -0.05);
+      headGroup.add(stalk);
+      smilerStalkMesh = stalk;
+
+      // ตาโต 2 ข้าง จมลึกเข้าไปในเบ้ากระดูก (ไม่ใช่โปนออกมาแบบตาการ์ตูน) สีตาเหลืองซีดแบบดีซ่าน
+      // รูม่านตาหดเป็นจุดเล็กจิ๋วแบบคนตายไม่โฟกัส + เส้นเลือดแดงฉีกรอบตา
       const eyeGeo = new THREE.SphereGeometry(0.19, 10, 10);
       const pupilGeo = new THREE.SphereGeometry(0.075, 8, 8);
       const veinGeo = new THREE.TorusGeometry(0.2, 0.025, 6, 12);
+      const scleraMat = new THREE.MeshStandardMaterial({ color: 0xc9be82, roughness: 0.5 }); // เหลืองซีดแบบดีซ่าน ไม่ใช่ขาวสะอาดแบบตาการ์ตูน
+      const socketMat = new THREE.MeshBasicMaterial({ color: 0x0a0805 });
 
-      const lEye = new THREE.Mesh(eyeGeo, whiteMat);
-      lEye.position.set(-0.35, 0.2, 0.78);
-      lEye.scale.set(1.0, 1.35, 0.6); // ตาข้างซ้ายยืดเป็นวงรีแนวตั้งผิดปกติ ไม่กลมเหมือนตาคนจริง
+      // เบ้าตาลึกสีดำอยู่หลังลูกตา ให้ตาดูจมมากกว่าโปน
+      const lSocket = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 10), socketMat);
+      lSocket.position.set(-0.35, 0.2, 0.7);
+      lSocket.scale.set(1.0, 1.2, 0.7);
+      const rSocket = new THREE.Mesh(new THREE.SphereGeometry(0.26, 10, 10), socketMat);
+      rSocket.position.set(0.34, 0.22, 0.7);
+      rSocket.scale.set(1.3, 0.95, 0.7);
+      headGroup.add(lSocket, rSocket);
+
+      const lEye = new THREE.Mesh(eyeGeo, scleraMat);
+      lEye.position.set(-0.35, 0.2, 0.72); // ดึงลูกตาถอยเข้าไปในเบ้า (เดิม 0.78 อยู่แนวเดียวกับผิวหน้า ดูโปนเกิน)
+      lEye.scale.set(1.0, 1.35, 0.55); // ตาข้างซ้ายยืดเป็นวงรีแนวตั้งผิดปกติ ไม่กลมเหมือนตาคนจริง
       const lPupil = new THREE.Mesh(pupilGeo, pupilMat);
-      lPupil.position.set(-0.38, 0.1, 0.86); // รูม่านตาเยื้องต่ำลง เหมือนกำลังจ้องขึ้นตลอดเวลา
-      lPupil.scale.setScalar(0.7);
+      lPupil.position.set(-0.38, 0.1, 0.8); // รูม่านตาเยื้องต่ำลง เหมือนกำลังจ้องขึ้นตลอดเวลา
+      lPupil.scale.setScalar(0.3); // หดเป็นจุดเล็กจิ๋วไร้จุดโฟกัส แทนรูม่านตาโตแบบตกใจ
       const lVein = new THREE.Mesh(veinGeo, veinMat);
-      lVein.position.set(-0.35, 0.2, 0.8);
+      lVein.position.set(-0.35, 0.2, 0.74);
 
-      const rEye = new THREE.Mesh(eyeGeo, whiteMat);
-      rEye.position.set(0.34, 0.22, 0.78);
-      rEye.scale.set(1.55, 0.85, 0.6); // ตาข้างขวาแบนกว้างผิดสัดส่วนไปอีกทาง ให้สองข้างไม่เท่ากันชัดเจน
+      const rEye = new THREE.Mesh(eyeGeo, scleraMat);
+      rEye.position.set(0.34, 0.22, 0.72);
+      rEye.scale.set(1.55, 0.85, 0.55); // ตาข้างขวาแบนกว้างผิดสัดส่วนไปอีกทาง ให้สองข้างไม่เท่ากันชัดเจน
       const rPupil = new THREE.Mesh(pupilGeo, pupilMat);
-      rPupil.position.set(0.24, 0.19, 0.87);
-      rPupil.scale.setScalar(1.5); // รูม่านตาขวาขยายโตผิดปกติ
+      rPupil.position.set(0.24, 0.19, 0.81);
+      rPupil.scale.setScalar(0.35); // หดเป็นจุดเล็กจิ๋วเช่นกัน แต่ไม่เท่าข้างซ้ายเป๊ะ
       const rVein = new THREE.Mesh(veinGeo, veinMat);
-      rVein.position.set(0.34, 0.22, 0.8);
+      rVein.position.set(0.34, 0.22, 0.74);
       rVein.scale.setScalar(1.2);
 
       headGroup.add(lEye, lPupil, lVein, rEye, rPupil, rVein);
@@ -1757,11 +1838,12 @@
       mouthVoid.position.set(0, -0.12, 0.7);
       headGroup.add(mouthVoid);
 
-      // ฟันบน แถวไม่เท่ากัน ทิ่มเอียงสุ่ม ให้ดูแหลมคมไม่เป็นระเบียบ
+      // ฟันบน แถวไม่เท่ากัน ทิ่มเอียงสุ่ม ให้ดูแหลมคมไม่เป็นระเบียบ (สีกระดูก/เขี้ยวเหลืองคราบ แยกจากผิวหนัง ไม่ใช่เนื้อเดียวกับหน้า)
+      const boneMat = new THREE.MeshStandardMaterial({ color: 0xcfc49a, roughness: 0.6 });
       const toothGeo = new THREE.ConeGeometry(0.045, 0.19, 4);
       toothGeo.rotateX(Math.PI);
       for (let i = -7; i <= 7; i++) {
-        const t = new THREE.Mesh(toothGeo, whiteMat);
+        const t = new THREE.Mesh(toothGeo, boneMat);
         const jitter = (Math.random() - 0.5) * 0.04;
         t.position.set(i * 0.075, -0.03 + jitter, 0.8 - Math.abs(i) * 0.03);
         t.rotation.z = (Math.random() - 0.5) * 0.5;
@@ -1776,7 +1858,7 @@
       smilerJawMesh = new THREE.Group();
       const jawToothGeo = new THREE.ConeGeometry(0.04, 0.21, 4);
       for (let i = -7; i <= 7; i++) {
-        const t = new THREE.Mesh(jawToothGeo, whiteMat);
+        const t = new THREE.Mesh(jawToothGeo, boneMat);
         const jitter = (Math.random() - 0.5) * 0.04;
         t.position.set(i * 0.065, 0.05 + jitter, 0.78 - Math.abs(i) * 0.03);
         t.rotation.z = (Math.random() - 0.5) * 0.5;
@@ -1788,7 +1870,9 @@
       smilerJawMesh.position.y = -0.16;
       rig.add(smilerJawMesh);
 
-      smilerLight = new THREE.PointLight(0xfff5cc, 1.8, 9, 2);
+      // เดิมเป็นไฟสีเหลืองนวลสว่างตลอดเวลา (0xfff5cc, 1.8) ทำให้ตัวมันเรืองแสงส่องตัวเองเหมือนโคมไฟ/ของเล่น
+      // เปลี่ยนเป็นแสงสีเขียว-เหลืองซีดแบบเนื้อเน่า ความสว่างต่ำ ต้องเอาไฟฉายส่องถึงเห็นชัด ไม่ใช่เรืองแสงเองตลอด
+      smilerLight = new THREE.PointLight(0x8a9a4a, 0.55, 7, 2);
       smilerLight.position.set(0, 0, 0.5);
       rig.add(smilerLight);
 
@@ -1832,7 +1916,8 @@
       ambientLight = new THREE.AmbientLight(OFFICE_AMBIENT_COLOR, 0.9);
       scene.add(ambientLight);
 
-      flashlight = new THREE.SpotLight(0xfff8e7, 0, 26, Math.PI * 0.25, 0.6, 1.1);
+      // ตัวไฟนี้เดิมคือไฟฉาย ตอนนี้ใช้เป็นแฟลชกล้อง: ปกติปิดสนิท (intensity 0) วาบสว่างเฉพาะตอนกดถ่ายรูป
+      flashlight = new THREE.SpotLight(0xfff8e7, 0, 24, Math.PI * 0.32, 0.5, 1.0);
       camera.add(flashlight);
       flashlight.position.set(0, 0, 0.1);
       flashlight.target = camera;
@@ -2404,10 +2489,11 @@
       }
 
       nextAmbientEventTime = performance.now() + 9000 + Math.random() * 6000;
-      flashlightBattery = 100;
-      flashlightDead = false;
+      cameraCharge = 100;
+      cameraFlashActive = false;
+      if (flashlight) flashlight.intensity = 0;
       recentNoise = null;
-      setFlashlight(false); // ไฟฉายจะใช้ได้ก็ต่อเมื่อไฟดับครั้งแรกเกิดขึ้น
+      updateFlashlightIndicator(); // กล้องจะใช้ได้ก็ต่อเมื่อไฟดับครั้งแรกเกิดขึ้น
       const noteOverlay = document.getElementById('note-overlay');
       if (noteOverlay) noteOverlay.style.display = 'none';
       lastExitLockedNoticeTime = 0;
@@ -2542,42 +2628,45 @@
     }
 
     // -------------------------------------------------------------
-    // Flashlight Toggle (ปิดไฟฉายลดโอกาสถูกสังเกตเห็น แลกกับมองเห็นทางน้อยลง)
+    // Camera Flash (กดถ่ายรูป = วาบแสงจ้าสั้นๆ รอบตัว แทนไฟฉายส่องต่อเนื่อง)
     // -------------------------------------------------------------
-    function setFlashlight(on) {
-      if (on && !firstBlackoutOccurred) return; // ยังไม่มีเหตุผลต้องใช้ไฟฉายก่อนไฟดับครั้งแรก
-      if (on && (flashlightDead || flashlightBattery <= 0.5)) return; // แบตไม่พอ เปิดไม่ติด
-      flashlightOn = on;
-      if (flashlight) flashlight.intensity = on ? 1.2 : 0;
-      const btn = document.getElementById('flash-btn');
-      if (btn) btn.classList.toggle('off', !on);
-      updateFlashlightIndicator();
-    }
-    function toggleFlashlight() {
+    function triggerCameraFlash() {
       if (!window.gameEngineStarted || isJumpscareActive || isHiding || !firstBlackoutOccurred) return;
-      const goingOn = !flashlightOn;
-      setFlashlight(goingOn);
-      // เสียงคลิกไฟฉาย + เสียงเปิด/ปิดตัวมันเอง ดึงความสนใจ The Duller ได้จากระยะไกล
-      emitNoise(camera.position.x, camera.position.z, 14);
+      if (cameraFlashActive) return; // กำลังวาบอยู่ ห้ามซ้อน
+      if (cameraCharge < CAMERA_MIN_CHARGE_TO_USE) return; // พลังงานไม่พอ ถ่ายไม่ได้
+      cameraCharge = Math.max(0, cameraCharge - CAMERA_CHARGE_COST);
+      cameraFlashActive = true;
+      if (flashlight) flashlight.intensity = CAMERA_FLASH_INTENSITY;
+      if (camFlashOverlayEl) {
+        camFlashOverlayEl.style.transition = 'none';
+        camFlashOverlayEl.style.opacity = '0.85';
+        requestAnimationFrame(() => {
+          camFlashOverlayEl.style.transition = 'opacity 0.18s ease-out';
+          camFlashOverlayEl.style.opacity = '0';
+        });
+      }
+      setTimeout(() => {
+        if (flashlight) flashlight.intensity = 0;
+        cameraFlashActive = false;
+      }, CAMERA_FLASH_DURATION_MS);
+      updateFlashlightIndicator();
+      // เสียงชัตเตอร์ + แสงวาบ ดึงความสนใจ The Duller ได้จากระยะไกล
+      emitNoise(camera.position.x, camera.position.z, 16);
     }
     function updateFlashlightIndicator() {
       const indicator = document.getElementById('flashlight-indicator');
       if (!indicator) return;
       if (!firstBlackoutOccurred) {
-        indicator.style.display = 'none'; // ยังไม่มีไฟฉายให้ใช้ก่อนไฟดับครั้งแรก
+        indicator.style.display = 'none'; // ยังไม่มีกล้องให้ใช้ก่อนไฟดับครั้งแรก
         return;
       }
-      if (flashlightDead) {
-        indicator.style.color = '#ff5555';
-        indicator.innerText = `แบตไฟฉายหมด — กำลังชาร์จ ${Math.floor(flashlightBattery)}%`;
-        indicator.style.display = 'block';
-      } else if (!flashlightOn) {
+      if (cameraCharge < CAMERA_MIN_CHARGE_TO_USE) {
         indicator.style.color = '#ff8888';
-        indicator.innerText = 'FLASHLIGHT OFF';
+        indicator.innerText = `กล้องกำลังชาร์จ ${Math.floor(cameraCharge)}%`;
         indicator.style.display = 'block';
-      } else if (flashlightBattery < 25) {
+      } else if (cameraCharge < 60) {
         indicator.style.color = '#ffb84d';
-        indicator.innerText = `แบตไฟฉายต่ำ ${Math.floor(flashlightBattery)}%`;
+        indicator.innerText = `พลังงานกล้อง ${Math.floor(cameraCharge)}%`;
         indicator.style.display = 'block';
       } else {
         indicator.style.display = 'none';
@@ -2656,7 +2745,7 @@
     window.addEventListener('keydown', (e) => { if (keys.hasOwnProperty(e.code)) keys[e.code] = true; });
     window.addEventListener('keyup', (e) => { if (keys.hasOwnProperty(e.code)) keys[e.code] = false; });
     window.addEventListener('keydown', (e) => {
-      if (e.code === 'KeyF') toggleFlashlight();
+      if (e.code === 'KeyF') triggerCameraFlash();
       if (e.code === 'KeyE') toggleHiding();
     });
 
@@ -2695,7 +2784,7 @@
     const flashBtn = document.getElementById('flash-btn');
     flashBtn.addEventListener('pointerdown', (e) => {
       e.preventDefault(); e.stopPropagation();
-      toggleFlashlight();
+      triggerCameraFlash();
     });
 
     document.body.addEventListener('click', (e) => {
@@ -2865,6 +2954,7 @@
     staticCanvas.width = 160; staticCanvas.height = 120;
     const dreadVignetteEl = document.getElementById('dread-vignette');
     const subliminalFlashEl = document.getElementById('subliminal-flash');
+    const camFlashOverlayEl = document.getElementById('camera-flash-overlay');
     const viewportEl = document.getElementById('viewport');
     const hudEl = document.querySelector('.hud');
     const chromaEl = document.getElementById('chroma-aberration');
@@ -3087,19 +3177,8 @@
           hideBtn.classList.add('disabled');
         }
 
-        // ระบบแบตไฟฉาย: ใช้แล้วหมดไปเรื่อยๆ, ปิดไว้ค่อยๆ ฟื้น
-        if (flashlightOn) {
-          flashlightBattery = Math.max(0, flashlightBattery - FLASHLIGHT_DRAIN_PER_SEC * dt);
-          if (flashlightBattery <= 0) {
-            flashlightDead = true;
-            setFlashlight(false);
-          }
-        } else {
-          flashlightBattery = Math.min(100, flashlightBattery + FLASHLIGHT_REGEN_PER_SEC * dt);
-          if (flashlightDead && flashlightBattery >= FLASHLIGHT_MIN_TO_REUSE) {
-            flashlightDead = false;
-          }
-        }
+        // พลังงานกล้อง: ค่อยๆ ฟื้นเองตลอดเวลา ไม่ต้องปิดรอเหมือนแบตไฟฉายเดิม (เพราะตอนนี้เป็นการยิงแฟลชสั้นๆ ไม่ใช่เปิดค้าง)
+        cameraCharge = Math.min(100, cameraCharge + CAMERA_CHARGE_REGEN_PER_SEC * dt);
         updateFlashlightIndicator();
 
         // ระบบลดค่า Energy / Sanity
@@ -3231,7 +3310,7 @@
         if (!isBlackout && now > nextBlackoutTime) {
           isBlackout = true;
           blackoutEndTime = now + 2000;
-          ambientLight.intensity = 0.04;
+          ambientLight.intensity = 0.11; // เดิม 0.04 มืดสนิทจนงงเกินไป ปรับให้พอเห็นเงาลางๆ ระหว่างไฟดับ
           if (humGain && audioCtx) humGain.gain.setValueAtTime(0.02, audioCtx.currentTime);
           for (let i = 0; i < ceilingLights.length; i++) ceilingLights[i].intensity = 0;
           // มุมมองบิดเบี้ยวเล็กน้อยตอนไฟดับ ให้รู้สึกพื้นที่ผิดปกติ ไม่ใช่แค่มืดเฉยๆ
@@ -3250,9 +3329,9 @@
           if (now > blackoutEndTime) {
             isBlackout = false;
             nextBlackoutTime = now + 28000 + Math.random() * 20000;
-            ambientLight.intensity = 0.82;
+            ambientLight.intensity = 0.5; // เดิม 0.82 สว่างเกินไปสำหรับบรรยากาศ backrooms ทั่วไป ลดลงให้มืดขึ้น พึ่งแสงแฟลชกล้องมากขึ้น
             if (humGain && audioCtx) humGain.gain.setValueAtTime(0.18, audioCtx.currentTime);
-            for (let i = 0; i < ceilingLights.length; i++) ceilingLights[i].intensity = 0.85;
+            for (let i = 0; i < ceilingLights.length; i++) ceilingLights[i].intensity = 0.6; // เดิม 0.85
             camera.fov = 72;
             camera.updateProjectionMatrix();
 
@@ -3286,8 +3365,8 @@
                 document.getElementById('sprint-btn').style.display = 'flex';
                 document.getElementById('hide-btn').style.display = 'flex';
               }
-              // ไฟดับครั้งแรก = มืดจริง เปิดไฟฉายให้อัตโนมัติ (ผู้เล่นยังกด F/ปุ่มปิดเองได้ตามปกติ)
-              setFlashlight(true);
+              // ไฟดับครั้งแรก = มืดจริง ผู้เล่นเริ่มใช้กล้อง (กด F / ปุ่มถ่ายรูป) เพื่อยิงแฟลชช่วยดูทางได้ตั้งแต่ตอนนี้
+              updateFlashlightIndicator();
 
               // ตั้งคิวเวลา "โกง" วาปเข้าใกล้ผู้เล่นใหม่ทั้งหมด ณ จุดที่ entity เริ่มทำงานจริง
               // (ถ้าไม่ตั้งใหม่ตรงนี้ ตัวจับเวลาเดิมที่นับมาตั้งแต่ต้นเกมจะหมดอายุพร้อมกันหมด
@@ -3363,8 +3442,8 @@
         // =========================================================
         const distSmiler = smilerRig.position.distanceTo(camera.position);
 
-        // ปิดไฟฉาย = ระยะที่ entity สังเกตเห็นผู้เล่นลดลง / ซ่อนตัวในตู้เอกสาร = มองไม่เห็นผู้เล่นเลย ไม่ว่าระยะจะใกล้แค่ไหน
-        const detectMult = flashlightOn ? 1.0 : 0.62;
+        // ไม่มีไฟฉายส่องต่อเนื่องแล้ว ปกติผู้เล่นมืดสนิทเท่า baseline / ตอนกล้องวาบแฟลช ระยะที่มันสังเกตเห็นผู้เล่นพุ่งสูงขึ้นชั่วครู่
+        const detectMult = cameraFlashActive ? 1.3 : 0.62;
         if (!isHiding && distSmiler < 20 * detectMult) {
           smilerState = 'CHASE';
 
@@ -3380,10 +3459,10 @@
 
           const dir = new THREE.Vector3().subVectors(camera.position, smilerRig.position).normalize();
 
-          // Smiler ล่าด้วยสายตา: ถ้าผู้เล่นส่องไฟฉายจ่อหน้ามันตรงๆ ในระยะใกล้ มันจะสะดุ้งถอยแทนที่จะพุ่งเข้าหา
+          // Smiler ล่าด้วยสายตา: ถ้าผู้เล่นถ่ายรูปวาบแฟลชจ่อหน้ามันตรงๆ ในระยะใกล้ มันจะสะดุ้งถอยแทนที่จะพุ่งเข้าหา
           const fx = -Math.sin(cameraYaw), fz = -Math.cos(cameraYaw);
           const litDot = fx * -dir.x + fz * -dir.z; // มุมระหว่างทิศที่มองกับทิศไปหา Smiler
-          const isBlindedByLight = flashlightOn && distSmiler < SMILER_LIGHT_REPEL_DIST && litDot > SMILER_LIGHT_REPEL_DOT;
+          const isBlindedByLight = cameraFlashActive && distSmiler < SMILER_LIGHT_REPEL_DIST && litDot > SMILER_LIGHT_REPEL_DOT;
 
           if (isBlindedByLight) {
             smilerState = 'RECOIL';
@@ -3449,6 +3528,11 @@
           smilerJawMesh.position.y = -0.16 - Math.abs(Math.sin(now * 0.006) * 0.6 + Math.sin(now * 0.021) * 0.4) * 0.22;
         }
         smilerRig.position.y = 1.4 + Math.sin(now * 0.005) * 0.15;
+        // เนื้อเยื่อที่ห้อยลงมาแกว่งช้าๆ ไม่สม่ำเสมอ ให้ดูเหมือนหนังหย่อนแขวนอยู่กับอะไรบางอย่าง ไม่ใช่แท่งแข็งติดหัว
+        if (smilerStalkMesh) {
+          smilerStalkMesh.rotation.x = Math.sin(now * 0.0009) * 0.12;
+          smilerStalkMesh.rotation.z = Math.sin(now * 0.0013 + 1.7) * 0.1;
+        }
 
         // "หยุดนิ่งแล้วสะบัดหน้าจ้อง" — ระหว่างลาดตระเวน มันจะหยุดหันมองตรงมาที่ผู้เล่นเป็นเสี้ยววินาทีแบบไร้สาเหตุ
         // ก่อนหันกลับไปเดินต่อเหมือนไม่มีอะไรเกิดขึ้น (ไม่กระทบระยะ/ตำแหน่งจริง แค่หลอนสายตา)
@@ -3458,8 +3542,8 @@
             smilerNextTwitchTime = now + 5000 + Math.random() * 9000;
             // แวบไฟจ้าขึ้นเสี้ยววินาทีพร้อมจังหวะที่มันหันมาจ้อง — ให้ความรู้สึกสะดุ้งพร้อมภาพ ไม่ใช่แค่หันหน้ามาเฉยๆ
             if (smilerLight) {
-              smilerLight.intensity = 3.2;
-              setTimeout(() => { if (smilerLight) smilerLight.intensity = 1.8; }, 90);
+              smilerLight.intensity = 2.0;
+              setTimeout(() => { if (smilerLight) smilerLight.intensity = 0.55; }, 90);
             }
           }
           if (now < smilerTwitchUntil) {
