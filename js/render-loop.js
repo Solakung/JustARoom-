@@ -785,11 +785,61 @@
         const distDuller = dullerRig.position.distanceTo(camera.position);
 
         // The Duller ตาบอด ไม่สนไฟฉายเปิด/ปิดเลย (ระยะตรวจจับคงที่) แต่หูไวมาก
-        // เสียงสปรินท์/คลิกไฟฉายจะดึงมันมาจากระยะไกลกว่าระยะมองเห็นปกติ
-        const dullerNoiseHeard = !!recentNoise && (now - recentNoise.time < 700) &&
-          Math.hypot(dullerRig.position.x - recentNoise.x, dullerRig.position.z - recentNoise.z) < recentNoise.radius;
+        // เสียงสปรินท์/ชัตเตอร์กล้องจะดึงมันมาจากระยะไกลกว่าระยะมองเห็นปกติ:
+        //  - ได้ยินตอนอยู่ไกล  -> วิ่งไล่ตามตัวผู้เล่นสดๆ (state 'CHASE', ปรับทิศทุกเฟรมตามที่ผู้เล่นขยับ)
+        //  - ได้ยินตอนอยู่ใกล้ -> พุ่งใส่ "ตำแหน่งที่เกิดเสียง" แบบเจาะจง (state 'LUNGE', ล็อกจุดหมายไว้ ไม่ตามตัวผู้เล่นระหว่างพุ่ง)
+        const dullerNoiseFresh = !!recentNoise && (now - recentNoise.time < 700);
+        const distDullerToNoise = dullerNoiseFresh
+          ? Math.hypot(dullerRig.position.x - recentNoise.x, dullerRig.position.z - recentNoise.z)
+          : Infinity;
+        const dullerNoiseHeard = dullerNoiseFresh && distDullerToNoise < recentNoise.radius;
+        const dullerNoiseCloseEnoughToLunge = dullerNoiseHeard && distDullerToNoise < DULLER_LUNGE_TRIGGER_DIST;
 
-        if (!isHiding && (distDuller < DULLER_BASE_DETECT_RANGE || dullerNoiseHeard)) {
+        if (isHiding && dullerState === 'LUNGE') {
+          // ผู้เล่นซ่อนตัวไปแล้วระหว่างที่มันกำลังพุ่ง -> เลิกพุ่ง ไปค้นหาแถวจุดเสียงแทน
+          dullerState = 'PATROL';
+          dullerLastKnownPos.copy(dullerLungeTarget);
+          dullerSearchUntil = now + SEARCH_LINGER_MS;
+        }
+
+        if (dullerState !== 'LUNGE' && !isHiding && dullerNoiseCloseEnoughToLunge) {
+          // เริ่มพุ่งใส่ตำแหน่งเสียงทันที (ล็อกจุดหมายไว้ ณ ตอนนี้ ไม่ใช่ไล่ตามตัวสดๆ อีกต่อไป)
+          dullerState = 'LUNGE';
+          dullerLungeTarget.set(recentNoise.x, dullerRig.position.y, recentNoise.z);
+          dullerLungeUntil = now + DULLER_LUNGE_MAX_MS;
+        }
+
+        if (dullerState === 'LUNGE') {
+          playerEnergy = Math.max(0, playerEnergy - 0.9 * dt);
+          dullerSpeed = DULLER_LUNGE_SPEED;
+
+          if (dullerSoundGain && audioCtx && audioCtx.state === 'running') {
+            const dVol = Math.max(0, 1 - distDuller / 18) * 0.25;
+            dullerSoundGain.gain.setValueAtTime(dVol, audioCtx.currentTime);
+            dullerOsc.frequency.setValueAtTime(130 + Math.max(0, 18 - distDuller) * 8, audioCtx.currentTime);
+          }
+
+          const distToLungeTarget = dullerRig.position.distanceTo(dullerLungeTarget);
+          if (distToLungeTarget < DULLER_LUNGE_ARRIVE_DIST || now > dullerLungeUntil) {
+            // พุ่งถึงจุดหมาย (หรือหมดเวลา) แล้วไม่เจอผู้เล่นตรงนั้นพอดี -> เข้าโหมดค้นหาแถวนั้นต่อ
+            dullerState = 'PATROL';
+            dullerLastKnownPos.copy(dullerLungeTarget);
+            dullerSearchUntil = now + SEARCH_LINGER_MS;
+          } else {
+            const dDir = new THREE.Vector3().subVectors(dullerLungeTarget, dullerRig.position).normalize();
+            dullerRig.position.x += dDir.x * dullerSpeed * dt;
+            dullerRig.position.z += dDir.z * dullerSpeed * dt;
+            dullerRig.lookAt(dullerLungeTarget.x, dullerRig.position.y, dullerLungeTarget.z);
+          }
+
+          if (distDuller < 1.45) {
+            isJumpscareActive = true;
+            jumpscareTargetRig = dullerRig;
+            jumpscareStartTime = now;
+            playViolentJumpscareSound();
+            if (document.exitPointerLock) document.exitPointerLock();
+          }
+        } else if (!isHiding && (distDuller < DULLER_BASE_DETECT_RANGE || dullerNoiseHeard)) {
           dullerState = 'CHASE';
           playerEnergy = Math.max(0, playerEnergy - 0.9 * dt);
           dullerSpeed = (distDuller < 10.0) ? 4.6 : 2.5;

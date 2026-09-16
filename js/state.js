@@ -264,6 +264,14 @@
 
     // Duller ตาบอด ไม่สนไฟฉาย ระยะตรวจจับพื้นฐานคงที่เสมอ (ต่างกับ Smiler/Bacteria ที่ยิ่งเปิดไฟยิ่งเห็นไกลขึ้น)
     const DULLER_BASE_DETECT_RANGE = 23;
+    // ได้ยินเสียง (วิ่ง/ถ่ายรูป) ตอนอยู่ไกล -> วิ่งไล่ตามตัวผู้เล่นสดๆ (ปรับทิศตามที่ผู้เล่นขยับ)
+    // ได้ยินเสียงตอนอยู่ใกล้กว่านี้ -> เปลี่ยนเป็น "พุ่งใส่ตำแหน่งที่เกิดเสียง" แบบเจาะจง ไม่ตามตัวผู้เล่นระหว่างพุ่ง
+    const DULLER_LUNGE_TRIGGER_DIST = 10.0;
+    const DULLER_LUNGE_SPEED = 6.2;      // เร็วกว่าไล่ล่าปกติ เพราะเป็นการพุ่งใส่จุดเดียวแบบทุ่มสุดตัว
+    const DULLER_LUNGE_MAX_MS = 2600;    // กันพุ่งค้าง ถ้าไปไม่ถึงจุดเสียงพอดี (เช่นโดนของกีดขวาง)
+    const DULLER_LUNGE_ARRIVE_DIST = 1.3;
+    let dullerLungeTarget = new THREE.Vector3();
+    let dullerLungeUntil = 0;
     let smilerLastKnownPos = new THREE.Vector3();
     let smilerSearchUntil = 0;
     let bacteriaLastKnownPos = new THREE.Vector3();
