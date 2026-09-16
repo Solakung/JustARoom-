@@ -300,6 +300,19 @@
       background: #ffffff;
       transition: opacity 0.18s ease-out;
     }
+    /* แฟลชเขียวขุ่นวาบสั้นๆ ตอนโดนกรดจาก Acid Man สาดใส่ */
+    #acid-splash-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 23;
+      pointer-events: none;
+      opacity: 0;
+      background: radial-gradient(circle, rgba(140,220,30,0.15) 0%, rgba(90,160,10,0.55) 60%, rgba(40,70,0,0.75) 100%);
+      mix-blend-mode: screen;
+    }
     #jumpscare-strobe {
       position: absolute;
       top: 0;
@@ -602,6 +615,7 @@
   <canvas id="noise-canvas"></canvas>
   <div id="subliminal-flash"></div>
   <div id="camera-flash-overlay"></div>
+  <div id="acid-splash-overlay"></div>
   <div id="chroma-aberration"></div>
   <div id="peripheral-glitch"><div class="figure"></div></div>
   <div id="jumpscare-strobe"></div>
