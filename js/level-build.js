@@ -217,6 +217,7 @@
       acidProjectiles = [];
       acidThrowCooldownUntil = 0;
       acidShakeUntil = 0;
+      acidBurnUntil = 0;
       
       for (let k in keys) keys[k] = false;
       joyVector.x = 0;

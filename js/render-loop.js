@@ -170,7 +170,7 @@
         if (isSprintBoost && now > sprintBoostEndTime) {
           isSprintBoost = false; // หมดช่วงวิ่งพุ่ง กลับความเร็วปกติ
         }
-        const playerSpeed = isSprintBoost ? 4.0 * SPRINT_SPEED_MULT : 4.0;
+        const playerSpeed = (isSprintBoost ? 4.0 * SPRINT_SPEED_MULT : 4.0) * (now < acidBurnUntil ? ACID_BURN_SPEED_MULT : 1);
 
         // อัพเดตปุ่ม Sprint บนจอ (เทาลงระหว่างคูลดาวน์)
         if (now < sprintCooldownEndTime) {
@@ -225,6 +225,7 @@
         // ระบบลดค่า Energy / Sanity
         let drainRate = 0.45 * dt;
         if (isBlackout) drainRate = 1.5 * dt;
+        if (now < acidBurnUntil) drainRate += ACID_BURN_DRAIN_PER_SEC * dt; // แผลกรดยังกัดกร่อนต่อเนื่อง
         playerEnergy = Math.max(0, playerEnergy - drainRate);
         updateEnergyHUD();
 
@@ -929,6 +930,7 @@
               playerEnergy = Math.max(0, playerEnergy - ACID_SPLASH_DAMAGE);
               updateEnergyHUD();
               acidShakeUntil = now + 380;
+              acidBurnUntil = now + ACID_BURN_DURATION;
               if (acidSplashEl) {
                 acidSplashEl.style.transition = 'none';
                 acidSplashEl.style.opacity = '0.85';

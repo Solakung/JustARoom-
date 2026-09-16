@@ -87,6 +87,12 @@
     let acidProjectiles = []; // { mesh, target: Vector3, life }
     let acidShakeUntil = 0;
 
+    // ผลกรดกัดผิวหลังโดนสาด: เดินช้าลง + SANITY ไหลออกไวขึ้นไปอีกพักหนึ่ง (นอกเหนือจากความเสียหายทันทีตอนโดน)
+    const ACID_BURN_DURATION = 6000;      // ms ที่แผลไหม้ยังกัดกร่อนต่อเนื่อง
+    const ACID_BURN_SPEED_MULT = 0.55;    // เดินได้แค่ ~55% ของความเร็วปกติระหว่างนี้
+    const ACID_BURN_DRAIN_PER_SEC = 2.4;  // SANITY ไหลเพิ่มขึ้นต่อวินาทีระหว่างแผลไหม้ยังกัดกร่อนอยู่
+    let acidBurnUntil = 0;
+
     // กระป๋อง Almond Milk ทั่วแมป
     let almondBottles = [];
 
