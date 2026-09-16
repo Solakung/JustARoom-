@@ -572,6 +572,11 @@
         if (acidManRig) acidManRig.visible = true;
         if (gappedRig) gappedRig.visible = true;
 
+        // ไม่มีไฟฉายส่องต่อเนื่องแล้ว ปกติผู้เล่นมืดสนิทเท่า baseline / ตอนกล้องวาบแฟลช ระยะที่มันสังเกตเห็นผู้เล่นพุ่งสูงขึ้นชั่วครู่
+        // ประกาศไว้ตรงนี้ (ระดับบนสุดของบล็อก entity) เพราะ AI ทั้ง 5 ตัวใช้ค่าเดียวกัน
+        // เดิมประกาศไว้ข้างใน else-block ของ Smiler ทำให้ Bacteria/Acid Man/Gapped มองไม่เห็นตัวแปรนี้ → ReferenceError ทุกเฟรมหลังไฟดับครั้งแรก
+        const detectMult = cameraFlashActive ? 1.3 : 0.62;
+
         // =========================================================
         // AI 1: The Smiler (ลอยเคว้งส่าย + อ้าขากรรไกร 3D)
         // =========================================================
@@ -585,8 +590,6 @@
         } else {
         if (smilerState === 'STUNNED') smilerState = 'PATROL'; // หมดเวลาสตันแล้ว ประเมินสถานะใหม่ด้านล่าง
 
-        // ไม่มีไฟฉายส่องต่อเนื่องแล้ว ปกติผู้เล่นมืดสนิทเท่า baseline / ตอนกล้องวาบแฟลช ระยะที่มันสังเกตเห็นผู้เล่นพุ่งสูงขึ้นชั่วครู่
-        const detectMult = cameraFlashActive ? 1.3 : 0.62;
         if (!isHiding && distSmiler < 20 * detectMult) {
           smilerState = 'CHASE';
 
