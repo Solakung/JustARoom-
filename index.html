@@ -210,6 +210,46 @@
       text-align: left;
     }
 
+    #notes-gallery-menu {
+      overflow-y: auto;
+      justify-content: flex-start;
+      padding-top: 48px;
+      padding-bottom: 48px;
+    }
+    #notes-gallery-count {
+      font-size: 13px;
+      color: #e5cb5b;
+      letter-spacing: 1px;
+      margin-bottom: 18px;
+      pointer-events: none;
+    }
+    #notes-gallery-list {
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 24px;
+      pointer-events: none;
+    }
+    .note-gallery-entry {
+      text-align: left;
+      font-size: 12.5px;
+      line-height: 1.6;
+      padding: 12px 14px;
+      border-radius: 6px;
+      border: 1px solid #6b6640;
+    }
+    .note-gallery-entry.found {
+      background: rgba(140, 134, 77, 0.16);
+      color: #d9d2a0;
+    }
+    .note-gallery-entry.locked {
+      background: rgba(60, 58, 40, 0.3);
+      color: #6b6640;
+      font-style: italic;
+    }
+
     #noise-canvas {
       position: absolute;
       top: 0;
@@ -584,6 +624,43 @@
       window.gameEngineStarted = true;
     };
 
+    // กลับไปหน้าเมนูหลักจากหน้าแพ้/ชนะ แทนที่จะเริ่มเกมใหม่ทันที
+    window.doBackToHome = function(e) {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      document.getElementById('over-menu').style.display = 'none';
+      document.getElementById('win-menu').style.display = 'none';
+      if (window.regenerateLevelAndRestart) {
+        window.regenerateLevelAndRestart();
+      }
+      window.gameEngineStarted = false;
+      const menu = document.getElementById('start-menu');
+      if (menu) menu.style.display = 'flex';
+    };
+
+    // เปิด/ปิดหน้าจอสรุปโน้ตที่เก็บได้ (สะสมข้ามรอบเล่นในเซสชันนี้)
+    window.openNotesGallery = function(e) {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      const gallery = document.getElementById('notes-gallery-menu');
+      const list = document.getElementById('notes-gallery-list');
+      if (list && window.LORE_TEXTS_REF) {
+        const collected = window.collectedLoreSet || new Set();
+        list.innerHTML = window.LORE_TEXTS_REF.map((txt, i) => {
+          const found = collected.has(txt);
+          return `<div class="note-gallery-entry ${found ? 'found' : 'locked'}">` +
+            (found ? txt : `บันทึก ${i + 1}/${window.LORE_TEXTS_REF.length} — ??? (ยังไม่พบเอกสารนี้)`) +
+            `</div>`;
+        }).join('');
+        const countEl = document.getElementById('notes-gallery-count');
+        if (countEl) countEl.innerText = `พบแล้ว ${collected.size}/${window.LORE_TEXTS_REF.length}`;
+      }
+      if (gallery) gallery.style.display = 'flex';
+    };
+    window.closeNotesGallery = function(e) {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      const gallery = document.getElementById('notes-gallery-menu');
+      if (gallery) gallery.style.display = 'none';
+    };
+
     // เปิด/ปิดหน้าจอ "วิธีเล่น"
     // ปุ่มเปิดผูกทั้ง pointerdown/click/touchend + stopPropagation ทุกตัว เพราะ #start-menu
     // ข้างนอกดักฟัง 3 event นี้อยู่ (แตะตรงไหนก็เริ่มเกม) — ถ้าไม่ stopPropagation ให้ครบทุก
@@ -657,8 +734,18 @@
     <div class="menu-btn-row">
       <button id="start-btn" class="action-btn">START GAME</button>
       <button id="howto-btn" class="action-btn secondary-btn" onpointerdown="openHowTo(event)" onclick="openHowTo(event)" ontouchend="openHowTo(event)">วิธีเล่น</button>
+      <button id="notes-gallery-btn" class="action-btn secondary-btn" onpointerdown="openNotesGallery(event)" onclick="openNotesGallery(event)" ontouchend="openNotesGallery(event)">📄 บันทึกที่เก็บได้</button>
     </div>
     <div class="hint-text">[ แตะปุ่ม START GAME หรือแตะตรงไหนก็ได้บนจอเพื่อเริ่ม ]</div>
+  </div>
+
+  <!-- Notes Gallery: สรุปโน้ต/เอกสารที่เก็บได้สะสม -->
+  <div id="notes-gallery-menu" class="dialog-layer" style="display: none;" onclick="closeNotesGallery(event)">
+    <h1>📄 บันทึกที่เก็บได้</h1>
+    <div id="notes-gallery-count"></div>
+    <div id="notes-gallery-list"></div>
+    <button id="notes-gallery-back-btn" class="action-btn">ย้อนกลับ</button>
+    <div class="hint-text">[ แตะที่ใดก็ได้เพื่อย้อนกลับ ]</div>
   </div>
 
   <!-- How To Play -->
@@ -686,7 +773,10 @@
       <b>คุณไม่มีวันหาทางออกเจอ</b>
     </p>
     <p id="survival-time-over" style="color: #f0d9a0; font-size: 13px; letter-spacing: 1px; margin-top: 4px;"></p>
-    <button id="retry-btn" class="action-btn">TRY AGAIN</button>
+    <div class="menu-btn-row">
+      <button id="retry-btn" class="action-btn">TRY AGAIN</button>
+      <button id="over-home-btn" class="action-btn secondary-btn" onpointerdown="doBackToHome(event)" onclick="doBackToHome(event)" ontouchend="doBackToHome(event)">กลับหน้าหลัก</button>
+    </div>
     <div class="hint-text">[ แตะที่ใดก็ได้เพื่อลองใหม่อีกครั้ง ]</div>
   </div>
 
@@ -695,7 +785,10 @@
     <h1 style="color: #6ed66e; text-shadow: 0 0 15px #0f0;">YOU ESCAPED</h1>
     <p>คุณผลักประตูหนีไฟและหลุดพ้นจากฝันร้ายได้สำเร็จ!</p>
     <p id="survival-time-win" style="color: #d9f0d9; font-size: 13px; letter-spacing: 1px; margin-top: 4px;"></p>
-    <button id="replay-btn" class="action-btn">PLAY AGAIN</button>
+    <div class="menu-btn-row">
+      <button id="replay-btn" class="action-btn">PLAY AGAIN</button>
+      <button id="win-home-btn" class="action-btn secondary-btn" onpointerdown="doBackToHome(event)" onclick="doBackToHome(event)" ontouchend="doBackToHome(event)">กลับหน้าหลัก</button>
+    </div>
     <div class="hint-text">[ แตะที่ใดก็ได้เพื่อเริ่มใหม่ ]</div>
   </div>
 
@@ -840,7 +933,10 @@
     let lastExitLockedNoticeTime = 0;
 
     let loreNotes = [];
-    let notesCollected = 0;
+    // สะสมข้อความโน้ตที่เคยเก็บได้ ไม่รีเซ็ตตอนเริ่มเกมใหม่ในเซสชันเดียวกัน
+    // เพื่อให้หน้าสรุปโน้ตในเมนูหลักแสดงความคืบหน้าสะสมทั้งหมด
+    let collectedLoreSet = new Set();
+    window.collectedLoreSet = collectedLoreSet;
     const LORE_TEXTS = [
       "บันทึก 1/12 — ทุกคนกลับบ้านหมดแล้วตั้งแต่สามทุ่ม... แต่ทำไมลิฟต์ยังขึ้นๆลงๆ เองอยู่เลย",
       "บันทึก 2/12 — ป้ายประกาศ: 'พนักงานที่ทำงานล่วงเวลาเกิน 22:00 น. กรุณาอย่าเดินออกนอกเส้นทางที่กำหนด'",
@@ -855,6 +951,7 @@
       "บันทึก 11/12 — โน้ตในลิ้นชัก: นับก้าวเดินของตัวเองไว้เสมอ ถ้าตัวเลขไม่ตรงกับที่จำได้ แปลว่าห้องเปลี่ยนไปแล้ว",
       "บันทึก 12/12 — หน้ากระดาษไหม้เกรียม: ...มันไม่ใช่สำนักงาน... มันไม่เคยเป็นสำนักงาน..."
     ];
+    window.LORE_TEXTS_REF = LORE_TEXTS;
 
     // -------------------------------------------------------------
     // Ambient Dread Events (เหตุการณ์หลอนที่ไม่ทำร้ายผู้เล่นโดยตรง)
@@ -911,7 +1008,7 @@
     const SMILER_RECOIL_SPEED = 3.0;
 
     // Duller ตาบอด ไม่สนไฟฉาย ระยะตรวจจับพื้นฐานคงที่เสมอ (ต่างกับ Smiler/Bacteria ที่ยิ่งเปิดไฟยิ่งเห็นไกลขึ้น)
-    const DULLER_BASE_DETECT_RANGE = 18;
+    const DULLER_BASE_DETECT_RANGE = 23;
     let smilerLastKnownPos = new THREE.Vector3();
     let smilerSearchUntil = 0;
     let bacteriaLastKnownPos = new THREE.Vector3();
@@ -1564,25 +1661,105 @@
     // -------------------------------------------------------------
     // 4. สร้าง 3D Rig มอนสเตอร์ (ขยับแขนขาได้จริง)
     // -------------------------------------------------------------
-    
+
+    // ผิวหนัง The Bacteria: เนื้อเน่าเปื่อยสีเขียวคล้ำอมดำ ราขึ้น + ตุ่มหนองนูนบวม + รอยแผลแตกเหมือนติดเชื้อ
+    function genBacteriaSkinTex() {
+      const c = document.createElement('canvas');
+      c.width = 256; c.height = 256;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#171c12'; ctx.fillRect(0, 0, 256, 256);
+      // คราบเน่า/รา กระจายไม่สม่ำเสมอทั่วตัว
+      for (let i = 0; i < 220; i++) {
+        const x = Math.random() * 256, y = Math.random() * 256, r = 3 + Math.random() * 15;
+        ctx.fillStyle = Math.random() < 0.5 ? 'rgba(70,95,35,0.32)' : 'rgba(35,15,10,0.36)';
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      }
+      // ตุ่มหนองนูนบวมเรืองซีด ใช้ radial gradient ให้ดูมีมิติเหมือนบวมพร้อมแตก
+      for (let i = 0; i < 55; i++) {
+        const x = Math.random() * 256, y = Math.random() * 256, r = 2.5 + Math.random() * 6;
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+        g.addColorStop(0, 'rgba(165, 200, 95, 0.7)');
+        g.addColorStop(0.6, 'rgba(120, 150, 70, 0.35)');
+        g.addColorStop(1, 'rgba(120, 150, 70, 0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      }
+      // รอยแผล/รอยแตกลายแบบผิวติดเชื้อ
+      ctx.strokeStyle = 'rgba(10,5,5,0.55)'; ctx.lineWidth = 1.2;
+      for (let i = 0; i < 65; i++) {
+        let x = Math.random() * 256, y = Math.random() * 256;
+        ctx.beginPath(); ctx.moveTo(x, y);
+        for (let j = 0; j < 4; j++) { x += (Math.random() - 0.5) * 18; y += (Math.random() - 0.5) * 18; ctx.lineTo(x, y); }
+        ctx.stroke();
+      }
+      return new THREE.CanvasTexture(c);
+    }
+
+    // ผิวหนัง The Duller: ซีดเทาเหมือนศพแห้ง แตกระแหงลายงา จุดคล้ำเน่าตายกระจายทั่ว
+    function genDullerSkinTex() {
+      const c = document.createElement('canvas');
+      c.width = 256; c.height = 256;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#3a3d3a'; ctx.fillRect(0, 0, 256, 256);
+      for (let i = 0; i < 190; i++) {
+        const x = Math.random() * 256, y = Math.random() * 256, r = 3 + Math.random() * 16;
+        ctx.fillStyle = Math.random() < 0.5 ? 'rgba(18,18,16,0.34)' : 'rgba(95,92,78,0.26)';
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      }
+      // รอยแตกแห้งกร้านทั่วผิวเหมือนดินแตกระแหง
+      ctx.strokeStyle = 'rgba(12,12,10,0.5)'; ctx.lineWidth = 1;
+      for (let i = 0; i < 75; i++) {
+        let x = Math.random() * 256, y = Math.random() * 256;
+        ctx.beginPath(); ctx.moveTo(x, y);
+        for (let j = 0; j < 4; j++) { x += (Math.random() - 0.5) * 16; y += (Math.random() - 0.5) * 16; ctx.lineTo(x, y); }
+        ctx.stroke();
+      }
+      // จุดคล้ำเน่าตายเป็นหย่อมๆ
+      for (let i = 0; i < 30; i++) {
+        const x = Math.random() * 256, y = Math.random() * 256, r = 4 + Math.random() * 10;
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+        g.addColorStop(0, 'rgba(10,10,8,0.5)');
+        g.addColorStop(1, 'rgba(10,10,8,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      }
+      return new THREE.CanvasTexture(c);
+    }
+
+    // ทำให้ทรงเรียบๆ กลายเป็นก้อนเนื้อบวมนูนไม่เท่ากัน (ใช้ร่วมกับผิวหนังมอนสเตอร์ทุกตัว ลบความรู้สึก "ของเล่นมันวาว")
+    function deformFleshGeo(geo, amp) {
+      const pos = geo.attributes.position;
+      const v = new THREE.Vector3();
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i);
+        const noise = Math.sin(v.x * 6.5) * Math.cos(v.y * 4.5) * Math.sin(v.z * 5.5);
+        const bump = 1 + noise * amp + (Math.random() - 0.5) * amp * 0.5;
+        v.multiplyScalar(bump);
+        pos.setXYZ(i, v.x, v.y, v.z);
+      }
+      geo.computeVertexNormals();
+    }
+
     // สร้าง The Bacteria (เงามนุษย์กิ่งไม้ยักษ์ ขยับแขนขาแบบ 3D Rig)
     function createBacteria3DRig() {
       const rig = new THREE.Group();
-      // แก้บั๊ก: เดิมใช้ MeshBasicMaterial (ไม่รับแสงเลย) สีเกือบดำสนิท (0x080808)
-      // ทำให้ไฟฉายส่องยังไงก็มองไม่เห็นตัว กลายเป็นล่องหนกลืนไปกับความมืด ไม่น่ากลัวเพราะมองไม่เห็น
-      // เปลี่ยนเป็น MeshLambertMaterial ให้รับแสงไฟฉาย/ไฟเพดานจริง เวลาไฟส่องโดนจะเห็นเงาชัดน่ากลัวขึ้นมาก
-      const darkMat = new THREE.MeshLambertMaterial({ color: 0x18140f });
-      const limbMat = new THREE.MeshLambertMaterial({ color: 0x1c1812 });
+      // เปลี่ยนจากสีทึบเรียบ (MeshLambertMaterial สีเดียว) เป็นผิวหนังเน่า/ติดเชื้อแบบมีลาย
+      // ใช้ MeshStandardMaterial รับแสงไฟฉายจริง ผิวด้านไม่มันวาว เห็นรายละเอียดชัดตอนเข้าใกล้/โดนแฟลช
+      const bacteriaSkinTex = genBacteriaSkinTex();
+      const darkMat = new THREE.MeshStandardMaterial({ map: bacteriaSkinTex, color: 0x707a55, roughness: 1.0, metalness: 0 });
+      const limbMat = new THREE.MeshStandardMaterial({ map: bacteriaSkinTex, color: 0x5f6a48, roughness: 1.0, metalness: 0 });
 
       // ลำตัวกระดูกสันหลังบิดเบี้ยว
       bacteriaTorso = new THREE.Group();
-      const spineGeo = new THREE.CylinderGeometry(0.12, 0.16, 1.4, 6);
+      const spineGeo = new THREE.CylinderGeometry(0.12, 0.16, 1.4, 8, 6);
+      deformFleshGeo(spineGeo, 0.14); // ผิวบวมนูนไม่เท่ากัน ไม่ใช่ท่อนเรียบ
       const spine = new THREE.Mesh(spineGeo, darkMat);
       bacteriaTorso.add(spine);
       spine.position.y = 0.7;
 
       // หัวเบี้ยว
-      const headGeo = new THREE.SphereGeometry(0.26, 8, 8);
+      const headGeo = new THREE.SphereGeometry(0.26, 10, 10);
+      deformFleshGeo(headGeo, 0.18);
       const head = new THREE.Mesh(headGeo, darkMat);
       head.scale.set(0.9, 1.1, 1.0);
       head.position.y = 1.5;
@@ -1616,8 +1793,9 @@
       bacteriaTorso.position.y = 1.3;
 
       // แขนซ้าย-ขวา ยาวเก้งก้าง
-      const armGeo = new THREE.CylinderGeometry(0.05, 0.04, 1.6, 5);
-      
+      const armGeo = new THREE.CylinderGeometry(0.05, 0.04, 1.6, 6, 5);
+      deformFleshGeo(armGeo, 0.16);
+
       bacteriaLeftArm = new THREE.Group();
       const lArmMesh = new THREE.Mesh(armGeo, limbMat);
       lArmMesh.position.y = -0.7;
@@ -1626,14 +1804,15 @@
       bacteriaTorso.add(bacteriaLeftArm);
 
       bacteriaRightArm = new THREE.Group();
-      const rArmMesh = new THREE.Mesh(armGeo, limbMat);
+      const rArmMesh = new THREE.Mesh(armGeo.clone(), limbMat);
       rArmMesh.position.y = -0.7;
       bacteriaRightArm.add(rArmMesh);
       bacteriaRightArm.position.set(0.35, 1.3, 0);
       bacteriaTorso.add(bacteriaRightArm);
 
       // ขาซ้าย-ขวา สูงโย่ง
-      const legGeo = new THREE.CylinderGeometry(0.06, 0.04, 1.5, 5);
+      const legGeo = new THREE.CylinderGeometry(0.06, 0.04, 1.5, 6, 5);
+      deformFleshGeo(legGeo, 0.16);
 
       bacteriaLeftLeg = new THREE.Group();
       const lLegMesh = new THREE.Mesh(legGeo, limbMat);
@@ -1643,7 +1822,7 @@
       rig.add(bacteriaLeftLeg);
 
       bacteriaRightLeg = new THREE.Group();
-      const rLegMesh = new THREE.Mesh(legGeo, limbMat);
+      const rLegMesh = new THREE.Mesh(legGeo.clone(), limbMat);
       rLegMesh.position.y = -0.75;
       bacteriaRightLeg.add(rLegMesh);
       bacteriaRightLeg.position.set(0.2, 1.4, 0);
@@ -1659,16 +1838,21 @@
     // สร้าง The Duller (สัตว์ประหลาด 4 ขาคลานติดพื้น)
     function createDuller3DRig() {
       const rig = new THREE.Group();
-      // แก้บั๊กเดียวกับ Bacteria: เปลี่ยนจาก MeshBasicMaterial เป็น MeshLambertMaterial
-      // ให้ตัวรับแสงไฟฉายได้จริง ไม่ใช่มืดทึบคงที่ตลอดจนมองไม่ออกว่ามีตัวอะไรคลานอยู่
-      const dullMat = new THREE.MeshLambertMaterial({ color: 0x26282b });
+      // เปลี่ยนจากสีทึบเรียบเป็นผิวหนังซีดแตกระแหงแบบศพเน่า ใช้ MeshStandardMaterial รับแสงไฟฉายจริง
+      const dullerSkinTex = genDullerSkinTex();
+      const dullMat = new THREE.MeshStandardMaterial({ map: dullerSkinTex, color: 0x9a9a90, roughness: 1.0, metalness: 0 });
+      const dullLimbMat = new THREE.MeshStandardMaterial({ map: dullerSkinTex, color: 0x86867c, roughness: 1.0, metalness: 0 });
 
-      dullerTorso = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 1.4, 6), dullMat);
+      const torsoGeo = new THREE.CylinderGeometry(0.22, 0.28, 1.4, 8, 6);
+      deformFleshGeo(torsoGeo, 0.14);
+      dullerTorso = new THREE.Mesh(torsoGeo, dullMat);
       dullerTorso.rotation.x = Math.PI / 2;
       dullerTorso.position.y = 0.55;
       rig.add(dullerTorso);
 
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 7, 7), dullMat);
+      const headGeo = new THREE.SphereGeometry(0.22, 9, 9);
+      deformFleshGeo(headGeo, 0.16);
+      const head = new THREE.Mesh(headGeo, dullMat);
       head.position.set(0, 0.5, 0.85);
       rig.add(head);
 
@@ -1692,8 +1876,8 @@
       dullerFaceAnchor.position.set(0, 0.48, 0.95);
       rig.add(dullerFaceAnchor);
 
-      // 4 ขาคลาน
-      const legGeo = new THREE.CylinderGeometry(0.05, 0.03, 0.7, 5);
+      // 4 ขาคลาน — ยืดยาวและหักงอเป็นข้อพับแบบแมงมุม (ต้นขากางออกด้านข้าง + หน้าแข้งพับกลับลงพื้น)
+      // ยาวและบิดเบี้ยวกว่าท่อนตรงเดิมมาก ให้ความรู้สึกขาผิดรูปน่าขยะแขยงสมกับสัตว์คลาน
       dullerLegs = [];
 
       const legOffsets = [
@@ -1702,10 +1886,37 @@
       ];
 
       for (let i = 0; i < 4; i++) {
+        const sideSign = legOffsets[i][0] < 0 ? -1 : 1;
+
+        // legGroup คือจุดหมุนสะโพก (แกน x หมุนตอนคลาน — โค้ดอนิเมชันเดิมยังใช้ได้ตรงๆ ไม่ต้องแก้)
         const legGroup = new THREE.Group();
-        const legMesh = new THREE.Mesh(legGeo, dullMat);
-        legMesh.position.y = -0.35;
-        legGroup.add(legMesh);
+
+        // ต้นขา: กางออกด้านข้างแรงๆ (หมุนรอบแกน z) ยาวและผอมกว่าเดิมมาก
+        const thighGeo = new THREE.CylinderGeometry(0.05, 0.035, 0.58, 6, 4);
+        deformFleshGeo(thighGeo, 0.18);
+        const thighPivot = new THREE.Group();
+        thighPivot.rotation.z = sideSign * 0.55;
+        const thighMesh = new THREE.Mesh(thighGeo, dullLimbMat);
+        thighMesh.position.y = -0.29;
+        thighPivot.add(thighMesh);
+        legGroup.add(thighPivot);
+
+        // ข้อพับ (เข่า/ข้อศอกกลับด้าน) อยู่ปลายต้นขาพอดี ให้หน้าแข้งพับกลับลงพื้นแบบขาแมงมุมหัก
+        const kneeJoint = new THREE.Group();
+        kneeJoint.position.y = -0.58;
+        thighPivot.add(kneeJoint);
+
+        const shinPivot = new THREE.Group();
+        shinPivot.rotation.z = -sideSign * 1.05;
+        kneeJoint.add(shinPivot);
+
+        // หน้าแข้ง: ยาวกว่าต้นขา ปลายเรียวแหลมผอมบิดเบี้ยว
+        const shinGeo = new THREE.CylinderGeometry(0.032, 0.012, 0.68, 6, 4);
+        deformFleshGeo(shinGeo, 0.2);
+        const shinMesh = new THREE.Mesh(shinGeo, dullLimbMat);
+        shinMesh.position.y = -0.34;
+        shinPivot.add(shinMesh);
+
         legGroup.position.set(legOffsets[i][0], legOffsets[i][1], legOffsets[i][2]);
         rig.add(legGroup);
         dullerLegs.push(legGroup);
@@ -1740,20 +1951,6 @@
       }
       const t = new THREE.CanvasTexture(c);
       return t;
-    }
-
-    // ทำให้ทรงกลมเรียบๆ กลายเป็นก้อนเนื้อบวมนูนไม่เท่ากัน (ลบความรู้สึก "ลูกบอลมันวาว" ของเล่นออก)
-    function deformFleshGeo(geo, amp) {
-      const pos = geo.attributes.position;
-      const v = new THREE.Vector3();
-      for (let i = 0; i < pos.count; i++) {
-        v.fromBufferAttribute(pos, i);
-        const noise = Math.sin(v.x * 6.5) * Math.cos(v.y * 4.5) * Math.sin(v.z * 5.5);
-        const bump = 1 + noise * amp + (Math.random() - 0.5) * amp * 0.5;
-        v.multiplyScalar(bump);
-        pos.setXYZ(i, v.x, v.y, v.z);
-      }
-      geo.computeVertexNormals();
     }
 
     // สร้าง The Smiler (หัวลอย + ขากรรไกร 3D อ้าหุบได้จริง)
@@ -2205,7 +2402,7 @@
 
       for (const n of loreNotes) scene.remove(n.mesh);
       loreNotes = [];
-      notesCollected = 0;
+      // หมายเหตุ: ไม่รีเซ็ต collectedLoreSet ตรงนี้ ให้สะสมข้ามรอบเล่นในเซสชันเดียวกัน
 
       for (const k of keycards) scene.remove(k.mesh);
       keycards = [];
@@ -2528,7 +2725,7 @@
       const el = document.getElementById('note-overlay');
       if (!el) return;
       el.querySelector('.note-body').innerText = text;
-      el.querySelector('.note-count').innerText = `เอกสารที่พบ: ${notesCollected}/${LORE_TEXTS.length}`;
+      el.querySelector('.note-count').innerText = `เอกสารที่พบ: ${collectedLoreSet.size}/${LORE_TEXTS.length}`;
       el.style.display = 'flex';
       if (noteOverlayTimer) clearTimeout(noteOverlayTimer);
       noteOverlayTimer = setTimeout(() => { el.style.display = 'none'; }, 5200);
@@ -3264,7 +3461,7 @@
             if (distN < 1.4) {
               n.active = false;
               scene.remove(n.mesh);
-              notesCollected++;
+              collectedLoreSet.add(n.text);
               playDrinkSound();
               showNoteOverlay(n.text);
             }
@@ -3556,10 +3753,10 @@
         // =========================================================
         const distBacteria = bacteriaRig.position.distanceTo(camera.position);
 
-        if (!isHiding && distBacteria < 22 * detectMult) {
+        if (!isHiding && distBacteria < 27 * detectMult) {
           bacteriaState = 'CHASE';
           playerEnergy = Math.max(0, playerEnergy - 1.0 * dt);
-          bacteriaSpeed = (distBacteria < 9.5) ? 4.25 : (isBlackout ? 3.0 : 2.1);
+          bacteriaSpeed = (distBacteria < 11) ? 4.55 : (isBlackout ? 3.25 : 2.4);
 
           bacteriaLastKnownPos.copy(camera.position);
           bacteriaSearchUntil = now + SEARCH_LINGER_MS;
@@ -3659,7 +3856,7 @@
         if (!isHiding && (distDuller < DULLER_BASE_DETECT_RANGE || dullerNoiseHeard)) {
           dullerState = 'CHASE';
           playerEnergy = Math.max(0, playerEnergy - 0.9 * dt);
-          dullerSpeed = (distDuller < 8.0) ? 4.3 : 2.2;
+          dullerSpeed = (distDuller < 10.0) ? 4.6 : 2.5;
 
           dullerLastKnownPos.copy(camera.position);
           dullerSearchUntil = now + SEARCH_LINGER_MS;
