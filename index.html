@@ -260,6 +260,54 @@
       opacity: 0.35;
     }
 
+    /* Chromatic aberration: สีแดง/ฟ้าเยื้องออกจากกัน ยิ่งสติต่ำยิ่งแยกห่างและสั่นมากขึ้น */
+    #chroma-aberration {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 8;
+      pointer-events: none;
+      opacity: 0;
+      --chroma-shift: 2px;
+    }
+    #chroma-aberration::before, #chroma-aberration::after {
+      content: " ";
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      mix-blend-mode: screen;
+    }
+    #chroma-aberration::before { background: rgba(255, 20, 20, 0.55); transform: translateX(var(--chroma-shift)); }
+    #chroma-aberration::after  { background: rgba(20, 220, 255, 0.55); transform: translateX(calc(var(--chroma-shift) * -1)); }
+
+    /* เงาร่างบางอย่างวาบที่ขอบจอ ไม่ใช่มอนสเตอร์จริง แค่ทำให้ผู้เล่นไม่แน่ใจว่าเห็นอะไรหรือเปล่า */
+    #peripheral-glitch {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 9;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    #peripheral-glitch .figure {
+      position: absolute;
+      width: 64px;
+      height: 180px;
+      opacity: 0;
+      background: linear-gradient(to bottom, rgba(3,3,2,0.94) 0%, rgba(3,3,2,0.88) 55%, rgba(3,3,2,0) 100%);
+      border-radius: 45% 45% 30% 30% / 22% 22% 16% 16%;
+      filter: blur(1.5px);
+    }
+    #peripheral-glitch .figure::before {
+      content: " ";
+      position: absolute;
+      top: -24px; left: 50%;
+      transform: translateX(-50%);
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: rgba(3,3,2,0.94);
+      filter: blur(1px);
+    }
+
     /* มองผ่านช่องล็อคเกอร์ตอนซ่อนตัวในตู้ — บังบนล่างเหลือช่องแคบตรงกลาง + ขอบตู้เข้ม */
     #locker-slit {
       position: absolute;
@@ -280,6 +328,17 @@
           rgba(5,5,3,0.97) 62%,
           rgba(5,5,3,0.97) 100%);
       box-shadow: inset 0 0 90px rgba(0,0,0,0.9);
+    }
+    /* สั่นช่องมองล็อคเกอร์แรงๆ ตอนมีบางอย่างมาจ่อใกล้ตู้ที่กำลังซ่อนอยู่ — สัญญาณเตือนว่าไม่ปลอดภัย 100% แล้ว */
+    #locker-slit.locker-shake {
+      animation: locker-shake-kf 0.09s linear infinite;
+    }
+    @keyframes locker-shake-kf {
+      0%   { transform: translate(0, 0); }
+      25%  { transform: translate(-3px, 2px); }
+      50%  { transform: translate(2px, -3px); }
+      75%  { transform: translate(-2px, -2px); }
+      100% { transform: translate(0, 0); }
     }
 
     /* Touch Controls */
@@ -538,6 +597,8 @@
   <div id="dread-vignette"></div>
   <canvas id="noise-canvas"></canvas>
   <div id="subliminal-flash"></div>
+  <div id="chroma-aberration"></div>
+  <div id="peripheral-glitch"><div class="figure"></div></div>
   <div id="jumpscare-strobe"></div>
   <div id="locker-slit"></div>
   <div id="item-notification">+45% ENERGY RESTORED</div>
@@ -641,6 +702,7 @@
     let wallInstancedMesh = null;
     let ceilingLights = [], lampMeshes = [], stairMeshes = [];
     let lastLightCullTime = 0;
+    let lastFlickerScheduleTime = 0;
 
     // เพดานไฟมีเป็นร้อยดวงทั่วแมพ 70x70 ถ้าปล่อยให้ทุกดวง "active" พร้อมกัน
     // shader ของวัตถุที่ใช้แสง (พื้น/ผนัง/เพดาน MeshLambertMaterial) ต้องวนคำนวณแสงทุกดวงต่อพิกเซล
@@ -816,6 +878,12 @@
     let hidingBaseYaw = 0; // มุมหันออกจากตู้ตอนแอบอยู่ ใช้จำกัดมุมมองผ่านช่องล็อคเกอร์
     const HIDE_PEEK_YAW_RANGE = 0.4;   // แอบมองได้แค่แคบๆ ผ่านช่องล็อคเกอร์
     const HIDE_PEEK_PITCH_RANGE = 0.22;
+
+    // "ตู้เอกสารไม่ได้ปลอดภัยแน่นอน 100% เสมอไป" — ถ้ามีอะไรเดินมาจ่อใกล้ตู้ตอนกำลังซ่อน
+    // จะมีจังหวะเตือน (สั่น+เสียง) ให้พอมีเวลาตัดสินใจ ก่อนที่มันจะมีโอกาสเล็กๆ "เช็คเจอ" จริงๆ
+    const LOCKER_CLOSE_CALL_DIST = 3.2;
+    const LOCKER_CLOSE_CALL_CATCH_CHANCE = 0.14;
+    let lockerCloseCallCooldownUntil = 0;
 
     // "หาไปพักหนึ่งก่อนเลิกล่า" — พอคลาดกับผู้เล่น (เช่นผู้เล่นเพิ่งซ่อนตัว) มอนจะไม่หันหนีทันที
     // แต่จะเดินไปวนดูจุดที่เห็นครั้งสุดท้ายก่อนสักพัก แล้วค่อยเลิกล่ากลับไปลาดตระเวนปกติ
@@ -2270,9 +2338,19 @@
       smilerNextCheatTime = restartNow + 14000 + Math.random() * 8000;
       bacteriaNextCheatTime = restartNow + 20000 + Math.random() * 8000;
       dullerNextCheatTime = restartNow + 26000 + Math.random() * 8000;
-      nextBaselineFlickerTime = restartNow + 6000 + Math.random() * 6000;
+      nextPeripheralGlitchTime = restartNow + 13000 + Math.random() * 9000;
+      lockerCloseCallCooldownUntil = 0;
+      lastFlickerScheduleTime = 0;
       if (dreadVignetteEl) dreadVignetteEl.style.opacity = 0;
       if (subliminalFlashEl) subliminalFlashEl.style.opacity = 0;
+      if (viewportEl) viewportEl.style.filter = '';
+      if (chromaEl) chromaEl.style.opacity = 0;
+      if (hudEl) hudEl.style.transform = '';
+      if (peripheralFigureEl) peripheralFigureEl.style.opacity = 0;
+      for (let i = 0; i < ceilingLights.length; i++) {
+        ceilingLights[i].nextFlickerTime = undefined;
+        ceilingLights[i].isFlickering = false;
+      }
 
       isSprintBoost = false;
       sprintBoostEndTime = 0;
@@ -2787,8 +2865,36 @@
     staticCanvas.width = 160; staticCanvas.height = 120;
     const dreadVignetteEl = document.getElementById('dread-vignette');
     const subliminalFlashEl = document.getElementById('subliminal-flash');
+    const viewportEl = document.getElementById('viewport');
+    const hudEl = document.querySelector('.hud');
+    const chromaEl = document.getElementById('chroma-aberration');
+    const peripheralGlitchEl = document.getElementById('peripheral-glitch');
+    const peripheralFigureEl = peripheralGlitchEl ? peripheralGlitchEl.querySelector('.figure') : null;
     const baseFogDensity = 0.028;
-    let nextBaselineFlickerTime = performance.now() + 6000 + Math.random() * 6000;
+    let nextPeripheralGlitchTime = performance.now() + 13000 + Math.random() * 9000;
+
+    // -------------------------------------------------------------
+    // Peripheral Vision Glitch: ร่างเงาวาบสั้นๆ ที่ขอบจอ ไม่ใช่ entity จริง
+    // สุ่มเวลา/ตำแหน่ง/ฝั่งทุกครั้ง เพื่อให้ผู้เล่นไม่แน่ใจว่าเห็นจริงหรือหลอนไปเอง
+    // -------------------------------------------------------------
+    function triggerPeripheralGlitch() {
+      if (!peripheralFigureEl) return;
+      const fromLeft = Math.random() < 0.5;
+      const edgeOffset = -14 - Math.random() * 22; // px ให้โผล่มาแค่บางส่วนตรงขอบจอ
+      const topPct = 6 + Math.random() * 48; // ค้างอยู่ครึ่งบนของจอ แถวสายตา
+      peripheralFigureEl.style.left = fromLeft ? (edgeOffset + 'px') : '';
+      peripheralFigureEl.style.right = fromLeft ? '' : (edgeOffset + 'px');
+      peripheralFigureEl.style.top = topPct + '%';
+      peripheralFigureEl.style.transform = fromLeft ? 'scaleX(1)' : 'scaleX(-1)';
+      peripheralFigureEl.style.transition = 'none';
+      peripheralFigureEl.style.opacity = (0.55 + Math.random() * 0.3).toFixed(2);
+      const holdTime = 70 + Math.random() * 110; // วาบไวมาก กันคนจ้องทัน
+      setTimeout(() => {
+        if (!peripheralFigureEl) return;
+        peripheralFigureEl.style.transition = 'opacity 0.12s ease';
+        peripheralFigureEl.style.opacity = 0;
+      }, holdTime);
+    }
 
     function renderNoise() {
       const imgData = staticCtx.createImageData(160, 120);
@@ -3009,6 +3115,39 @@
           camera.updateProjectionMatrix();
         }
 
+        // ภาพบิดเบี้ยวตามระดับ SANITY ที่เหลือ — เริ่มไต่ระดับตั้งแต่สติต่ำกว่า ~55%
+        // สีเพี้ยน คอนทราสต์จัดขึ้น ภาพเบลอเล็กน้อยตอนต่ำมาก + เส้นสีแดง/ฟ้าแยกออกจากกัน (chromatic aberration)
+        if (hasRevealedSanity) {
+          const corruption = Math.max(0, Math.min(1, (55 - playerEnergy) / 55));
+          if (corruption > 0.01 && viewportEl) {
+            const wobble = Math.sin(now * 0.0021);
+            const sat = 1 + corruption * 1.5 + wobble * corruption * 0.3;
+            const hue = wobble * 20 * corruption;
+            const contrast = 1 + corruption * 0.32;
+            const blurPx = corruption > 0.6 ? (corruption - 0.6) * 3.2 : 0;
+            viewportEl.style.filter = `saturate(${sat.toFixed(2)}) hue-rotate(${hue.toFixed(1)}deg) contrast(${contrast.toFixed(2)})` +
+              (blurPx > 0 ? ` blur(${blurPx.toFixed(2)}px)` : '');
+          } else if (viewportEl && viewportEl.style.filter) {
+            viewportEl.style.filter = '';
+          }
+
+          if (chromaEl) {
+            if (corruption > 0.12) {
+              const shiftPx = 1.5 + corruption * 6 + Math.sin(now * 0.05) * corruption * 2;
+              chromaEl.style.setProperty('--chroma-shift', shiftPx.toFixed(2) + 'px');
+              chromaEl.style.opacity = Math.min(0.7, corruption * 0.8).toFixed(2);
+            } else if (chromaEl.style.opacity !== '0') {
+              chromaEl.style.opacity = 0;
+            }
+          }
+
+          // HUD สั่น/กระตุกเบาๆ เป็นครั้งคราวตอนสติต่ำมาก เหมือนสัญญาณกล้องเริ่มเพี้ยน
+          if (hudEl && corruption > 0.55 && Math.random() < 0.05) {
+            hudEl.style.transform = `translate(${((Math.random() - 0.5) * 4).toFixed(1)}px, ${((Math.random() - 0.5) * 3).toFixed(1)}px)`;
+            setTimeout(() => { if (hudEl) hudEl.style.transform = ''; }, 60 + Math.random() * 70);
+          }
+        }
+
         if (playerEnergy <= 0) {
           window.gameEngineStarted = false;
           document.getElementById('over-title').innerText = "INSANITY OVERTAKEN";
@@ -3173,14 +3312,38 @@
           scene.fog.density = baseFogDensity + breathe + (isBlackout ? 0.014 : 0);
         }
 
-        // ไฟเพดานกระพริบแผ่วๆ แบบสุ่มเป็นระยะๆ ตลอดเกม (คนละชุดกับ triggerAmbientDreadEvent ที่เป็นอีเวนต์ใหญ่)
-        // ให้บรรยากาศรู้สึกไม่มั่นคงตลอดเวลา ไม่ใช่แค่ตอนมีอีเวนต์เกิดขึ้นเท่านั้น
-        if (firstBlackoutOccurred && !isBlackout && ceilingLights.length > 0 && now > nextBaselineFlickerTime) {
-          const l = ceilingLights[Math.floor(Math.random() * ceilingLights.length)];
-          const orig = l.intensity;
-          l.intensity = orig * (0.15 + Math.random() * 0.25);
-          setTimeout(() => { if (l) l.intensity = orig; }, 70 + Math.random() * 120);
-          nextBaselineFlickerTime = now + 2500 + Math.random() * 5500;
+        // ไฟเพดานกระพริบแผ่วๆ แบบอิสระต่อดวง (ไม่รอคิวเดียวกันทั้งแมพ) — ห้องหนึ่งกระพริบ อีกห้องอาจนิ่งสนิท
+        // ยิ่ง SANITY เหลือน้อย ยิ่งกระพริบถี่ขึ้น มืดสนิทได้บ่อยขึ้น ให้รู้สึกว่าตึกเริ่ม "เสีย" ไปพร้อมกับสติ
+        // throttle ทุก ~180ms + ข้ามไฟที่ถูก cull แล้ว (มองไม่เห็นอยู่แล้ว) กันวนเช็คทั้งแมพทุกเฟรมจนเฟรมกระตุก/เสียงสะดุด
+        if (firstBlackoutOccurred && !isBlackout && ceilingLights.length > 0 && now - lastFlickerScheduleTime > 180) {
+          lastFlickerScheduleTime = now;
+          const sanityFactor = hasRevealedSanity ? Math.max(0, Math.min(1, (100 - playerEnergy) / 100)) : 0;
+          for (let li = 0; li < ceilingLights.length; li++) {
+            const l = ceilingLights[li];
+            if (!l.visible) continue;
+            if (l.baseIntensity === undefined) l.baseIntensity = l.intensity;
+            if (l.nextFlickerTime === undefined) l.nextFlickerTime = now + 2000 + Math.random() * 9000;
+            if (!l.isFlickering && now > l.nextFlickerTime) {
+              l.isFlickering = true;
+              const orig = l.baseIntensity;
+              const dipFloor = Math.max(0, 0.2 - sanityFactor * 0.2); // สติต่ำมาก = มีโอกาสดับสนิทกว่าเดิม
+              l.intensity = orig * (dipFloor + Math.random() * 0.25);
+              const dipTime = 70 + Math.random() * (120 - sanityFactor * 40);
+              setTimeout(() => { if (l) { l.intensity = orig; l.isFlickering = false; } }, dipTime);
+              const intervalMin = 2500 - sanityFactor * 1700;
+              const intervalRange = 5500 - sanityFactor * 3500;
+              l.nextFlickerTime = now + intervalMin + Math.random() * intervalRange;
+            }
+          }
+        }
+
+        // Peripheral Vision Glitch: ร่างเงาวาบที่ขอบจอ ไม่ผูกกับตำแหน่ง entity จริง — ถี่ขึ้นเมื่อ SANITY ต่ำ
+        if (firstBlackoutOccurred && !isHiding && !isJumpscareActive && now > nextPeripheralGlitchTime) {
+          triggerPeripheralGlitch();
+          const freqFactor = hasRevealedSanity ? Math.max(0, Math.min(1, (100 - playerEnergy) / 100)) : 0;
+          const intervalMin = 13000 - freqFactor * 8500;
+          const intervalRange = 9000 - freqFactor * 5000;
+          nextPeripheralGlitchTime = now + intervalMin + Math.random() * intervalRange;
         }
 
         // ก่อนไฟดับครั้งแรก entity ยังไม่ปรากฏตัวและไม่ขยับเลย
@@ -3498,6 +3661,35 @@
 
         // เสียงหัวใจเต้น (คงระยะเดิมไว้ให้ยังรู้สึกได้ว่ามีอะไรเข้าใกล้)
         const closestDist = Math.min(distSmiler, distBacteria, distDuller);
+
+        // "ตู้เอกสารไม่ได้ปลอดภัย 100% เสมอไป" — ถ้ามีบางอย่างเดินมาจ่อใกล้ตู้ตอนกำลังซ่อนอยู่
+        // ช่องมองจะสั่น+มีเสียงเตือนก่อน ให้พอมีจังหวะตัดสินใจว่าจะซ่อนต่อหรือรีบวิ่งหนี
+        // ก่อนที่มันจะมีโอกาสเล็กๆ "เช็คเจอ" จริงๆ ทำให้กลไกที่เคยไว้ใจได้ไม่น่าเชื่อถือ 100% อีกต่อไป
+        if (isHiding && closestDist < LOCKER_CLOSE_CALL_DIST && now > lockerCloseCallCooldownUntil && !isJumpscareActive) {
+          lockerCloseCallCooldownUntil = now + 7000 + Math.random() * 4000;
+          const closeRig = (closestDist === distSmiler) ? smilerRig : (closestDist === distBacteria) ? bacteriaRig : dullerRig;
+
+          if (lockerSlitEl) {
+            lockerSlitEl.classList.add('locker-shake');
+            setTimeout(() => { if (lockerSlitEl) lockerSlitEl.classList.remove('locker-shake'); }, 900);
+          }
+          playHeartbeat(0.5);
+          playDistantGrowl();
+
+          if (Math.random() < LOCKER_CLOSE_CALL_CATCH_CHANCE) {
+            setTimeout(() => {
+              if (!window.gameEngineStarted || !isHiding) return; // ออกจากตู้ทันเวลา รอดไป
+              isJumpscareActive = true;
+              jumpscareTargetRig = closeRig;
+              jumpscareStartTime = performance.now();
+              isHiding = false;
+              if (lockerSlitEl) lockerSlitEl.style.display = 'none';
+              playViolentJumpscareSound();
+              if (document.exitPointerLock) document.exitPointerLock();
+            }, 900 + Math.random() * 500);
+          }
+        }
+
         if (closestDist < 18) {
           const heartRateInterval = Math.max(360, closestDist * 60);
           if (now > nextHeartbeatTime) {
