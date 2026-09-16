@@ -9,6 +9,8 @@
 
       for (const b of almondBottles) scene.remove(b.mesh);
       almondBottles = [];
+      almondInventory = 0;
+      updateBottleHUD();
 
       for (const n of loreNotes) scene.remove(n.mesh);
       loreNotes = [];
@@ -307,7 +309,7 @@
         scene.fog.density = OFFICE_FOG_DENSITY;
       }
       if (renderer) renderer.setClearColor(OFFICE_FOG_COLOR);
-      if (camera) { camera.fov = 72; camera.updateProjectionMatrix(); }
+      if (camera) { camera.fov = 82; camera.updateProjectionMatrix(); }
       if (liminalHumGain && audioCtx) {
         liminalHumGain.gain.cancelScheduledValues(audioCtx.currentTime);
         liminalHumGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
@@ -318,6 +320,7 @@
         document.getElementById('sprint-btn').style.display = 'none';
         document.getElementById('flash-btn').style.display = 'none';
         document.getElementById('hide-btn').style.display = 'none';
+        document.getElementById('drink-btn').style.display = 'none';
       }
 
       nextAmbientEventTime = performance.now() + 9000 + Math.random() * 6000;

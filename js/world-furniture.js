@@ -24,7 +24,7 @@
       // ค่อยเปลี่ยนเป็นสีเหลือง backrooms หนาขึ้นตอนไฟดับครั้งแรก ไม่ใช่ตั้งแต่ต้นเกม
       scene.fog = new THREE.FogExp2(OFFICE_FOG_COLOR, OFFICE_FOG_DENSITY);
 
-      camera = new THREE.PerspectiveCamera(72, w / h, 0.1, 85);
+      camera = new THREE.PerspectiveCamera(82, w / h, 0.1, 85);
       renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'default' });
       renderer.setSize(w, h);
       renderer.setClearColor(OFFICE_FOG_COLOR);

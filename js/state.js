@@ -115,10 +115,14 @@
 
     // กระป๋อง Almond Milk ทั่วแมป
     let almondBottles = [];
+    // นมอัลมอนด์ตอนนี้เก็บเข้ากระเป๋าไว้ก่อน ไม่ดื่มทันทีที่เดินผ่าน — กด Q/ปุ่ม DRINK เพื่อใช้ตอนที่ต้องการจริงๆ
+    let almondInventory = 0;
+    const ALMOND_INVENTORY_MAX = 5;
+    const ALMOND_RESTORE_AMOUNT = 45;
 
     // Energy / Sanity Juke
     let playerEnergy = 100;
-    let baseFov = 72;
+    let baseFov = 82; // เดิม 72 — มุมมองแคบไป ขยายให้เห็นรอบตัวมากขึ้น ลดโอกาสโดนจู่โจมแบบมองไม่ทัน
     let hasRevealedSanity = false;
 
     // Jumpscare
@@ -133,8 +137,8 @@
     let isSprintBoost = false;
     let sprintBoostEndTime = 0;
     let sprintCooldownEndTime = 0;
-    const SPRINT_DURATION = 2200;      // ms ที่วิ่งเร็วขึ้น
-    const SPRINT_COOLDOWN = 7000;      // ms ก่อนใช้ได้อีกครั้ง (นับจากตอนวิ่งจบ)
+    const SPRINT_DURATION = 2800;      // ms ที่วิ่งเร็วขึ้น (เดิม 2200 — ยืดให้พอมีเวลาสร้างระยะห่างจริงๆ)
+    const SPRINT_COOLDOWN = 5000;      // ms ก่อนใช้ได้อีกครั้ง (เดิม 7000 — ลดลงให้กดหนีได้ถี่ขึ้น)
     const SPRINT_SPEED_MULT = 1.85;
     const SPRINT_ENERGY_COST = 8;      // หักตอนกดใช้ครั้งเดียว
     const SPRINT_MIN_ENERGY = 6;       // ต่ำกว่านี้ห้ามกดวิ่ง (กันตายฟรี)
@@ -261,13 +265,16 @@
     const SMILER_LIGHT_REPEL_DIST = 9.0;
     const SMILER_LIGHT_REPEL_DOT = 0.55; // ~56 องศาครึ่งมุม ใกล้เคียงลำแสงไฟฉาย
     const SMILER_RECOIL_SPEED = 3.0;
+    const SMILER_STUN_MIN_MS = 2000;     // โดนแฟลชจ่อหน้า -> สตันนิ่ง ไร้พิษภัยชั่วคราว 2-3 วิ
+    const SMILER_STUN_MAX_MS = 3000;
+    let smilerStunUntil = 0;
 
     // Duller ตาบอด ไม่สนไฟฉาย ระยะตรวจจับพื้นฐานคงที่เสมอ (ต่างกับ Smiler/Bacteria ที่ยิ่งเปิดไฟยิ่งเห็นไกลขึ้น)
     const DULLER_BASE_DETECT_RANGE = 23;
     // ได้ยินเสียง (วิ่ง/ถ่ายรูป) ตอนอยู่ไกล -> วิ่งไล่ตามตัวผู้เล่นสดๆ (ปรับทิศตามที่ผู้เล่นขยับ)
     // ได้ยินเสียงตอนอยู่ใกล้กว่านี้ -> เปลี่ยนเป็น "พุ่งใส่ตำแหน่งที่เกิดเสียง" แบบเจาะจง ไม่ตามตัวผู้เล่นระหว่างพุ่ง
     const DULLER_LUNGE_TRIGGER_DIST = 10.0;
-    const DULLER_LUNGE_SPEED = 6.2;      // เร็วกว่าไล่ล่าปกติ เพราะเป็นการพุ่งใส่จุดเดียวแบบทุ่มสุดตัว
+    const DULLER_LUNGE_SPEED = 5.4;      // เร็วกว่าไล่ล่าปกติ เพราะเป็นการพุ่งใส่จุดเดียวแบบทุ่มสุดตัว
     const DULLER_LUNGE_MAX_MS = 2600;    // กันพุ่งค้าง ถ้าไปไม่ถึงจุดเสียงพอดี (เช่นโดนของกีดขวาง)
     const DULLER_LUNGE_ARRIVE_DIST = 1.3;
     let dullerLungeTarget = new THREE.Vector3();

@@ -324,7 +324,7 @@
             const sat = 1 + corruption * 1.5 + wobble * corruption * 0.3;
             const hue = wobble * 20 * corruption;
             const contrast = 1 + corruption * 0.32;
-            const blurPx = corruption > 0.6 ? (corruption - 0.6) * 3.2 : 0;
+            const blurPx = corruption > 0.75 ? (corruption - 0.75) * 2.2 : 0;
             viewportEl.style.filter = `saturate(${sat.toFixed(2)}) hue-rotate(${hue.toFixed(1)}deg) contrast(${contrast.toFixed(2)})` +
               (blurPx > 0 ? ` blur(${blurPx.toFixed(2)}px)` : '');
           } else if (viewportEl && viewportEl.style.filter) {
@@ -335,7 +335,7 @@
             if (corruption > 0.12) {
               const shiftPx = 1.5 + corruption * 6 + Math.sin(now * 0.05) * corruption * 2;
               chromaEl.style.setProperty('--chroma-shift', shiftPx.toFixed(2) + 'px');
-              chromaEl.style.opacity = Math.min(0.7, corruption * 0.8).toFixed(2);
+              chromaEl.style.opacity = Math.min(0.5, corruption * 0.55).toFixed(2);
             } else if (chromaEl.style.opacity !== '0') {
               chromaEl.style.opacity = 0;
             }
@@ -357,20 +357,21 @@
           return;
         }
 
-        // เก็บขวดนมอัลมอนด์
+        // เก็บขวดนมอัลมอนด์ -> ใส่กระเป๋าไว้ก่อน (ไม่ดื่มทันที) เก็บได้สูงสุด ALMOND_INVENTORY_MAX ขวด ไว้ใช้ทีหลังตอนจำเป็นจริงๆ
         for (let i = 0; i < almondBottles.length; i++) {
           const b = almondBottles[i];
           if (b.active) {
             const distB = Math.hypot(camera.position.x - b.x, camera.position.z - b.z);
             if (distB < 1.4) {
+              if (almondInventory >= ALMOND_INVENTORY_MAX) continue; // กระเป๋าเต็ม เก็บเพิ่มไม่ได้ ขวดยังอยู่ตรงนั้น กลับมาเก็บทีหลังได้
               b.active = false;
               scene.remove(b.mesh);
-              playerEnergy = Math.min(100, playerEnergy + 45);
+              almondInventory++;
               playDrinkSound();
-              updateEnergyHUD();
+              updateBottleHUD();
 
               const notif = document.getElementById('item-notification');
-              notif.innerText = hasRevealedSanity ? '+45% SANITY RESTORED' : '+45% ENERGY RESTORED';
+              notif.innerText = `เก็บนมอัลมอนด์ (${almondInventory}/${ALMOND_INVENTORY_MAX}) — กด Q เพื่อดื่ม`;
               notif.style.display = 'block';
               setTimeout(() => { notif.style.display = 'none'; }, 2200);
             }
@@ -441,7 +442,7 @@
           if (humGain && audioCtx) humGain.gain.setValueAtTime(0.02, audioCtx.currentTime);
           for (let i = 0; i < ceilingLights.length; i++) ceilingLights[i].intensity = 0;
           // มุมมองบิดเบี้ยวเล็กน้อยตอนไฟดับ ให้รู้สึกพื้นที่ผิดปกติ ไม่ใช่แค่มืดเฉยๆ
-          camera.fov = 76;
+          camera.fov = 86;
           camera.updateProjectionMatrix();
 
           if (!hasRevealedSanity) {
@@ -459,7 +460,7 @@
             ambientLight.intensity = 0.5; // เดิม 0.82 สว่างเกินไปสำหรับบรรยากาศ backrooms ทั่วไป ลดลงให้มืดขึ้น พึ่งแสงแฟลชกล้องมากขึ้น
             if (humGain && audioCtx) humGain.gain.setValueAtTime(0.18, audioCtx.currentTime);
             for (let i = 0; i < ceilingLights.length; i++) ceilingLights[i].intensity = 0.6; // เดิม 0.85
-            camera.fov = 72;
+            camera.fov = 82;
             camera.updateProjectionMatrix();
 
             if (!firstBlackoutOccurred) {
@@ -491,6 +492,7 @@
                 document.getElementById('flash-btn').style.display = 'flex';
                 document.getElementById('sprint-btn').style.display = 'flex';
                 document.getElementById('hide-btn').style.display = 'flex';
+                document.getElementById('drink-btn').style.display = 'flex';
               }
               // ไฟดับครั้งแรก = มืดจริง ผู้เล่นเริ่มใช้กล้อง (กด F / ปุ่มถ่ายรูป) เพื่อยิงแฟลชช่วยดูทางได้ตั้งแต่ตอนนี้
               updateFlashlightIndicator();
@@ -575,6 +577,14 @@
         // =========================================================
         const distSmiler = smilerRig.position.distanceTo(camera.position);
 
+        if (smilerState === 'STUNNED' && now < smilerStunUntil) {
+          // โดนแฟลชจ่อหน้าไปแล้ว - นิ่งงงไร้พิษภัยอยู่ชั่วคราว ทำร้ายผู้เล่นไม่ได้ระหว่างนี้
+          if (monsterSoundGain && audioCtx && audioCtx.state === 'running') {
+            monsterSoundGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+          }
+        } else {
+        if (smilerState === 'STUNNED') smilerState = 'PATROL'; // หมดเวลาสตันแล้ว ประเมินสถานะใหม่ด้านล่าง
+
         // ไม่มีไฟฉายส่องต่อเนื่องแล้ว ปกติผู้เล่นมืดสนิทเท่า baseline / ตอนกล้องวาบแฟลช ระยะที่มันสังเกตเห็นผู้เล่นพุ่งสูงขึ้นชั่วครู่
         const detectMult = cameraFlashActive ? 1.3 : 0.62;
         if (!isHiding && distSmiler < 20 * detectMult) {
@@ -592,19 +602,21 @@
 
           const dir = new THREE.Vector3().subVectors(camera.position, smilerRig.position).normalize();
 
-          // Smiler ล่าด้วยสายตา: ถ้าผู้เล่นถ่ายรูปวาบแฟลชจ่อหน้ามันตรงๆ ในระยะใกล้ มันจะสะดุ้งถอยแทนที่จะพุ่งเข้าหา
+          // Smiler ล่าด้วยสายตา: ถ้าผู้เล่นถ่ายรูปวาบแฟลชจ่อหน้ามันตรงๆ ในระยะใกล้ มันจะสตันนิ่งไปพักหนึ่งแทนที่จะพุ่งเข้าหา
           const fx = -Math.sin(cameraYaw), fz = -Math.cos(cameraYaw);
           const litDot = fx * -dir.x + fz * -dir.z; // มุมระหว่างทิศที่มองกับทิศไปหา Smiler
           const isBlindedByLight = cameraFlashActive && distSmiler < SMILER_LIGHT_REPEL_DIST && litDot > SMILER_LIGHT_REPEL_DOT;
 
           if (isBlindedByLight) {
-            smilerState = 'RECOIL';
-            smilerRig.position.x -= dir.x * SMILER_RECOIL_SPEED * dt;
-            smilerRig.position.z -= dir.z * SMILER_RECOIL_SPEED * dt;
+            smilerState = 'STUNNED';
+            smilerStunUntil = now + SMILER_STUN_MIN_MS + Math.random() * (SMILER_STUN_MAX_MS - SMILER_STUN_MIN_MS);
+            // สะดุ้งถอยเล็กน้อยครั้งเดียวตอนโดนแฟลช ให้รู้สึกว่ามีปฏิกิริยา ก่อนจะนิ่งสตันไป
+            smilerRig.position.x -= dir.x * SMILER_RECOIL_SPEED * 0.25;
+            smilerRig.position.z -= dir.z * SMILER_RECOIL_SPEED * 0.25;
             smilerRig.lookAt(camera.position.x, smilerRig.position.y, camera.position.z);
           } else {
             playerEnergy = Math.max(0, playerEnergy - 1.2 * dt);
-            smilerSpeed = (distSmiler < 9.0) ? 4.45 : (isBlackout ? 3.4 : 2.3);
+            smilerSpeed = (distSmiler < 9.0) ? 4.15 : (isBlackout ? 3.2 : 2.3);
             smilerRig.position.x += dir.x * smilerSpeed * dt;
             smilerRig.position.z += dir.z * smilerSpeed * dt;
             smilerRig.lookAt(camera.position.x, smilerRig.position.y, camera.position.z);
@@ -654,6 +666,7 @@
           smilerRig.position.z += pDir.z * smilerSpeed * dt;
           smilerRig.lookAt(smilerWaypoint.x, smilerRig.position.y, smilerWaypoint.z);
         }
+        } // จบ else ของเช็คสตัน (โดนแฟลชจ่อหน้า)
 
         // อนิเมชันอ้าขากรรไกรและลอยเคว้ง
         if (smilerJawMesh) {
@@ -692,7 +705,7 @@
         if (!isHiding && distBacteria < 27 * detectMult) {
           bacteriaState = 'CHASE';
           playerEnergy = Math.max(0, playerEnergy - 1.0 * dt);
-          bacteriaSpeed = (distBacteria < 11) ? 4.55 : (isBlackout ? 3.25 : 2.4);
+          bacteriaSpeed = (distBacteria < 11) ? 3.85 : (isBlackout ? 3.0 : 2.4);
 
           bacteriaLastKnownPos.copy(camera.position);
           bacteriaSearchUntil = now + SEARCH_LINGER_MS;
@@ -842,7 +855,7 @@
         } else if (!isHiding && (distDuller < DULLER_BASE_DETECT_RANGE || dullerNoiseHeard)) {
           dullerState = 'CHASE';
           playerEnergy = Math.max(0, playerEnergy - 0.9 * dt);
-          dullerSpeed = (distDuller < 10.0) ? 4.6 : 2.5;
+          dullerSpeed = (distDuller < 10.0) ? 4.2 : 2.5;
 
           dullerLastKnownPos.copy(camera.position);
           dullerSearchUntil = now + SEARCH_LINGER_MS;
@@ -934,7 +947,7 @@
         if (!isHiding && distAcidMan < ACIDMAN_BASE_DETECT_RANGE * detectMult) {
           acidManState = 'CHASE';
           playerEnergy = Math.max(0, playerEnergy - 0.9 * dt);
-          acidManSpeed = (distAcidMan < 9.0) ? 3.6 : (isBlackout ? 2.7 : 2.0);
+          acidManSpeed = (distAcidMan < 9.0) ? 3.3 : (isBlackout ? 2.5 : 2.0);
 
           acidManLastKnownPos.copy(camera.position);
           acidManSearchUntil = now + SEARCH_LINGER_MS;
@@ -1055,7 +1068,7 @@
         if (!isHiding && !gappedGrabActive && distGapped < GAPPED_BASE_DETECT_RANGE * detectMult) {
           gappedState = 'CHASE';
           playerEnergy = Math.max(0, playerEnergy - 0.8 * dt);
-          gappedSpeed = (distGapped < 9.0) ? 3.9 : (isBlackout ? 2.9 : 2.1);
+          gappedSpeed = (distGapped < 9.0) ? 3.6 : (isBlackout ? 2.7 : 2.1);
 
           gappedLastKnownPos.copy(camera.position);
           gappedSearchUntil = now + SEARCH_LINGER_MS;
@@ -1231,10 +1244,10 @@
           }
         }
 
-        // จอซ่า: ให้ขึ้นเฉพาะตอนใกล้จริงๆ (ไม่งั้นบังทางตอนพยายามหนี) และลดความจัดลงมาก
-        if (closestDist < 10) {
-          const glitchStrength = Math.pow(1 - closestDist / 10, 1.8);
-          staticCanvas.style.opacity = Math.min(0.28, glitchStrength * 0.28);
+        // จอซ่า: ให้ขึ้นเฉพาะตอนใกล้จริงๆๆ (ไม่งั้นบังทางตอนพยายามหนี) — ลดเพดานความจัดลงอีก กันบังจอตอนประชิดตัว
+        if (closestDist < 7) {
+          const glitchStrength = Math.pow(1 - closestDist / 7, 2.2);
+          staticCanvas.style.opacity = Math.min(0.14, glitchStrength * 0.14);
           renderNoise();
         } else {
           staticCanvas.style.opacity = 0;
@@ -1242,9 +1255,10 @@
 
         // จอเหลืองป่วยๆ ของ backrooms: มีระดับพื้นฐานเบาๆ ตลอดเวลาหลังไฟดับครั้งแรก แล้วไล่เข้มขึ้นเรื่อยๆ
         // ตามระยะห่างจาก entity ที่ใกล้ที่สุด — ให้รู้สึกบีบเข้ามาก่อนจะโดนไล่จริงๆ ไม่ใช่โผล่ปุ๊บจัดปั๊บ
+        // (ลดเพดานลงจากเดิม กันรวมกับเอฟเฟกต์อื่นแล้วบังจอจนมองไม่เห็นตอน entity ประชิดตัว)
         {
-          const proximityDread = closestDist < 16 ? Math.pow(1 - Math.min(closestDist, 16) / 16, 1.4) * 0.55 : 0;
-          dreadVignetteEl.style.opacity = Math.min(0.7, 0.12 + proximityDread + (isBlackout ? 0.15 : 0));
+          const proximityDread = closestDist < 16 ? Math.pow(1 - Math.min(closestDist, 16) / 16, 1.4) * 0.38 : 0;
+          dreadVignetteEl.style.opacity = Math.min(0.48, 0.1 + proximityDread + (isBlackout ? 0.1 : 0));
         }
         } // จบเงื่อนไข firstBlackoutOccurred: ปิดการทำงานของ entity ทั้งหมดก่อนไฟดับครั้งแรก
 

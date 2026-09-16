@@ -44,6 +44,25 @@
       }
     }
 
+    // -------------------------------------------------------------
+    // ดื่มนมอัลมอนด์จากกระเป๋า (เก็บสะสมไว้ก่อน ใช้ตอนต้องการจริงๆ)
+    // -------------------------------------------------------------
+    function useAlmondBottle() {
+      if (!window.gameEngineStarted || isJumpscareActive || isHiding) return;
+      if (almondInventory <= 0) return;
+      if (playerEnergy >= 100) return; // เต็มอยู่แล้ว ไม่ต้องเปลือง
+
+      almondInventory--;
+      playerEnergy = Math.min(100, playerEnergy + ALMOND_RESTORE_AMOUNT);
+      playDrinkSound();
+      updateEnergyHUD();
+
+      const notif = document.getElementById('item-notification');
+      notif.innerText = (hasRevealedSanity ? `+${ALMOND_RESTORE_AMOUNT}% SANITY` : `+${ALMOND_RESTORE_AMOUNT}% ENERGY`) + ` — เหลือ ${almondInventory}/${ALMOND_INVENTORY_MAX} ขวด`;
+      notif.style.display = 'block';
+      setTimeout(() => { notif.style.display = 'none'; }, 2200);
+    }
+
     function getNearestHidingDist() {
       let best = Infinity;
       for (const h of hidingSpots) {
@@ -118,7 +137,16 @@
     window.addEventListener('keydown', (e) => {
       if (e.code === 'KeyF') triggerCameraFlash();
       if (e.code === 'KeyE') toggleHiding();
+      if (e.code === 'KeyQ') useAlmondBottle();
     });
+
+    const drinkBtn = document.getElementById('drink-btn');
+    if (drinkBtn) {
+      drinkBtn.addEventListener('pointerdown', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        useAlmondBottle();
+      });
+    }
 
     const hideBtn = document.getElementById('hide-btn');
     hideBtn.addEventListener('pointerdown', (e) => {

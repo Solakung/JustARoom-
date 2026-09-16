@@ -13,6 +13,17 @@
           fill.style.backgroundColor = '#cc3333';
         }
       }
+      updateBottleHUD();
+    }
+
+    function updateBottleHUD() {
+      const countEl = document.getElementById('bottle-count');
+      const btn = document.getElementById('drink-btn');
+      if (countEl) countEl.innerText = `${almondInventory}/${ALMOND_INVENTORY_MAX}`;
+      if (btn) {
+        if (almondInventory <= 0 || playerEnergy >= 100) btn.classList.add('disabled');
+        else btn.classList.remove('disabled');
+      }
     }
 
     // -------------------------------------------------------------
