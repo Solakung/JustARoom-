@@ -28,6 +28,17 @@
       staticCtx.putImageData(imgData, 0, 0);
     }
 
+    // จุดลาดตระเวนแบบ "วนเข้าหาผู้เล่น" แทนการสุ่มเซลล์ทั้งแมพ 70x70
+    // แมพกว้าง ~250 เมตร ถ้าสุ่มจุดหมายทั้งแมพ ทิศที่ entity เดินจะสุ่มล้วนๆ
+    // แทบไม่มีโอกาสเข้ามาในระยะตรวจจับ (12-22 เมตร) เลย — entity จึงเดินวนอยู่อีกฟากตึกตลอดเกม
+    // ส่วนใหญ่จึงเล็งจุดใกล้ผู้เล่น เหลือส่วนน้อยไว้เดินเตร็ดเตร่จริงๆ กันไม่ให้เดาทางได้ว่ามันพุ่งเข้าหาเสมอ
+    function pickStalkWaypoint() {
+      if (Math.random() < 0.75) {
+        return getRandomFloorCellNear(camera.position.x, camera.position.z, 2, 14) || getRandomFloorCell();
+      }
+      return getRandomFloorCell();
+    }
+
     // -------------------------------------------------------------
     // Main Loop
     // -------------------------------------------------------------
@@ -501,10 +512,13 @@
               // (ถ้าไม่ตั้งใหม่ตรงนี้ ตัวจับเวลาเดิมที่นับมาตั้งแต่ต้นเกมจะหมดอายุพร้อมกันหมด
               // ทำให้ทั้ง 3 ตัววาปมาใกล้ผู้เล่นพร้อมกันทันทีที่ไฟกลับมาติด) — ให้เรียงคิวมาทีละตัวแทน
               smilerNextCheatTime = now + 22000 + Math.random() * 8000;
-              bacteriaNextCheatTime = smilerNextCheatTime + 16000 + Math.random() * 8000;
-              dullerNextCheatTime = bacteriaNextCheatTime + 16000 + Math.random() * 8000;
-              acidManNextCheatTime = dullerNextCheatTime + 16000 + Math.random() * 8000;
-              gappedNextCheatTime = acidManNextCheatTime + 16000 + Math.random() * 8000;
+              // เดิมเว้นคิวตัวละ 16-24 วิ สะสมกันจนตัวที่ 5 (The Gapped) เพิ่งเริ่มวาปเข้าหาผู้เล่นตอนนาทีที่ ~1.5-2.2
+              // ซึ่งผู้เล่นส่วนใหญ่ตายหรือจบเกมไปก่อน ทำให้ Duller / Acid Man / Gapped แทบไม่เคยโผล่เลย
+              // ลดเหลือตัวละ 9-15 วิ — ยังทยอยมาทีละตัวเหมือนเดิม แต่ครบ 5 ตัวภายใน ~1 นาทีแรกหลังไฟติด
+              bacteriaNextCheatTime = smilerNextCheatTime + 9000 + Math.random() * 6000;
+              dullerNextCheatTime = bacteriaNextCheatTime + 9000 + Math.random() * 6000;
+              acidManNextCheatTime = dullerNextCheatTime + 9000 + Math.random() * 6000;
+              gappedNextCheatTime = acidManNextCheatTime + 9000 + Math.random() * 6000;
             }
           }
         }
@@ -653,14 +667,15 @@
               if (cheatSpot) {
                 smilerRig.position.x = cheatSpot.x;
                 smilerRig.position.z = cheatSpot.z;
-                smilerWaypoint = getRandomFloorCell();
+                // วาปมาแล้วต้องเดินเข้าหาผู้เล่น ไม่ใช่สุ่มจุดใหม่ทั้งแมพแล้วเดินหนีออกไป
+                smilerWaypoint = getRandomFloorCellNear(camera.position.x, camera.position.z, 0, 8) || getRandomFloorCell();
               }
               smilerNextCheatTime = now + CHEAT_MIN_INTERVAL + Math.random() * (CHEAT_MAX_INTERVAL - CHEAT_MIN_INTERVAL);
             }
 
             // ลาดตระเวนสุ่มห้อง
             if (!smilerWaypoint || smilerRig.position.distanceTo(smilerWaypoint) < 2.0) {
-              smilerWaypoint = getRandomFloorCell();
+              smilerWaypoint = pickStalkWaypoint();
             }
           }
 
@@ -751,13 +766,14 @@
               if (cheatSpot) {
                 bacteriaRig.position.x = cheatSpot.x;
                 bacteriaRig.position.z = cheatSpot.z;
-                bacteriaWaypoint = getRandomFloorCell();
+                // วาปมาแล้วต้องเดินเข้าหาผู้เล่น ไม่ใช่สุ่มจุดใหม่ทั้งแมพแล้วเดินหนีออกไป
+                bacteriaWaypoint = getRandomFloorCellNear(camera.position.x, camera.position.z, 0, 8) || getRandomFloorCell();
               }
               bacteriaNextCheatTime = now + CHEAT_MIN_INTERVAL + Math.random() * (CHEAT_MAX_INTERVAL - CHEAT_MIN_INTERVAL);
             }
 
             if (!bacteriaWaypoint || bacteriaRig.position.distanceTo(bacteriaWaypoint) < 2.0) {
-              bacteriaWaypoint = getRandomFloorCell();
+              bacteriaWaypoint = pickStalkWaypoint();
             }
           }
           const bDir = new THREE.Vector3().subVectors(bacteriaWaypoint, bacteriaRig.position).normalize();
@@ -901,13 +917,14 @@
               if (cheatSpot) {
                 dullerRig.position.x = cheatSpot.x;
                 dullerRig.position.z = cheatSpot.z;
-                dullerWaypoint = getRandomFloorCell();
+                // วาปมาแล้วต้องเดินเข้าหาผู้เล่น ไม่ใช่สุ่มจุดใหม่ทั้งแมพแล้วเดินหนีออกไป
+                dullerWaypoint = getRandomFloorCellNear(camera.position.x, camera.position.z, 0, 8) || getRandomFloorCell();
               }
               dullerNextCheatTime = now + CHEAT_MIN_INTERVAL + Math.random() * (CHEAT_MAX_INTERVAL - CHEAT_MIN_INTERVAL);
             }
 
             if (!dullerWaypoint || dullerRig.position.distanceTo(dullerWaypoint) < 2.0) {
-              dullerWaypoint = getRandomFloorCell();
+              dullerWaypoint = pickStalkWaypoint();
             }
           }
           const dDir = new THREE.Vector3().subVectors(dullerWaypoint, dullerRig.position).normalize();
@@ -1020,13 +1037,14 @@
               if (cheatSpot) {
                 acidManRig.position.x = cheatSpot.x;
                 acidManRig.position.z = cheatSpot.z;
-                acidManWaypoint = getRandomFloorCell();
+                // วาปมาแล้วต้องเดินเข้าหาผู้เล่น ไม่ใช่สุ่มจุดใหม่ทั้งแมพแล้วเดินหนีออกไป
+                acidManWaypoint = getRandomFloorCellNear(camera.position.x, camera.position.z, 0, 8) || getRandomFloorCell();
               }
               acidManNextCheatTime = now + CHEAT_MIN_INTERVAL + Math.random() * (CHEAT_MAX_INTERVAL - CHEAT_MIN_INTERVAL);
             }
 
             if (!acidManWaypoint || acidManRig.position.distanceTo(acidManWaypoint) < 2.0) {
-              acidManWaypoint = getRandomFloorCell();
+              acidManWaypoint = pickStalkWaypoint();
             }
           }
           const amDir = new THREE.Vector3().subVectors(acidManWaypoint, acidManRig.position).normalize();
@@ -1111,13 +1129,14 @@
               if (cheatSpot) {
                 gappedRig.position.x = cheatSpot.x;
                 gappedRig.position.z = cheatSpot.z;
-                gappedWaypoint = getRandomFloorCell();
+                // วาปมาแล้วต้องเดินเข้าหาผู้เล่น ไม่ใช่สุ่มจุดใหม่ทั้งแมพแล้วเดินหนีออกไป
+                gappedWaypoint = getRandomFloorCellNear(camera.position.x, camera.position.z, 0, 8) || getRandomFloorCell();
               }
               gappedNextCheatTime = now + CHEAT_MIN_INTERVAL + Math.random() * (CHEAT_MAX_INTERVAL - CHEAT_MIN_INTERVAL);
             }
 
             if (!gappedWaypoint || gappedRig.position.distanceTo(gappedWaypoint) < 2.0) {
-              gappedWaypoint = getRandomFloorCell();
+              gappedWaypoint = pickStalkWaypoint();
             }
           }
           const gpDir = new THREE.Vector3().subVectors(gappedWaypoint, gappedRig.position).normalize();
