@@ -63,6 +63,7 @@
           let faceAnchor = smilerFaceAnchor;
           if (jumpscareTargetRig === bacteriaRig) faceAnchor = bacteriaFaceAnchor;
           else if (jumpscareTargetRig === dullerRig) faceAnchor = dullerFaceAnchor;
+          else if (jumpscareTargetRig === acidManRig) faceAnchor = acidManFaceAnchor;
 
           const faceWorldPos = new THREE.Vector3();
           if (faceAnchor) {
@@ -96,6 +97,11 @@
             for (let li = 0; li < dullerLegs.length; li++) {
               dullerLegs[li].rotation.x = (Math.random() - 0.5) * 0.6;
             }
+          } else if (jumpscareTargetRig === acidManRig) {
+            acidManLeftArm.rotation.x = -1.0 + (Math.random() - 0.5) * 0.5;
+            acidManRightArm.rotation.x = -1.0 + (Math.random() - 0.5) * 0.5;
+            acidManTorso.rotation.z = (Math.random() - 0.5) * 0.2;
+            if (acidManJawMesh) acidManJawMesh.scale.y = 1 + Math.abs(Math.sin(now * 0.03)) * 5;
           }
 
           camera.position.x += (Math.random() - 0.5) * 0.16;
@@ -341,6 +347,12 @@
         camera.rotation.x = cameraPitch;
         camera.rotation.z = bobZ;
 
+        // สั่นกล้องสั้นๆ ตอนโดนกรดสาดใส่ (ไม่กระทบตำแหน่งจริง แค่เอียงจอชั่วครู่)
+        if (now < acidShakeUntil) {
+          camera.rotation.z += (Math.random() - 0.5) * 0.05;
+          camera.rotation.x += (Math.random() - 0.5) * 0.02;
+        }
+
         // ระบบไฟดับ & จู๊คเปลี่ยนคำเป็น SANITY
         if (!isBlackout && now > nextBlackoutTime) {
           isBlackout = true;
@@ -409,6 +421,7 @@
               smilerNextCheatTime = now + 22000 + Math.random() * 8000;
               bacteriaNextCheatTime = smilerNextCheatTime + 16000 + Math.random() * 8000;
               dullerNextCheatTime = bacteriaNextCheatTime + 16000 + Math.random() * 8000;
+              acidManNextCheatTime = dullerNextCheatTime + 16000 + Math.random() * 8000;
             }
           }
         }
@@ -465,12 +478,14 @@
           if (smilerRig) smilerRig.visible = false;
           if (bacteriaRig) bacteriaRig.visible = false;
           if (dullerRig) dullerRig.visible = false;
+          if (acidManRig) acidManRig.visible = false;
           staticCanvas.style.opacity = 0;
           dreadVignetteEl.style.opacity = 0;
         } else {
         if (smilerRig) smilerRig.visible = true;
         if (bacteriaRig) bacteriaRig.visible = true;
         if (dullerRig) dullerRig.visible = true;
+        if (acidManRig) acidManRig.visible = true;
 
         // =========================================================
         // AI 1: The Smiler (ลอยเคว้งส่าย + อ้าขากรรไกร 3D)
@@ -778,15 +793,174 @@
           }
         }
 
+        // =========================================================
+        // AI 4: The Acid Man (เดินสองขาตามล่าตรงๆ + ถ่มกรดใส่จากระยะไกล)
+        // =========================================================
+        const distAcidMan = acidManRig.position.distanceTo(camera.position);
+
+        if (!isHiding && distAcidMan < ACIDMAN_BASE_DETECT_RANGE * detectMult) {
+          acidManState = 'CHASE';
+          playerEnergy = Math.max(0, playerEnergy - 0.9 * dt);
+          acidManSpeed = (distAcidMan < 9.0) ? 3.6 : (isBlackout ? 2.7 : 2.0);
+
+          acidManLastKnownPos.copy(camera.position);
+          acidManSearchUntil = now + SEARCH_LINGER_MS;
+
+          if (acidSoundGain && audioCtx && audioCtx.state === 'running') {
+            const aVol = Math.max(0, 1 - distAcidMan / 20) * 0.28;
+            acidSoundGain.gain.setValueAtTime(aVol, audioCtx.currentTime);
+            acidOsc.frequency.setValueAtTime(100 + Math.max(0, 20 - distAcidMan) * 6, audioCtx.currentTime);
+          }
+
+          const aDir = new THREE.Vector3().subVectors(camera.position, acidManRig.position).normalize();
+
+          // ยิ่งเข้าใกล้ในระยะถ่มกรดได้ ยิ่งเดินเข้าหาช้าลง (ยืนกึ่งกลางถ่มกรดใส่แทนที่จะพุ่งเข้าประชิดทันที)
+          const inThrowRange = distAcidMan >= ACID_THROW_MIN_RANGE && distAcidMan <= ACID_THROW_MAX_RANGE;
+          if (!inThrowRange || distAcidMan > ACID_THROW_MAX_RANGE * 0.7) {
+            acidManRig.position.x += aDir.x * acidManSpeed * dt;
+            acidManRig.position.z += aDir.z * acidManSpeed * dt;
+          }
+          acidManRig.lookAt(camera.position.x, acidManRig.position.y, camera.position.z);
+
+          // ถ่มกรดใส่ผู้เล่นเมื่ออยู่ในระยะ มีเส้นทางพอมองเห็น และคูลดาวน์หมดแล้ว
+          if (inThrowRange && now > acidThrowCooldownUntil) {
+            acidThrowCooldownUntil = now + ACID_THROW_COOLDOWN_MIN + Math.random() * (ACID_THROW_COOLDOWN_MAX - ACID_THROW_COOLDOWN_MIN);
+
+            const spitOrigin = new THREE.Vector3();
+            if (acidManFaceAnchor) acidManFaceAnchor.getWorldPosition(spitOrigin);
+            else spitOrigin.set(acidManRig.position.x, acidManRig.position.y + 1.1, acidManRig.position.z);
+
+            const globGeo = new THREE.SphereGeometry(0.11, 8, 8);
+            const globMat = new THREE.MeshStandardMaterial({ color: 0x9bff33, emissive: 0x4d8a10, emissiveIntensity: 1.4, roughness: 0.4 });
+            const glob = new THREE.Mesh(globGeo, globMat);
+            glob.position.copy(spitOrigin);
+            scene.add(glob);
+
+            acidProjectiles.push({
+              mesh: glob,
+              target: camera.position.clone(),
+              life: 0
+            });
+
+            if (playAcidSpitSound) playAcidSpitSound();
+          }
+
+          if (distAcidMan < 1.45) {
+            isJumpscareActive = true;
+            jumpscareTargetRig = acidManRig;
+            jumpscareStartTime = now;
+            playViolentJumpscareSound();
+            if (document.exitPointerLock) document.exitPointerLock();
+          }
+        } else {
+          acidManState = 'PATROL';
+          if (acidSoundGain && audioCtx && audioCtx.state === 'running') {
+            acidSoundGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+          }
+
+          if (now < acidManSearchUntil) {
+            acidManSpeed = SEARCH_SPEED;
+            if (!acidManWaypoint || acidManRig.position.distanceTo(acidManWaypoint) < 2.0) {
+              acidManWaypoint = getRandomFloorCellNear(acidManLastKnownPos.x, acidManLastKnownPos.z, 0, 5) || acidManLastKnownPos.clone();
+            }
+          } else {
+            acidManSpeed = 1.1;
+
+            if (!isHiding && now > acidManNextCheatTime) {
+              const cheatSpot = getRandomFloorCellNear(camera.position.x, camera.position.z, CHEAT_MIN_DIST, CHEAT_MAX_DIST);
+              if (cheatSpot) {
+                acidManRig.position.x = cheatSpot.x;
+                acidManRig.position.z = cheatSpot.z;
+                acidManWaypoint = getRandomFloorCell();
+              }
+              acidManNextCheatTime = now + CHEAT_MIN_INTERVAL + Math.random() * (CHEAT_MAX_INTERVAL - CHEAT_MIN_INTERVAL);
+            }
+
+            if (!acidManWaypoint || acidManRig.position.distanceTo(acidManWaypoint) < 2.0) {
+              acidManWaypoint = getRandomFloorCell();
+            }
+          }
+          const amDir = new THREE.Vector3().subVectors(acidManWaypoint, acidManRig.position).normalize();
+          acidManRig.position.x += amDir.x * acidManSpeed * dt;
+          acidManRig.position.z += amDir.z * acidManSpeed * dt;
+          acidManRig.lookAt(acidManWaypoint.x, acidManRig.position.y, acidManWaypoint.z);
+        }
+
+        // อนิเมชันเดิน 3D ของ Acid Man (หลังค่อม แขนขาแกว่งหนักๆ ช้ากว่า Bacteria)
+        acidManWalkCycle += dt * (acidManSpeed * 3.4);
+        acidManLeftLeg.rotation.x = Math.sin(acidManWalkCycle) * 0.5;
+        acidManRightLeg.rotation.x = -Math.sin(acidManWalkCycle) * 0.5;
+        acidManLeftArm.rotation.x = -Math.sin(acidManWalkCycle) * 0.4;
+        acidManRightArm.rotation.x = Math.sin(acidManWalkCycle) * 0.4;
+        acidManTorso.rotation.z = Math.sin(acidManWalkCycle) * 0.08;
+        acidManRig.position.y = Math.abs(Math.sin(acidManWalkCycle * 2)) * 0.06;
+
+        // อาการสะดุ้งกระตุกยามลาดตระเวน เหมือน entity อื่นๆ
+        if (acidManState === 'PATROL' && !isJumpscareActive) {
+          if (now > acidManNextTwitchTime) {
+            acidManTwitchUntil = now + 180 + Math.random() * 200;
+            acidManNextTwitchTime = now + 6500 + Math.random() * 8500;
+            if (acidManLight) {
+              acidManLight.intensity = 2.4;
+              setTimeout(() => { if (acidManLight) acidManLight.intensity = 1.1; }, 90);
+            }
+          }
+          if (now < acidManTwitchUntil) {
+            const jerk = (Math.random() - 0.5) * 0.4;
+            acidManTorso.rotation.z = jerk;
+            acidManTorso.rotation.x = 0.18 + jerk * 0.3;
+            acidManLeftArm.rotation.x = jerk * 1.8;
+            acidManRightArm.rotation.x = -jerk * 1.8;
+          }
+        }
+
+        // อัพเดตก้อนกรดที่กำลังบินอยู่ทั้งหมด — พุ่งตรงไปยังตำแหน่งที่ผู้เล่นยืนอยู่ตอนถูกถ่มออกมา
+        // (ไม่ homing ตามผู้เล่นแบบเรียลไทม์ ให้พอมีจังหวะหลบได้ถ้าขยับตัวทัน)
+        for (let pi = acidProjectiles.length - 1; pi >= 0; pi--) {
+          const proj = acidProjectiles[pi];
+          proj.life += dt;
+          const toTarget = new THREE.Vector3().subVectors(proj.target, proj.mesh.position);
+          const distToTarget = toTarget.length();
+
+          if (distToTarget < 0.6 || proj.life > 2.5) {
+            // ถึงเป้าหมาย (หรือหมดเวลา) — เช็คว่าผู้เล่นยังอยู่ใกล้จุดตกพอจะโดนสาดหรือไม่
+            const hitDist = proj.mesh.position.distanceTo(camera.position);
+            if (hitDist < 2.2 && !isHiding && !isJumpscareActive) {
+              playerEnergy = Math.max(0, playerEnergy - ACID_SPLASH_DAMAGE);
+              updateEnergyHUD();
+              acidShakeUntil = now + 380;
+              if (acidSplashEl) {
+                acidSplashEl.style.transition = 'none';
+                acidSplashEl.style.opacity = '0.85';
+                setTimeout(() => {
+                  if (acidSplashEl) {
+                    acidSplashEl.style.transition = 'opacity 0.5s ease';
+                    acidSplashEl.style.opacity = '0';
+                  }
+                }, 30);
+              }
+              if (playAcidSizzleSound) playAcidSizzleSound();
+            }
+            scene.remove(proj.mesh);
+            acidProjectiles.splice(pi, 1);
+          } else {
+            const step = Math.min(1, (ACID_PROJECTILE_SPEED * dt) / distToTarget);
+            proj.mesh.position.addScaledVector(toTarget, step);
+            proj.mesh.position.y += Math.sin(proj.life * 14) * 0.006; // สั่นเล็กน้อยระหว่างบิน
+            proj.mesh.rotation.x += dt * 10;
+            proj.mesh.rotation.y += dt * 7;
+          }
+        }
+
         // เสียงหัวใจเต้น (คงระยะเดิมไว้ให้ยังรู้สึกได้ว่ามีอะไรเข้าใกล้)
-        const closestDist = Math.min(distSmiler, distBacteria, distDuller);
+        const closestDist = Math.min(distSmiler, distBacteria, distDuller, distAcidMan);
 
         // "ตู้เอกสารไม่ได้ปลอดภัย 100% เสมอไป" — ถ้ามีบางอย่างเดินมาจ่อใกล้ตู้ตอนกำลังซ่อนอยู่
         // ช่องมองจะสั่น+มีเสียงเตือนก่อน ให้พอมีจังหวะตัดสินใจว่าจะซ่อนต่อหรือรีบวิ่งหนี
         // ก่อนที่มันจะมีโอกาสเล็กๆ "เช็คเจอ" จริงๆ ทำให้กลไกที่เคยไว้ใจได้ไม่น่าเชื่อถือ 100% อีกต่อไป
         if (isHiding && closestDist < LOCKER_CLOSE_CALL_DIST && now > lockerCloseCallCooldownUntil && !isJumpscareActive) {
           lockerCloseCallCooldownUntil = now + 7000 + Math.random() * 4000;
-          const closeRig = (closestDist === distSmiler) ? smilerRig : (closestDist === distBacteria) ? bacteriaRig : dullerRig;
+          const closeRig = (closestDist === distSmiler) ? smilerRig : (closestDist === distBacteria) ? bacteriaRig : (closestDist === distDuller) ? dullerRig : acidManRig;
 
           if (lockerSlitEl) {
             lockerSlitEl.classList.add('locker-shake');

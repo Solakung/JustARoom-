@@ -9,6 +9,7 @@
     let monsterSoundGain = null, monsterOsc1 = null, monsterOsc2 = null;
     let shadowSoundGain = null, shadowOsc = null;
     let dullerSoundGain = null, dullerOsc = null;
+    let acidSoundGain = null, acidOsc = null;
 
     let camera, scene, renderer, flashlight, ambientLight;
     let wallInstancedMesh = null;
@@ -65,6 +66,27 @@
     let dullerCrawlCycle = 0;
     let dullerNextTwitchTime = performance.now() + 5000 + Math.random() * 6000, dullerTwitchUntil = 0;
 
+    // Entity 4: The Acid Man (มนุษย์เดิน 2 ขา ตามล่าตรงๆ + ถ่มกรดใส่จากระยะไกล)
+    let acidManRig, acidManLeftLeg, acidManRightLeg, acidManLeftArm, acidManRightArm, acidManTorso, acidManLight, acidManJawMesh, acidManFaceAnchor;
+    let acidManSpawn = new THREE.Vector3(120, 0, 130);
+    let acidManSpeed = 1.1;
+    let acidManState = 'PATROL';
+    let acidManWaypoint = null, acidManWaitTimer = 0;
+    let acidManWalkCycle = 0;
+    let acidManEnraged = false, acidManTimer = 0, acidManCooldown = 0;
+    let acidManNextTwitchTime = performance.now() + 5500 + Math.random() * 7000, acidManTwitchUntil = 0;
+
+    // ก้อนกรดที่ Acid Man ถ่มใส่ผู้เล่นเมื่ออยู่ในระยะโจมตี (ไม่ต้องเดินมาถึงตัวก็โดนได้)
+    const ACID_THROW_MIN_RANGE = 4.0;
+    const ACID_THROW_MAX_RANGE = 16.0;
+    const ACID_PROJECTILE_SPEED = 11.0;
+    const ACID_SPLASH_DAMAGE = 11;
+    const ACID_THROW_COOLDOWN_MIN = 2600;
+    const ACID_THROW_COOLDOWN_MAX = 4200;
+    let acidThrowCooldownUntil = 0;
+    let acidProjectiles = []; // { mesh, target: Vector3, life }
+    let acidShakeUntil = 0;
+
     // กระป๋อง Almond Milk ทั่วแมป
     let almondBottles = [];
 
@@ -109,6 +131,7 @@
     let smilerNextCheatTime = performance.now() + 14000 + Math.random() * 8000;
     let bacteriaNextCheatTime = performance.now() + 20000 + Math.random() * 8000;
     let dullerNextCheatTime = performance.now() + 26000 + Math.random() * 8000;
+    let acidManNextCheatTime = performance.now() + 32000 + Math.random() * 8000;
     const CHEAT_MIN_INTERVAL = 22000;
     const CHEAT_MAX_INTERVAL = 38000;
     const CHEAT_MIN_DIST = 24;   // เดิม 17 — ขยับให้ไกลขึ้นอีก ผู้เล่นมีเวลาตั้งตัว/ตอบสนองทันมากขึ้น
@@ -220,4 +243,9 @@
     let bacteriaSearchUntil = 0;
     let dullerLastKnownPos = new THREE.Vector3();
     let dullerSearchUntil = 0;
+    let acidManLastKnownPos = new THREE.Vector3();
+    let acidManSearchUntil = 0;
+
+    // Acid Man มองเห็นได้เหมือน Smiler/Bacteria (ยิ่งเปิดแฟลชยิ่งเห็นไกลขึ้น)
+    const ACIDMAN_BASE_DETECT_RANGE = 24;
 

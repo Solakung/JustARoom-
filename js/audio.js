@@ -60,6 +60,17 @@
           dullerOsc.connect(df); df.connect(dullerSoundGain);
           dullerSoundGain.connect(audioCtx.destination);
           dullerOsc.start();
+
+          // 4. The Acid Man (เสียงฟู่กัดกร่อนต่ำๆ ตลอดเวลาที่มันไล่ล่า)
+          acidOsc = audioCtx.createOscillator();
+          acidOsc.type = 'sawtooth'; acidOsc.frequency.value = 100;
+          const af = audioCtx.createBiquadFilter();
+          af.type = 'bandpass'; af.frequency.value = 500; af.Q.value = 2.2;
+          acidSoundGain = audioCtx.createGain();
+          acidSoundGain.gain.value = 0.0001;
+          acidOsc.connect(af); af.connect(acidSoundGain);
+          acidSoundGain.connect(audioCtx.destination);
+          acidOsc.start();
         }
       } catch (err) {}
     };
@@ -155,6 +166,54 @@
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
         osc.connect(gain); gain.connect(audioCtx.destination);
         osc.start(now); osc.stop(now + 0.42);
+      } catch(e) {}
+    }
+
+    // เสียง "ถุ๊ย" ตอน Acid Man ถ่มกรดออกจากปาก — เสียงเปียกๆ สั้นๆ ความถี่ตก
+    function playAcidSpitSound() {
+      if (!audioCtx || audioCtx.state !== 'running') return;
+      try {
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(500, now);
+        osc.frequency.exponentialRampToValueAtTime(140, now + 0.14);
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(0.22, now + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(now); osc.stop(now + 0.2);
+      } catch(e) {}
+    }
+
+    // เสียง "ฟู่ซ่า" ตอนก้อนกรดกระทบตัวผู้เล่น — เสียงนอยส์กรองความถี่สูงแทนเสียงกัดกร่อน
+    function playAcidSizzleSound() {
+      if (!audioCtx || audioCtx.state !== 'running') return;
+      try {
+        const now = audioCtx.currentTime;
+        const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.4, audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * 0.5;
+        const noise = audioCtx.createBufferSource();
+        noise.buffer = buffer;
+        const hf = audioCtx.createBiquadFilter();
+        hf.type = 'highpass'; hf.frequency.value = 1800;
+        const nGain = audioCtx.createGain();
+        nGain.gain.setValueAtTime(0.35, now);
+        nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+        noise.connect(hf); hf.connect(nGain); nGain.connect(audioCtx.destination);
+        noise.start(now);
+
+        const thud = audioCtx.createOscillator();
+        const thudGain = audioCtx.createGain();
+        thud.type = 'sine';
+        thud.frequency.setValueAtTime(90, now);
+        thud.frequency.exponentialRampToValueAtTime(35, now + 0.2);
+        thudGain.gain.setValueAtTime(0.3, now);
+        thudGain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+        thud.connect(thudGain); thudGain.connect(audioCtx.destination);
+        thud.start(now); thud.stop(now + 0.26);
       } catch(e) {}
     }
 

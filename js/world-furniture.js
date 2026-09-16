@@ -87,6 +87,9 @@
       dullerRig = createDuller3DRig();
       scene.add(dullerRig);
 
+      acidManRig = createAcidMan3DRig();
+      scene.add(acidManRig);
+
       if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
         isTouchDevice = true;
         document.getElementById('joy-base').style.display = 'block';

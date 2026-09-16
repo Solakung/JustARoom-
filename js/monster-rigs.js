@@ -417,4 +417,136 @@
       return rig;
     }
 
+    // ผิวหนัง The Acid Man: เขียวเหลืองบวมพอง เหมือนแผลไหม้จากกรดกัดผิวตัวเอง มีรอยฟองอากาศ/รอยไหม้ดำ
+    function genAcidManSkinTex() {
+      const c = document.createElement('canvas');
+      c.width = 256; c.height = 256;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#4d5c1c'; ctx.fillRect(0, 0, 256, 256);
+      // คราบเหลือง-เขียวเข้มข้นไม่สม่ำเสมอ เหมือนผิวแช่สารเคมี
+      for (let i = 0; i < 200; i++) {
+        const x = Math.random() * 256, y = Math.random() * 256, r = 3 + Math.random() * 17;
+        ctx.fillStyle = Math.random() < 0.5 ? 'rgba(150,170,30,0.30)' : 'rgba(35,45,10,0.35)';
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      }
+      // ฟองอากาศ/ตุ่มกัดกร่อนเรืองแสงเขียวอมเหลือง คล้ายผิวกำลังฟู่
+      for (let i = 0; i < 70; i++) {
+        const x = Math.random() * 256, y = Math.random() * 256, r = 2 + Math.random() * 5;
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+        g.addColorStop(0, 'rgba(210, 230, 90, 0.75)');
+        g.addColorStop(0.6, 'rgba(150, 190, 40, 0.35)');
+        g.addColorStop(1, 'rgba(150, 190, 40, 0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      }
+      // รอยไหม้ดำเป็นหย่อมคล้ายกรดกัดผิวลึกจนไหม้เกรียม
+      for (let i = 0; i < 26; i++) {
+        const x = Math.random() * 256, y = Math.random() * 256, r = 4 + Math.random() * 9;
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+        g.addColorStop(0, 'rgba(10,8,4,0.6)');
+        g.addColorStop(1, 'rgba(10,8,4,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      }
+      return new THREE.CanvasTexture(c);
+    }
+
+    // สร้าง The Acid Man (มนุษย์เดิน 2 ขา ตัวเตี้ยหนา หลังค่อม แขนยาวหิ้วถังกรดไว้ถ่มใส่ผู้เล่น)
+    function createAcidMan3DRig() {
+      const rig = new THREE.Group();
+      const acidSkinTex = genAcidManSkinTex();
+      const bodyMat = new THREE.MeshStandardMaterial({ map: acidSkinTex, color: 0x7c8f3a, roughness: 0.85, metalness: 0 });
+      const limbMat = new THREE.MeshStandardMaterial({ map: acidSkinTex, color: 0x6c7d32, roughness: 0.85, metalness: 0 });
+
+      // ลำตัวหนาค่อม
+      acidManTorso = new THREE.Group();
+      const torsoGeo = new THREE.CylinderGeometry(0.26, 0.34, 1.1, 8, 6);
+      deformFleshGeo(torsoGeo, 0.16);
+      const torso = new THREE.Mesh(torsoGeo, bodyMat);
+      acidManTorso.add(torso);
+      torso.position.y = 0.55;
+      torso.rotation.x = 0.18; // หลังค่อมงอไปข้างหน้าเล็กน้อย
+
+      // หัวจมคอ เอียงมองต่ำแบบสัตว์นักล่า
+      const headGeo = new THREE.SphereGeometry(0.24, 10, 10);
+      deformFleshGeo(headGeo, 0.15);
+      const head = new THREE.Mesh(headGeo, bodyMat);
+      head.scale.set(0.92, 1.0, 1.0);
+      head.position.set(0, 1.08, 0.14);
+      head.rotation.x = 0.22;
+      acidManTorso.add(head);
+
+      // ตาเรืองเขียวพิษ 2 ดวง + ปากแหว่งหยดกรดตลอดเวลา
+      const eyeGeo = new THREE.SphereGeometry(0.06, 8, 8);
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0x9bff33 });
+      const lEye = new THREE.Mesh(eyeGeo, eyeMat);
+      lEye.position.set(-0.09, 1.1, 0.32);
+      acidManTorso.add(lEye);
+      const rEye = new THREE.Mesh(eyeGeo, eyeMat);
+      rEye.position.set(0.09, 1.11, 0.33);
+      acidManTorso.add(rEye);
+
+      const jawMat = new THREE.MeshBasicMaterial({ color: 0x0d1400 });
+      acidManJawMesh = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.05, 0.06), jawMat);
+      acidManJawMesh.position.set(0, 0.98, 0.34);
+      acidManTorso.add(acidManJawMesh);
+
+      acidManFaceAnchor = new THREE.Object3D();
+      acidManFaceAnchor.position.set(0, 1.04, 0.32);
+      acidManTorso.add(acidManFaceAnchor);
+
+      rig.add(acidManTorso);
+      acidManTorso.position.y = 1.0;
+
+      // แขนสั้นหนา ปลายมือบวมพอง (มือที่ถ่มกรดออกมา)
+      const armGeo = new THREE.CylinderGeometry(0.065, 0.055, 0.85, 6, 5);
+      deformFleshGeo(armGeo, 0.14);
+      const handGeo = new THREE.SphereGeometry(0.1, 8, 8);
+      deformFleshGeo(handGeo, 0.22);
+
+      acidManLeftArm = new THREE.Group();
+      const lArmMesh = new THREE.Mesh(armGeo, limbMat);
+      lArmMesh.position.y = -0.4;
+      acidManLeftArm.add(lArmMesh);
+      const lHand = new THREE.Mesh(handGeo, limbMat);
+      lHand.position.y = -0.82;
+      acidManLeftArm.add(lHand);
+      acidManLeftArm.position.set(-0.32, 1.55, 0.05);
+      rig.add(acidManLeftArm);
+
+      acidManRightArm = new THREE.Group();
+      const rArmMesh = new THREE.Mesh(armGeo.clone(), limbMat);
+      rArmMesh.position.y = -0.4;
+      acidManRightArm.add(rArmMesh);
+      const rHand = new THREE.Mesh(handGeo.clone(), limbMat);
+      rHand.position.y = -0.82;
+      acidManRightArm.add(rHand);
+      acidManRightArm.position.set(0.32, 1.55, 0.05);
+      rig.add(acidManRightArm);
+
+      // ขาสั้นหนา
+      const legGeo = new THREE.CylinderGeometry(0.09, 0.07, 0.85, 6, 5);
+      deformFleshGeo(legGeo, 0.13);
+
+      acidManLeftLeg = new THREE.Group();
+      const lLegMesh = new THREE.Mesh(legGeo, limbMat);
+      lLegMesh.position.y = -0.42;
+      acidManLeftLeg.add(lLegMesh);
+      acidManLeftLeg.position.set(-0.16, 0.85, 0);
+      rig.add(acidManLeftLeg);
+
+      acidManRightLeg = new THREE.Group();
+      const rLegMesh = new THREE.Mesh(legGeo.clone(), limbMat);
+      rLegMesh.position.y = -0.42;
+      acidManRightLeg.add(rLegMesh);
+      acidManRightLeg.position.set(0.16, 0.85, 0);
+      rig.add(acidManRightLeg);
+
+      acidManLight = new THREE.PointLight(0x8fdb1f, 1.1, 7, 2);
+      acidManLight.position.y = 1.2;
+      rig.add(acidManLight);
+
+      return rig;
+    }
+
 

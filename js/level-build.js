@@ -107,6 +107,7 @@
             if (val === 4) smilerSpawn.set(wx, 1.4, wz);
             if (val === 5) bacteriaSpawn.set(wx, 0, wz);
             if (val === 6) dullerSpawn.set(wx, 0, wz);
+            if (val === 7) acidManSpawn.set(wx, 0, wz);
           }
         }
       }
@@ -205,8 +206,17 @@
       if (smilerRig) { smilerRig.position.copy(smilerSpawn); smilerRig.rotation.z = 0; }
       if (bacteriaRig) { bacteriaRig.position.copy(bacteriaSpawn); bacteriaTorso.rotation.z = 0; }
       if (dullerRig) { dullerRig.position.copy(dullerSpawn); dullerRig.rotation.z = 0; dullerRig.rotation.x = 0; }
+      if (acidManRig) { acidManRig.position.copy(acidManSpawn); acidManRig.rotation.set(0, 0, 0); }
       if (bacteriaJawMesh) bacteriaJawMesh.scale.y = 1;
       if (dullerJawMesh) dullerJawMesh.scale.y = 0.6;
+
+      // เก็บกวาดก้อนกรดที่ยังลอยค้างอยู่กลางอากาศตอนกดเริ่มใหม่
+      for (let i = 0; i < acidProjectiles.length; i++) {
+        if (acidProjectiles[i].mesh && scene) scene.remove(acidProjectiles[i].mesh);
+      }
+      acidProjectiles = [];
+      acidThrowCooldownUntil = 0;
+      acidShakeUntil = 0;
       
       for (let k in keys) keys[k] = false;
       joyVector.x = 0;
@@ -225,16 +235,19 @@
       smilerSpeed = 1.4; smilerState = 'PATROL'; smilerWaypoint = null; smilerSearchUntil = 0;
       bacteriaSpeed = 1.2; bacteriaState = 'PATROL'; bacteriaWaypoint = null; bacteriaSearchUntil = 0;
       dullerSpeed = 1.3; dullerState = 'PATROL'; dullerWaypoint = null; dullerSearchUntil = 0;
+      acidManSpeed = 1.1; acidManState = 'PATROL'; acidManWaypoint = null; acidManSearchUntil = 0;
 
       const restartNow = performance.now();
       smilerNextCheatTime = restartNow + 14000 + Math.random() * 8000;
       bacteriaNextCheatTime = restartNow + 20000 + Math.random() * 8000;
       dullerNextCheatTime = restartNow + 26000 + Math.random() * 8000;
+      acidManNextCheatTime = restartNow + 32000 + Math.random() * 8000;
       nextPeripheralGlitchTime = restartNow + 13000 + Math.random() * 9000;
       lockerCloseCallCooldownUntil = 0;
       lastFlickerScheduleTime = 0;
       if (dreadVignetteEl) dreadVignetteEl.style.opacity = 0;
       if (subliminalFlashEl) subliminalFlashEl.style.opacity = 0;
+      if (acidSplashEl) acidSplashEl.style.opacity = 0;
       if (viewportEl) viewportEl.style.filter = '';
       if (chromaEl) chromaEl.style.opacity = 0;
       if (hudEl) hudEl.style.transform = '';

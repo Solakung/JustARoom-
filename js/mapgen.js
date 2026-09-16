@@ -84,6 +84,7 @@
       map[25][35] = 4; // Smiler
       map[50][20] = 5; // Bacteria
       map[18][55] = 6; // Duller
+      map[45][45] = 7; // Acid Man
 
       if (!isPathReachable(map, 1, 1, exitR, exitC)) {
         carveGuaranteedCorridor(map, 1, 1, exitR, exitC);

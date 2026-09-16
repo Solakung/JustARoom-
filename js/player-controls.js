@@ -326,6 +326,7 @@
     const dreadVignetteEl = document.getElementById('dread-vignette');
     const subliminalFlashEl = document.getElementById('subliminal-flash');
     const camFlashOverlayEl = document.getElementById('camera-flash-overlay');
+    const acidSplashEl = document.getElementById('acid-splash-overlay');
     const viewportEl = document.getElementById('viewport');
     const hudEl = document.querySelector('.hud');
     const chromaEl = document.getElementById('chroma-aberration');
