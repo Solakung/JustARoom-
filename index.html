@@ -551,6 +551,40 @@
       opacity: 0.35;
     }
 
+    #drink-btn {
+      position: absolute;
+      bottom: 118px;
+      right: 122px;
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: rgba(90, 110, 190, 0.28);
+      border: 1.5px solid rgba(170, 190, 255, 0.55);
+      color: #dbe4ff;
+      font-family: monospace;
+      font-size: 9px;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      line-height: 1.2;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      z-index: 11;
+      touch-action: manipulation;
+      user-select: none;
+      transition: opacity 0.15s ease, filter 0.15s ease, transform 0.1s ease;
+    }
+    #drink-btn:active {
+      transform: scale(0.94);
+      background: rgba(120, 140, 220, 0.4);
+    }
+    #drink-btn.disabled {
+      filter: grayscale(0.85);
+      opacity: 0.35;
+      pointer-events: none;
+    }
+
     #hide-prompt {
       position: absolute;
       bottom: 110px;
@@ -647,6 +681,7 @@
       </div>
       <span id="energy-text">100%</span>
     </div>
+    <div id="bottle-container" style="font-size: 11px; margin-top: 3px; color: #d9c98a;">🥛 นมอัลมอนด์: <span id="bottle-count">0/5</span></div>
   </div>
   <div id="crosshair"></div>
   <div id="flashlight-indicator" style="display:none;">CAMERA READY</div>
@@ -664,6 +699,7 @@
   <div id="sprint-btn">SPRINT</div>
   <div id="flash-btn">📷<br>SHOT</div>
   <div id="hide-btn">HIDE</div>
+  <div id="drink-btn">🥛<br>DRINK</div>
   <div id="hide-prompt">[ กด E เพื่อซ่อนตัว ]</div>
 
   <!-- Start Menu พรางตัว -->
@@ -696,12 +732,12 @@
     <p class="howto-text">
       <b>เป้าหมาย:</b> หาทาง <b>บันไดหนีไฟ (EXIT)</b> แล้วออกจากตึกให้ได้<br><br>
       • ประตู EXIT ถูกล็อกไว้ ต้องเก็บ <b>บัตรผ่าน (Keycard) ให้ครบ 3 ใบ</b> ก่อนถึงจะออกได้<br>
-      • ถ้าพลังงานใกล้หมด ให้แวะเก็บเครื่องดื่มตามทางเพื่อเติม <b>พลังงาน</b><br>
+      • เก็บ <b>นมอัลมอนด์</b> ที่เจอตามทางใส่กระเป๋าไว้ก่อนได้สูงสุด 5 ขวด แล้วค่อยกด <b>Q</b> (หรือปุ่ม DRINK) ดื่มตอนที่ต้องการเติม <b>พลังงาน/สติ</b> จริงๆ<br>
       • ระหว่างทางมีเอกสาร/โน้ตของเพื่อนร่วมงานวางทิ้งไว้ เก็บอ่านเล่นได้<br>
-      • ใช้ <b>กล้อง</b> ถ่ายรูปเพื่อสร้างแสงแฟลชวาบช่วยให้เห็นทางชัดขึ้นชั่วครู่<br><br>
+      • ใช้ <b>กล้อง</b> ถ่ายรูปเพื่อสร้างแสงแฟลชวาบช่วยให้เห็นทางชัดขึ้นชั่วครู่ และแฟลชจ่อหน้า Smiler ระยะใกล้จะทำให้มันสตันนิ่งไปชั่วคราวด้วย<br><br>
       <b>การควบคุม:</b><br>
-      • <b>มือถือ:</b> จอยสติ๊กซ้ายเดิน | ปัดนิ้วฝั่งขวาหันมอง | ปุ่ม SPRINT วิ่ง | ปุ่ม CAMERA ถ่ายภาพสร้างแสงแฟลช<br>
-      • <b>PC:</b> W, A, S, D เดิน | คลิกเมาส์เพื่อหันมุมมอง | Shift หรือ Space วิ่ง | กด F ถ่ายภาพสร้างแสงแฟลช
+      • <b>มือถือ:</b> จอยสติ๊กซ้ายเดิน | ปัดนิ้วฝั่งขวาหันมอง | ปุ่ม SPRINT วิ่ง | ปุ่ม CAMERA ถ่ายภาพสร้างแสงแฟลช | ปุ่ม DRINK ดื่มนมจากกระเป๋า<br>
+      • <b>PC:</b> W, A, S, D เดิน | คลิกเมาส์เพื่อหันมุมมอง | Shift หรือ Space วิ่ง | กด F ถ่ายภาพสร้างแสงแฟลช | กด Q ดื่มนมจากกระเป๋า
     </p>
     <button id="howto-back-btn" class="action-btn">ย้อนกลับ</button>
     <div class="hint-text">[ แตะที่ใดก็ได้เพื่อย้อนกลับ ]</div>
