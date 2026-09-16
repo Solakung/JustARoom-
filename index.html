@@ -1478,6 +1478,44 @@
       return t;
     }
 
+    // กระดานไวท์บอร์ดห้องประชุม มีกราฟ/ตารางประชุมเลือนๆ แบบออฟฟิศทั่วไป
+    function genWhiteboardTex() {
+      const c = document.createElement('canvas');
+      c.width = 256; c.height = 160;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#eef0ea'; ctx.fillRect(0, 0, 256, 160);
+      ctx.strokeStyle = 'rgba(40,60,150,0.55)'; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(15, 120); ctx.lineTo(60, 90); ctx.lineTo(100, 100); ctx.lineTo(150, 60); ctx.lineTo(200, 70); ctx.lineTo(240, 40);
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(180,30,30,0.5)'; ctx.lineWidth = 2;
+      for (let i = 0; i < 6; i++) {
+        const x = 20 + Math.random() * 200, y = 15 + Math.random() * 25;
+        ctx.strokeRect(x, y, 26 + Math.random() * 18, 12);
+      }
+      ctx.fillStyle = 'rgba(40,40,40,0.65)';
+      ctx.font = '11px sans-serif';
+      ctx.fillText('Q3 REVIEW', 16, 18);
+      ctx.fillText('TARGETS', 150, 152);
+      const t = new THREE.CanvasTexture(c);
+      return t;
+    }
+
+    // แผงไฟกะพริบด้านหน้าตู้เซิร์ฟเวอร์ จุดไฟเขียว/น้ำเงินเรียงเป็นแถวสุ่ม
+    function genServerLightsTex() {
+      const c = document.createElement('canvas');
+      c.width = 64; c.height = 128;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#15181c'; ctx.fillRect(0, 0, 64, 128);
+      for (let y = 6; y < 128; y += 10) {
+        ctx.fillStyle = Math.random() < 0.6 ? '#1fae4a' : '#2255aa';
+        ctx.fillRect(6, y, 6, 4);
+        ctx.fillStyle = '#33383f';
+        ctx.fillRect(16, y, 40, 4);
+      }
+      return new THREE.CanvasTexture(c);
+    }
+
     function genOfficeCarpetTex() {
       const c = document.createElement('canvas');
       c.width = 256; c.height = 256;
@@ -2183,7 +2221,7 @@
     // 4.5 Office Furniture — สิ่งที่บ่งบอกว่านี่คือออฟฟิศจริงๆ ก่อนไฟดับครั้งแรก
     // เก็บ basePos/baseRot ของแต่ละชิ้นไว้ เพื่อให้ "บิดเบี้ยว" ตอนไฟดับครั้งแรก แล้วรีเซ็ตกลับได้ตอนเริ่มใหม่
     // -------------------------------------------------------------
-    let deskTopMat, cabinetSideMat;
+    let deskTopMat, cabinetSideMat, whiteboardMat;
 
     function makeDesk() {
       const g = new THREE.Group();
@@ -2261,11 +2299,126 @@
       return g;
     }
 
+    // ชั้นหนังสือ/แฟ้มเอกสาร ตั้งเรียงเป็นแถวสีสุ่มไม่เท่ากัน ให้ดูเป็นออฟฟิศจริงที่มีคนใช้งาน
+    function makeBookshelf() {
+      const g = new THREE.Group();
+      const shelfMat = new THREE.MeshLambertMaterial({ color: 0x5b4632 });
+      const body = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.9, 0.4), shelfMat);
+      body.position.y = 0.95;
+      g.add(body);
+      const bookColors = [0x8a2e2e, 0x2e4a8a, 0x2e8a4d, 0x8a7a2e, 0x5a2e8a, 0x8a5a2e];
+      const bookGroup = new THREE.Group();
+      for (let shelf = 0; shelf < 3; shelf++) {
+        let x = -0.42;
+        const y = 0.5 + shelf * 0.6;
+        while (x < 0.4) {
+          const w = 0.05 + Math.random() * 0.05;
+          const h = 0.28 + Math.random() * 0.12;
+          const book = new THREE.Mesh(
+            new THREE.BoxGeometry(w, h, 0.3),
+            new THREE.MeshLambertMaterial({ color: bookColors[Math.floor(Math.random() * bookColors.length)] })
+          );
+          book.position.set(x + w / 2, y + h / 2 - 0.15, 0.02);
+          book.userData.basePos = book.position.clone();
+          bookGroup.add(book);
+          x += w + 0.01;
+        }
+      }
+      g.add(bookGroup);
+      g.userData.type = 'bookshelf';
+      g.userData.bookGroup = bookGroup;
+      return g;
+    }
+
+    // เครื่องปริ้นเตอร์สำนักงาน มีไฟแสดงสถานะเล็กๆ
+    function makePrinter() {
+      const g = new THREE.Group();
+      const bodyMat = new THREE.MeshLambertMaterial({ color: 0xd8d8d0 });
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.35, 0.45), bodyMat);
+      body.position.y = 0.4;
+      g.add(body);
+      const tray = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.03, 0.35), new THREE.MeshLambertMaterial({ color: 0x2a2a2a }));
+      tray.position.set(0, 0.58, 0.02);
+      g.add(tray);
+      const ledMat = new THREE.MeshBasicMaterial({ color: 0x22ff44 });
+      const led = new THREE.Mesh(new THREE.SphereGeometry(0.02, 6, 6), ledMat);
+      led.position.set(0.2, 0.58, 0.24);
+      g.add(led);
+      g.userData.type = 'printer';
+      g.userData.ledMat = ledMat;
+      return g;
+    }
+
+    // ตู้กดน้ำดื่มมุมออฟฟิศ
+    function makeWaterCooler() {
+      const g = new THREE.Group();
+      const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.2, 0.9, 8), new THREE.MeshLambertMaterial({ color: 0xe8e8e8 }));
+      stand.position.y = 0.45;
+      g.add(stand);
+      const bottleMat = new THREE.MeshLambertMaterial({ color: 0x8fc7e8, transparent: true, opacity: 0.75 });
+      const bottle = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.14, 0.55, 10), bottleMat);
+      bottle.position.y = 1.15;
+      g.add(bottle);
+      g.userData.type = 'watercooler';
+      g.userData.bottleMat = bottleMat;
+      return g;
+    }
+
+    // ไวท์บอร์ดตั้งพื้น มีกราฟ/ตารางประชุมเลือนๆ อยู่ในตัว
+    function makeWhiteboard() {
+      const g = new THREE.Group();
+      const legMat = new THREE.MeshLambertMaterial({ color: 0x2a2a2a });
+      [-0.55, 0.55].forEach((x) => {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.3, 6), legMat);
+        leg.position.set(x, 0.65, 0);
+        g.add(leg);
+      });
+      if (!whiteboardMat) whiteboardMat = new THREE.MeshLambertMaterial({ map: genWhiteboardTex() });
+      const board = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.8, 0.04), whiteboardMat);
+      board.position.set(0, 1.25, 0);
+      g.add(board);
+      g.userData.type = 'whiteboard';
+      g.userData.boardMesh = board;
+      return g;
+    }
+
+    // ตู้เซิร์ฟเวอร์/แร็คไฟฟ้าเล็กๆ มุมออฟฟิศ มีแผงไฟกะพริบ
+    function makeServerRack() {
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.55, 1.8, 0.6), new THREE.MeshLambertMaterial({ color: 0x1c1e22 }));
+      body.position.y = 0.9;
+      g.add(body);
+      const panelMat = new THREE.MeshLambertMaterial({ map: genServerLightsTex() });
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.6, 0.02), panelMat);
+      panel.position.set(0, 0.9, 0.31);
+      g.add(panel);
+      g.userData.type = 'server';
+      g.userData.panelMat = panelMat;
+      return g;
+    }
+
+    // ถังขยะสำนักงานเล็กๆ ให้มุมห้องดูมีรายละเอียดขึ้น
+    function makeTrashBin() {
+      const g = new THREE.Group();
+      const bin = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.13, 0.42, 10), new THREE.MeshLambertMaterial({ color: 0x2f3438 }));
+      bin.position.y = 0.21;
+      g.add(bin);
+      g.userData.type = 'trashbin';
+      return g;
+    }
+
     // วางเฟอร์นิเจอร์สำนักงานกระจายทั่วแมป ต่อจากตำแหน่งจุดซ่อนตัว (ใช้ floor cell list เดียวกัน กันซ้อนกับของอื่น)
     function placeOfficeFurniture(floorCells, startIdx) {
       officeFurniture = [];
-      const count = Math.min(46, Math.max(0, floorCells.length - startIdx));
-      const types = ['desk_chair', 'desk_chair', 'cabinet', 'plant', 'desk_chair', 'cabinet'];
+      // เพิ่มความหนาแน่นของเฟอร์นิเจอร์ขึ้นมาก (เดิม 46) + เพิ่มชนิดของให้หลากหลายขึ้น
+      // ให้ทุกห้องดูเหมือนออฟฟิศที่มีคนใช้งานจริง ไม่ใช่มีแค่โต๊ะ/เก้าอี้ไม่กี่ตัวลอยอยู่ในที่ว่างเปล่า
+      const count = Math.min(120, Math.max(0, floorCells.length - startIdx));
+      const types = [
+        'desk_chair', 'desk_chair', 'cabinet', 'plant', 'desk_chair', 'bookshelf',
+        'desk_chair', 'trashbin', 'printer', 'desk_chair', 'cabinet', 'watercooler',
+        'desk_chair', 'plant', 'whiteboard', 'desk_chair', 'bookshelf', 'server',
+        'desk_chair', 'trashbin', 'cabinet', 'desk_chair', 'plant', 'printer'
+      ];
       for (let i = 0; i < count; i++) {
         const { wx, wz } = floorCells[startIdx + i];
         const kind = types[i % types.length];
@@ -2291,6 +2444,18 @@
           addItem(makeFilingCabinet(), 0, 0);
         } else if (kind === 'plant') {
           addItem(makePlant(), 0, 0);
+        } else if (kind === 'bookshelf') {
+          addItem(makeBookshelf(), 0, 0);
+        } else if (kind === 'printer') {
+          addItem(makePrinter(), 0, 0);
+        } else if (kind === 'watercooler') {
+          addItem(makeWaterCooler(), 0, 0);
+        } else if (kind === 'whiteboard') {
+          addItem(makeWhiteboard(), 0, 0);
+        } else if (kind === 'server') {
+          addItem(makeServerRack(), 0, 0);
+        } else if (kind === 'trashbin') {
+          addItem(makeTrashBin(), 0, 0);
         }
       }
     }
@@ -2311,6 +2476,39 @@
           item.mesh.userData.bodyMesh.material.color.setHex(0x5c5548);
         } else if (item.type === 'plant') {
           item.mesh.userData.leafMat.color.setHex(0x5a4a2e);
+        } else if (item.type === 'bookshelf' && Math.random() < 0.45) {
+          // ชั้นหนังสือล้มเอียง หนังสือร่วงกระจายเกลื่อนพื้น
+          item.mesh.rotation.z = (Math.random() < 0.5 ? -1 : 1) * (0.35 + Math.random() * 0.5);
+          item.mesh.position.y -= 0.3;
+          for (const book of item.mesh.userData.bookGroup.children) {
+            book.position.x += (Math.random() - 0.5) * 0.6;
+            book.position.z += (Math.random() - 0.5) * 0.6;
+            book.position.y -= 0.3 + Math.random() * 0.2;
+            book.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+          }
+        } else if (item.type === 'printer') {
+          // ไฟสถานะเปลี่ยนเป็นสีแดงกะพริบ เหมือนเครื่องพังหรือถูกปล่อยทิ้งไว้กลางงานพิมพ์
+          item.mesh.userData.ledMat.color.setHex(0xff2200);
+        } else if (item.type === 'watercooler') {
+          // น้ำในตู้กดกลายเป็นสีขุ่นคล้ำ ไม่น่าดื่ม
+          item.mesh.userData.bottleMat.color.setHex(0x4a4030);
+          item.mesh.userData.bottleMat.opacity = 0.9;
+        } else if (item.type === 'server' && Math.random() < 0.6) {
+          // แผงไฟเซิร์ฟเวอร์เปลี่ยนเป็นสีแดงเถื่อนทั้งแผง เหมือนระบบเตือนภัยค้าง
+          // (วัสดุนี้สร้างแยกต่อเซิร์ฟเวอร์แต่ละตัวอยู่แล้ว ไม่ใช่วัสดุร่วม จึงแก้สีตรงๆ ได้เลยไม่ต้อง clone)
+          item.mesh.userData.panelMat.color.setHex(0xff3322);
+        } else if (item.type === 'whiteboard' && Math.random() < 0.5) {
+          // ข้อความบนกระดานเปลี่ยนเป็นข้อความหลอนแทนกราฟประชุมปกติ
+          const c = document.createElement('canvas');
+          c.width = 256; c.height = 160;
+          const ctx = c.getContext('2d');
+          ctx.fillStyle = '#c8c8be'; ctx.fillRect(0, 0, 256, 160);
+          ctx.fillStyle = 'rgba(120,10,10,0.85)';
+          ctx.font = 'bold 22px sans-serif';
+          ctx.fillText('GET OUT', 55, 60);
+          ctx.font = '13px sans-serif';
+          ctx.fillText('THIS IS NOT THE OFFICE', 30, 105);
+          item.mesh.userData.boardMesh.material = new THREE.MeshLambertMaterial({ map: new THREE.CanvasTexture(c) });
         }
       }
 
@@ -2340,6 +2538,21 @@
           item.mesh.userData.bodyMesh.material = cabinetSideMat;
         } else if (item.type === 'plant') {
           item.mesh.userData.leafMat.color.setHex(0x4c7a3e);
+        } else if (item.type === 'bookshelf') {
+          // หนังสือกลับสภาพและตำแหน่งเดิมเป๊ะ (เก็บตำแหน่งตั้งต้นไว้ตอนสร้างในตอน makeBookshelf)
+          for (const book of item.mesh.userData.bookGroup.children) {
+            book.position.copy(book.userData.basePos);
+            book.rotation.set(0, 0, 0);
+          }
+        } else if (item.type === 'printer') {
+          item.mesh.userData.ledMat.color.setHex(0x22ff44);
+        } else if (item.type === 'watercooler') {
+          item.mesh.userData.bottleMat.color.setHex(0x8fc7e8);
+          item.mesh.userData.bottleMat.opacity = 0.75;
+        } else if (item.type === 'server') {
+          item.mesh.userData.panelMat.color.setHex(0xffffff);
+        } else if (item.type === 'whiteboard') {
+          item.mesh.userData.boardMesh.material = whiteboardMat;
         }
       }
       for (const m of anomalyMeshes) scene.remove(m);
