@@ -90,6 +90,9 @@
       acidManRig = createAcidMan3DRig();
       scene.add(acidManRig);
 
+      gappedRig = createGapped3DRig();
+      scene.add(gappedRig);
+
       if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
         isTouchDevice = true;
         document.getElementById('joy-base').style.display = 'block';

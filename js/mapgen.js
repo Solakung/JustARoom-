@@ -85,6 +85,7 @@
       map[50][20] = 5; // Bacteria
       map[18][55] = 6; // Duller
       map[45][45] = 7; // Acid Man
+      map[60][15] = 8; // The Gapped
 
       if (!isPathReachable(map, 1, 1, exitR, exitC)) {
         carveGuaranteedCorridor(map, 1, 1, exitR, exitC);

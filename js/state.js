@@ -10,6 +10,7 @@
     let shadowSoundGain = null, shadowOsc = null;
     let dullerSoundGain = null, dullerOsc = null;
     let acidSoundGain = null, acidOsc = null;
+    let gapSoundGain = null, gapOsc = null;
 
     let camera, scene, renderer, flashlight, ambientLight;
     let wallInstancedMesh = null;
@@ -76,6 +77,25 @@
     let acidManEnraged = false, acidManTimer = 0, acidManCooldown = 0;
     let acidManNextTwitchTime = performance.now() + 5500 + Math.random() * 7000, acidManTwitchUntil = 0;
 
+    // Entity 5: The Gapped (มนุษยนอยด์ผอมสูง อกแหวกเป็นรอยแยกมิติ ไม่ทำร้ายตรงๆ แต่ลากผู้เล่นผ่านรอยแยกไปโผล่ที่อื่นในแมพ)
+    let gappedRig, gappedLeftLeg, gappedRightLeg, gappedLeftArm, gappedRightArm, gappedTorso, gappedLight, gappedFaceAnchor, gappedVoidRing;
+    let gappedSpawn = new THREE.Vector3(200, 0, 40);
+    let gappedSpeed = 1.15;
+    let gappedState = 'PATROL';
+    let gappedWaypoint = null, gappedWaitTimer = 0;
+    let gappedWalkCycle = 0;
+    let gappedNextTwitchTime = performance.now() + 7000 + Math.random() * 8000, gappedTwitchUntil = 0;
+
+    // "ลากผ่านรอยแยก" แทนจั๊มสแกร์ — ผู้เล่นไม่ตาย แค่ถูกดึงวาปไปโผล่จุดอื่นในแมพแบบมึนงง
+    let gappedGrabActive = false;
+    let gappedGrabStartTime = 0;
+    let gappedGrabCooldownUntil = 0;
+    const GAPPED_GRAB_DURATION = 900;      // ms ที่ภาพบิดเบี้ยว/ดูดกล้องก่อนสลับตำแหน่ง
+    const GAPPED_GRAB_RANGE = 1.7;         // แขนมันยาวเก้งก้างกว่าตัวอื่นเล็กน้อย จับได้จากระยะที่ไกลกว่านิดหน่อย
+    const GAPPED_GRAB_COOLDOWN = 26000;    // ms ก่อนมันจะลากผู้เล่นซ้ำได้อีกครั้ง
+    const GAPPED_SANITY_DRAIN = 14;        // เสีย SANITY/ENERGY ก้อนหนึ่งตอนโดนลากผ่านรอยแยก (ไม่ใช่ความเสียหายรุนแรงแบบโดนจับตาย)
+    const GAPPED_TELEPORT_MIN_DIST = 12;   // จุดที่โผล่มาใหม่ต้องห่างจากจุดเดิมอย่างน้อยเท่านี้ กันวาปไปโผล่ที่เดิม/ติดกำแพง
+
     // ก้อนกรดที่ Acid Man ถ่มใส่ผู้เล่นเมื่ออยู่ในระยะโจมตี (ไม่ต้องเดินมาถึงตัวก็โดนได้)
     const ACID_THROW_MIN_RANGE = 4.0;
     const ACID_THROW_MAX_RANGE = 16.0;
@@ -138,6 +158,7 @@
     let bacteriaNextCheatTime = performance.now() + 20000 + Math.random() * 8000;
     let dullerNextCheatTime = performance.now() + 26000 + Math.random() * 8000;
     let acidManNextCheatTime = performance.now() + 32000 + Math.random() * 8000;
+    let gappedNextCheatTime = performance.now() + 38000 + Math.random() * 8000;
     const CHEAT_MIN_INTERVAL = 22000;
     const CHEAT_MAX_INTERVAL = 38000;
     const CHEAT_MIN_DIST = 24;   // เดิม 17 — ขยับให้ไกลขึ้นอีก ผู้เล่นมีเวลาตั้งตัว/ตอบสนองทันมากขึ้น
@@ -254,4 +275,9 @@
 
     // Acid Man มองเห็นได้เหมือน Smiler/Bacteria (ยิ่งเปิดแฟลชยิ่งเห็นไกลขึ้น)
     const ACIDMAN_BASE_DETECT_RANGE = 24;
+
+    // The Gapped มองเห็นได้เหมือน Smiler/Bacteria/Acid Man (ยิ่งเปิดแฟลชยิ่งเห็นไกลขึ้น)
+    const GAPPED_BASE_DETECT_RANGE = 22;
+    let gappedLastKnownPos = new THREE.Vector3();
+    let gappedSearchUntil = 0;
 

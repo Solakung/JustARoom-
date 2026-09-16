@@ -549,4 +549,184 @@
       return rig;
     }
 
+    // ผิวหนัง The Gapped: ดำอมม่วงเข้มแบบเนื้อไม่มีชีวิต มีรอยแตกเรืองแสงม่วงลามทั่วตัวเหมือนรอยร้าวของมิติ
+    function genGappedSkinTex() {
+      const c = document.createElement('canvas');
+      c.width = 256; c.height = 256;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#0b0913'; ctx.fillRect(0, 0, 256, 256);
+      // คราบดำสนิทเป็นหย่อมๆ ให้ผิวดูลึกไม่มีมิติ ไม่สะท้อนแสงเป็นเนื้อเดียวกัน
+      for (let i = 0; i < 200; i++) {
+        const x = Math.random() * 256, y = Math.random() * 256, r = 3 + Math.random() * 16;
+        ctx.fillStyle = Math.random() < 0.5 ? 'rgba(5,4,10,0.4)' : 'rgba(25,15,35,0.3)';
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      }
+      // รอยแตกเรืองม่วง-ฟ้าลามทั่วผิวเหมือนรอยร้าวของความจริง แตกกิ่งก้านสาขาแบบสายฟ้า
+      ctx.strokeStyle = 'rgba(150,90,230,0.55)'; ctx.lineWidth = 1.1;
+      for (let i = 0; i < 45; i++) {
+        let x = Math.random() * 256, y = Math.random() * 256;
+        ctx.beginPath(); ctx.moveTo(x, y);
+        for (let j = 0; j < 5; j++) {
+          x += (Math.random() - 0.5) * 20; y += (Math.random() - 0.5) * 20;
+          ctx.lineTo(x, y);
+          if (Math.random() < 0.4) { // แตกกิ่งย่อยออกไปอีกทาง
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + (Math.random() - 0.5) * 14, y + (Math.random() - 0.5) * 14);
+            ctx.moveTo(x, y);
+          }
+        }
+        ctx.stroke();
+      }
+      // จุดเรืองแสงม่วงอ่อนกระจายเหมือนรอยร้าวกำลังจะแยกออก
+      for (let i = 0; i < 40; i++) {
+        const x = Math.random() * 256, y = Math.random() * 256, r = 1.5 + Math.random() * 4;
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+        g.addColorStop(0, 'rgba(190,140,255,0.6)');
+        g.addColorStop(1, 'rgba(190,140,255,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      }
+      return new THREE.CanvasTexture(c);
+    }
+
+    // ผิว/พื้นผิวของรอยแยกมิติที่ผ่าอกของ The Gapped: วงวนดำมืดมิด ขอบเรืองม่วงบิดเป็นเกลียว
+    function genGapRiftTex() {
+      const c = document.createElement('canvas');
+      c.width = 128; c.height = 128;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, 128, 128);
+      const cx = 64, cy = 64;
+      for (let i = 0; i < 26; i++) {
+        const g = ctx.createRadialGradient(cx, cy, i * 2, cx, cy, i * 2 + 3);
+        const a = 0.18 * (1 - i / 26);
+        g.addColorStop(0, `rgba(120,50,200,0)`);
+        g.addColorStop(0.85, `rgba(160,90,255,${a})`);
+        g.addColorStop(1, `rgba(160,90,255,0)`);
+        ctx.strokeStyle = g;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let a2 = 0; a2 <= Math.PI * 2.4; a2 += 0.1) {
+          const rad = i * 2.1 + a2 * 1.4;
+          const px = cx + Math.cos(a2) * rad * 0.18;
+          const py = cy + Math.sin(a2) * rad * 0.18;
+          if (a2 === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+      }
+      const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, 14);
+      core.addColorStop(0, 'rgba(0,0,0,1)');
+      core.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = core;
+      ctx.beginPath(); ctx.arc(cx, cy, 14, 0, Math.PI * 2); ctx.fill();
+      return new THREE.CanvasTexture(c);
+    }
+
+    // สร้าง The Gapped (หุ่นผอมสูงเพรียว อกแหวกเป็นรอยแยกมิติเรืองม่วง แขนยาวเก้งก้างไว้คว้าลากผู้เล่น)
+    // ต่างจากมอนสเตอร์ตัวอื่นตรงที่ "จับ" แล้วไม่ได้ฆ่า/จั๊มสแกร์ แต่ลากผู้เล่นทะลุรอยแยกไปโผล่ที่อื่นในแมพแทน
+    function createGapped3DRig() {
+      const rig = new THREE.Group();
+      const gappedSkinTex = genGappedSkinTex();
+      const bodyMat = new THREE.MeshStandardMaterial({ map: gappedSkinTex, color: 0x2a2438, roughness: 0.95, metalness: 0 });
+      const limbMat = new THREE.MeshStandardMaterial({ map: gappedSkinTex, color: 0x221d2e, roughness: 0.95, metalness: 0 });
+
+      // ลำตัวผอมเพรียวสูงชะลูด
+      gappedTorso = new THREE.Group();
+      const torsoGeo = new THREE.CylinderGeometry(0.17, 0.22, 1.35, 8, 6);
+      deformFleshGeo(torsoGeo, 0.12);
+      const torso = new THREE.Mesh(torsoGeo, bodyMat);
+      gappedTorso.add(torso);
+      torso.position.y = 0.68;
+
+      // หัวเล็กเรียวยาว เอียงต่ำเล็กน้อยแบบจ้องมองนิ่ง
+      const headGeo = new THREE.SphereGeometry(0.19, 10, 10);
+      deformFleshGeo(headGeo, 0.1);
+      const head = new THREE.Mesh(headGeo, bodyMat);
+      head.scale.set(0.85, 1.25, 0.9);
+      head.position.set(0, 1.52, 0.04);
+      gappedTorso.add(head);
+
+      // ตาม่วงเรืองแสงจาง ไม่มีม่านตา ไม่กระพริบ — เหมือนมองทะลุมากกว่ามอง
+      const eyeGeo = new THREE.SphereGeometry(0.045, 8, 8);
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xb388ff });
+      const lEye = new THREE.Mesh(eyeGeo, eyeMat);
+      lEye.position.set(-0.07, 1.55, 0.2);
+      gappedTorso.add(lEye);
+      const rEye = new THREE.Mesh(eyeGeo, eyeMat);
+      rEye.position.set(0.07, 1.55, 0.2);
+      gappedTorso.add(rEye);
+
+      // รอยแยกมิติผ่าอก: วงกลมแบนเรืองม่วงดำมืด + วงแหวนบิดเกลียวรอบขอบ (แอนิเมตหมุน/ขยายตอนลากตัวผู้เล่น)
+      const riftTex = genGapRiftTex();
+      const riftMat = new THREE.MeshBasicMaterial({ map: riftTex, transparent: true, opacity: 0.95, side: THREE.DoubleSide });
+      const riftMesh = new THREE.Mesh(new THREE.CircleGeometry(0.24, 20), riftMat);
+      riftMesh.position.set(0, 1.0, 0.22);
+      gappedTorso.add(riftMesh);
+
+      gappedVoidRing = new THREE.Mesh(
+        new THREE.TorusGeometry(0.26, 0.02, 6, 24),
+        new THREE.MeshBasicMaterial({ color: 0x9a5fe0, transparent: true, opacity: 0.75 })
+      );
+      gappedVoidRing.position.set(0, 1.0, 0.22);
+      gappedTorso.add(gappedVoidRing);
+
+      // จุดยึดตำแหน่งจริงของรอยแยก ไว้ให้กล้องเพ่งไปตอนถูกลาก (แทนจุดยึดหน้าแบบมอนสเตอร์ตัวอื่น)
+      gappedFaceAnchor = new THREE.Object3D();
+      gappedFaceAnchor.position.set(0, 1.0, 0.22);
+      gappedTorso.add(gappedFaceAnchor);
+
+      rig.add(gappedTorso);
+      gappedTorso.position.y = 1.0;
+
+      // แขนยาวเก้งก้างผอมเรียว ปลายมือเรียวแหลมคล้ายหนวด/เส้นเอ็นยื่นออกมาไว้คว้า
+      const armGeo = new THREE.CylinderGeometry(0.035, 0.05, 1.15, 6, 5);
+      deformFleshGeo(armGeo, 0.1);
+      const handGeo = new THREE.ConeGeometry(0.045, 0.22, 6);
+      handGeo.rotateX(Math.PI);
+
+      gappedLeftArm = new THREE.Group();
+      const lArmMesh = new THREE.Mesh(armGeo, limbMat);
+      lArmMesh.position.y = -0.55;
+      gappedLeftArm.add(lArmMesh);
+      const lHand = new THREE.Mesh(handGeo, limbMat);
+      lHand.position.y = -1.14;
+      gappedLeftArm.add(lHand);
+      gappedLeftArm.position.set(-0.24, 1.6, 0);
+      rig.add(gappedLeftArm);
+
+      gappedRightArm = new THREE.Group();
+      const rArmMesh = new THREE.Mesh(armGeo.clone(), limbMat);
+      rArmMesh.position.y = -0.55;
+      gappedRightArm.add(rArmMesh);
+      const rHand = new THREE.Mesh(handGeo.clone(), limbMat);
+      rHand.position.y = -1.14;
+      gappedRightArm.add(rHand);
+      gappedRightArm.position.set(0.24, 1.6, 0);
+      rig.add(gappedRightArm);
+
+      // ขาผอมยาวชะลูดสมส่วนกับลำตัว
+      const legGeo = new THREE.CylinderGeometry(0.07, 0.05, 1.35, 6, 5);
+      deformFleshGeo(legGeo, 0.1);
+
+      gappedLeftLeg = new THREE.Group();
+      const lLegMesh = new THREE.Mesh(legGeo, limbMat);
+      lLegMesh.position.y = -0.68;
+      gappedLeftLeg.add(lLegMesh);
+      gappedLeftLeg.position.set(-0.13, 1.35, 0);
+      rig.add(gappedLeftLeg);
+
+      gappedRightLeg = new THREE.Group();
+      const rLegMesh = new THREE.Mesh(legGeo.clone(), limbMat);
+      rLegMesh.position.y = -0.68;
+      gappedRightLeg.add(rLegMesh);
+      gappedRightLeg.position.set(0.13, 1.35, 0);
+      rig.add(gappedRightLeg);
+
+      // แสงม่วงจางๆ เรืองออกจากรอยแยกที่อก ไม่สว่างจ้าแบบตัวอื่นๆ (ให้รู้สึกเหมือนแสงรั่วออกมาจากที่อื่น ไม่ใช่แหล่งกำเนิดแสงปกติ)
+      gappedLight = new THREE.PointLight(0x9a5fe0, 0.7, 7, 2);
+      gappedLight.position.set(0, 1.0, 0.3);
+      rig.add(gappedLight);
+
+      return rig;
+    }
+
 

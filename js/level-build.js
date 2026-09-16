@@ -108,6 +108,7 @@
             if (val === 5) bacteriaSpawn.set(wx, 0, wz);
             if (val === 6) dullerSpawn.set(wx, 0, wz);
             if (val === 7) acidManSpawn.set(wx, 0, wz);
+            if (val === 8) gappedSpawn.set(wx, 0, wz);
           }
         }
       }
@@ -207,6 +208,7 @@
       if (bacteriaRig) { bacteriaRig.position.copy(bacteriaSpawn); bacteriaTorso.rotation.z = 0; }
       if (dullerRig) { dullerRig.position.copy(dullerSpawn); dullerRig.rotation.z = 0; dullerRig.rotation.x = 0; }
       if (acidManRig) { acidManRig.position.copy(acidManSpawn); acidManRig.rotation.set(0, 0, 0); }
+      if (gappedRig) { gappedRig.position.copy(gappedSpawn); gappedRig.rotation.set(0, 0, 0); }
       if (bacteriaJawMesh) bacteriaJawMesh.scale.y = 1;
       if (dullerJawMesh) dullerJawMesh.scale.y = 0.6;
 
@@ -218,6 +220,12 @@
       acidThrowCooldownUntil = 0;
       acidShakeUntil = 0;
       acidBurnUntil = 0;
+
+      // เคลียร์สถานะ "ลากผ่านรอยแยก" ของ The Gapped ตอนกดเริ่มใหม่
+      gappedGrabActive = false;
+      gappedGrabStartTime = 0;
+      gappedGrabCooldownUntil = 0;
+      if (gapWarpEl) gapWarpEl.style.opacity = 0;
       
       for (let k in keys) keys[k] = false;
       joyVector.x = 0;
@@ -237,12 +245,14 @@
       bacteriaSpeed = 1.2; bacteriaState = 'PATROL'; bacteriaWaypoint = null; bacteriaSearchUntil = 0;
       dullerSpeed = 1.3; dullerState = 'PATROL'; dullerWaypoint = null; dullerSearchUntil = 0;
       acidManSpeed = 1.1; acidManState = 'PATROL'; acidManWaypoint = null; acidManSearchUntil = 0;
+      gappedSpeed = 1.15; gappedState = 'PATROL'; gappedWaypoint = null; gappedSearchUntil = 0;
 
       const restartNow = performance.now();
       smilerNextCheatTime = restartNow + 14000 + Math.random() * 8000;
       bacteriaNextCheatTime = restartNow + 20000 + Math.random() * 8000;
       dullerNextCheatTime = restartNow + 26000 + Math.random() * 8000;
       acidManNextCheatTime = restartNow + 32000 + Math.random() * 8000;
+      gappedNextCheatTime = restartNow + 38000 + Math.random() * 8000;
       nextPeripheralGlitchTime = restartNow + 13000 + Math.random() * 9000;
       lockerCloseCallCooldownUntil = 0;
       lastFlickerScheduleTime = 0;
@@ -270,6 +280,7 @@
       if (monsterSoundGain && audioCtx) monsterSoundGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
       if (shadowSoundGain && audioCtx) shadowSoundGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
       if (dullerSoundGain && audioCtx) dullerSoundGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+      if (gapSoundGain && audioCtx) gapSoundGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
 
       isBlackout = false;
       nextBlackoutTime = performance.now() + 25000;

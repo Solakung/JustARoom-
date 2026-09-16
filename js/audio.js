@@ -71,6 +71,19 @@
           acidOsc.connect(af); af.connect(acidSoundGain);
           acidSoundGain.connect(audioCtx.destination);
           acidOsc.start();
+
+          // 5. The Gapped (เสียงหอนต่ำแหบแบบมิติบิดเบี้ยว สั่นเพี้ยนเสียงคู่ ต่างจากตัวอื่นที่เป็นเสียงชีวภาพ)
+          gapOsc = audioCtx.createOscillator();
+          gapOsc.type = 'sine'; gapOsc.frequency.value = 58;
+          const gapOsc2 = audioCtx.createOscillator();
+          gapOsc2.type = 'sine'; gapOsc2.frequency.value = 61;
+          const gf = audioCtx.createBiquadFilter();
+          gf.type = 'lowpass'; gf.frequency.value = 200;
+          gapSoundGain = audioCtx.createGain();
+          gapSoundGain.gain.value = 0.0001;
+          gapOsc.connect(gf); gapOsc2.connect(gf); gf.connect(gapSoundGain);
+          gapSoundGain.connect(audioCtx.destination);
+          gapOsc.start(); gapOsc2.start();
         }
       } catch (err) {}
     };
@@ -214,6 +227,54 @@
         thudGain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
         thud.connect(thudGain); thudGain.connect(audioCtx.destination);
         thud.start(now); thud.stop(now + 0.26);
+      } catch(e) {}
+    }
+
+    // เสียงตอน The Gapped คว้าจับได้ — เสียงดูด/ฉีกมิติ ความถี่ตกฮวบพร้อมนอยส์ย้อนกลับ (reverse-ish) แทนเสียงกรีดร้องจั๊มสแกร์แบบตัวอื่น
+    function playGapPullSound() {
+      if (!audioCtx || audioCtx.state !== 'running') return;
+      try {
+        const now = audioCtx.currentTime;
+
+        // เสียงดูดความถี่ต่ำไล่ลง เหมือนอากาศถูกดูดหายเข้ารอยแยก
+        const suck = audioCtx.createOscillator();
+        const suckGain = audioCtx.createGain();
+        suck.type = 'sine';
+        suck.frequency.setValueAtTime(320, now);
+        suck.frequency.exponentialRampToValueAtTime(35, now + 0.85);
+        suckGain.gain.setValueAtTime(0.001, now);
+        suckGain.gain.linearRampToValueAtTime(0.55, now + 0.15);
+        suckGain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
+        suck.connect(suckGain); suckGain.connect(audioCtx.destination);
+        suck.start(now); suck.stop(now + 0.92);
+
+        // นอยส์กรองแบบ "ลมย้อนเข้า" ความดังไล่ขึ้นก่อนเงียบวูบ (ตรงข้ามกับเสียงระเบิดทั่วไป)
+        const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.75, audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < data.length; i++) {
+          const t = i / data.length;
+          data[i] = (Math.random() * 2 - 1) * t * 0.6; // ค่อยๆ ดังขึ้นแทนที่จะดังทันทีแล้วซาลง
+        }
+        const noise = audioCtx.createBufferSource();
+        noise.buffer = buffer;
+        const nf = audioCtx.createBiquadFilter();
+        nf.type = 'bandpass'; nf.frequency.value = 900; nf.Q.value = 1.4;
+        const nGain = audioCtx.createGain();
+        nGain.gain.setValueAtTime(0.3, now);
+        noise.connect(nf); nf.connect(nGain); nGain.connect(audioCtx.destination);
+        noise.start(now);
+
+        // เสียงหอนม่วงบิดเบี้ยวสั้นๆ ปิดท้ายตอนวาปตัวหาย
+        const tail = audioCtx.createOscillator();
+        const tailGain = audioCtx.createGain();
+        tail.type = 'triangle';
+        tail.frequency.setValueAtTime(140, now + 0.6);
+        tail.frequency.exponentialRampToValueAtTime(900, now + 0.95);
+        tailGain.gain.setValueAtTime(0.001, now + 0.6);
+        tailGain.gain.linearRampToValueAtTime(0.28, now + 0.75);
+        tailGain.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
+        tail.connect(tailGain); tailGain.connect(audioCtx.destination);
+        tail.start(now + 0.6); tail.stop(now + 1.02);
       } catch(e) {}
     }
 

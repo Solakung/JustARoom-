@@ -327,6 +327,7 @@
     const subliminalFlashEl = document.getElementById('subliminal-flash');
     const camFlashOverlayEl = document.getElementById('camera-flash-overlay');
     const acidSplashEl = document.getElementById('acid-splash-overlay');
+    const gapWarpEl = document.getElementById('gap-warp-overlay');
     const viewportEl = document.getElementById('viewport');
     const hudEl = document.querySelector('.hud');
     const chromaEl = document.getElementById('chroma-aberration');

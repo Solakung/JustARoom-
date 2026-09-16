@@ -57,6 +57,85 @@
         // =========================================================
         // JUMPSCARE: ล็อกสบตาระยะ 1.35 เมตร (เห็นหน้าชัด ไม่จมทะลุจอ)
         // =========================================================
+        // =========================================================
+        // GAP GRAB: The Gapped ลากผู้เล่นผ่านรอยแยกไปโผล่จุดอื่นในแมพ
+        // ไม่ใช่จั๊มสแกร์ ไม่จบเกม — ผู้เล่นแค่เสียสติ/พลังงานก้อนหนึ่งแล้วถูกวาปไปที่อื่นแบบมึนงง
+        // =========================================================
+        if (gappedGrabActive && gappedRig) {
+          const gElapsed = now - gappedGrabStartTime;
+
+          const voidWorldPos = new THREE.Vector3();
+          if (gappedFaceAnchor) gappedFaceAnchor.getWorldPosition(voidWorldPos);
+          else voidWorldPos.set(gappedRig.position.x, gappedRig.position.y + 1.0, gappedRig.position.z);
+          camera.lookAt(voidWorldPos.x, voidWorldPos.y, voidWorldPos.z);
+
+          // ดึงตัวมันเข้าประชิดกล้อง เหมือนกำลังลากผู้เล่นเข้าไปในรอยแยกที่อก
+          const toCam = new THREE.Vector3().subVectors(camera.position, gappedRig.position);
+          toCam.y = 0;
+          const pullDist = 0.85;
+          if (toCam.length() > pullDist) {
+            gappedRig.position.addScaledVector(toCam.normalize(), 8.0 * dt);
+          }
+
+          if (gappedLeftArm && gappedRightArm) {
+            gappedLeftArm.rotation.x = -1.35 + Math.sin(now * 0.025) * 0.15;
+            gappedRightArm.rotation.x = -1.35 + Math.sin(now * 0.025 + 1) * 0.15;
+          }
+          const gProgress = Math.min(1, gElapsed / GAPPED_GRAB_DURATION);
+          if (gappedVoidRing) {
+            gappedVoidRing.rotation.z += dt * (5 + gProgress * 10);
+            gappedVoidRing.scale.setScalar(1 + gProgress * 1.6);
+          }
+
+          camera.position.x += (Math.random() - 0.5) * 0.06 * gProgress;
+          camera.position.y += (Math.random() - 0.5) * 0.06 * gProgress;
+          camera.rotation.z = (Math.random() - 0.5) * 0.07 * gProgress;
+
+          if (gapWarpEl) gapWarpEl.style.opacity = (0.15 + gProgress * 0.8).toFixed(2);
+          staticCanvas.style.opacity = Math.min(0.85, 0.1 + gProgress * 0.6);
+          renderNoise();
+
+          if (gElapsed > GAPPED_GRAB_DURATION) {
+            gappedGrabActive = false;
+
+            // สุ่มจุดโผล่ใหม่ให้ผู้เล่น พยายามหาจุดที่ห่างจากตำแหน่งเดิมพอสมควรกันวาปไปโผล่ที่เดิม/ติดกำแพง
+            let dest = null;
+            for (let attempt = 0; attempt < 12; attempt++) {
+              const cand = getRandomFloorCell();
+              if (cand.distanceTo(camera.position) > GAPPED_TELEPORT_MIN_DIST) { dest = cand; break; }
+            }
+            if (!dest) dest = getRandomFloorCell();
+            camera.position.x = dest.x;
+            camera.position.z = dest.z;
+            camera.position.y = 1.5;
+            cameraYaw = Math.random() * Math.PI * 2; // หันหน้าสุ่ม เพิ่มความมึนงงหลังโดนลาก
+            cameraPitch = 0;
+
+            // ตัวมันเองก็วาปหายไปที่อื่นพร้อมกัน ไม่ยืนจ่อซ้ำทันที แล้วกลับไปลาดตระเวนตามปกติ
+            const awaySpot = getRandomFloorCellNear(camera.position.x, camera.position.z, 20, 34) || getRandomFloorCell();
+            gappedRig.position.x = awaySpot.x;
+            gappedRig.position.z = awaySpot.z;
+            gappedState = 'PATROL';
+            gappedWaypoint = null;
+            gappedSearchUntil = 0;
+            gappedGrabCooldownUntil = now + GAPPED_GRAB_COOLDOWN;
+
+            playerEnergy = Math.max(0, playerEnergy - GAPPED_SANITY_DRAIN);
+            updateEnergyHUD();
+
+            if (gapWarpEl) gapWarpEl.style.opacity = 0;
+            staticCanvas.style.opacity = 0;
+
+            const notif = document.getElementById('item-notification');
+            notif.innerText = 'มันลากคุณผ่านรอยแยก... คุณโผล่มาอีกจุดหนึ่งแล้ว';
+            notif.style.display = 'block';
+            setTimeout(() => { notif.style.display = 'none'; }, 2600);
+          }
+
+          renderer.render(scene, camera);
+          return;
+        }
+
         if (isJumpscareActive && jumpscareTargetRig) {
           // เล็งกล้องไปที่ "จุดยึดหน้าจริง" ของ entity ตัวนั้นๆ (แต่ละตัวหัวอยู่คนละความสูงกันมาก
           // ใช้ offset คงที่ตัวเดียวแบบเดิมเลยกลายเป็นเห็นหัวหรือคางแทนหน้า)
@@ -423,6 +502,7 @@
               bacteriaNextCheatTime = smilerNextCheatTime + 16000 + Math.random() * 8000;
               dullerNextCheatTime = bacteriaNextCheatTime + 16000 + Math.random() * 8000;
               acidManNextCheatTime = dullerNextCheatTime + 16000 + Math.random() * 8000;
+              gappedNextCheatTime = acidManNextCheatTime + 16000 + Math.random() * 8000;
             }
           }
         }
@@ -480,6 +560,7 @@
           if (bacteriaRig) bacteriaRig.visible = false;
           if (dullerRig) dullerRig.visible = false;
           if (acidManRig) acidManRig.visible = false;
+          if (gappedRig) gappedRig.visible = false;
           staticCanvas.style.opacity = 0;
           dreadVignetteEl.style.opacity = 0;
         } else {
@@ -487,6 +568,7 @@
         if (bacteriaRig) bacteriaRig.visible = true;
         if (dullerRig) dullerRig.visible = true;
         if (acidManRig) acidManRig.visible = true;
+        if (gappedRig) gappedRig.visible = true;
 
         // =========================================================
         // AI 1: The Smiler (ลอยเคว้งส่าย + อ้าขากรรไกร 3D)
@@ -915,6 +997,99 @@
           }
         }
 
+        // =========================================================
+        // AI 5: The Gapped (ผอมสูง อกแหวกเป็นรอยแยกมิติ — จับแล้วไม่ฆ่า แต่ลากไปโผล่ที่อื่นในแมพ)
+        // =========================================================
+        const distGapped = gappedRig.position.distanceTo(camera.position);
+
+        if (!isHiding && !gappedGrabActive && distGapped < GAPPED_BASE_DETECT_RANGE * detectMult) {
+          gappedState = 'CHASE';
+          playerEnergy = Math.max(0, playerEnergy - 0.8 * dt);
+          gappedSpeed = (distGapped < 9.0) ? 3.9 : (isBlackout ? 2.9 : 2.1);
+
+          gappedLastKnownPos.copy(camera.position);
+          gappedSearchUntil = now + SEARCH_LINGER_MS;
+
+          if (gapSoundGain && audioCtx && audioCtx.state === 'running') {
+            const gVol = Math.max(0, 1 - distGapped / 20) * 0.22;
+            gapSoundGain.gain.setValueAtTime(gVol, audioCtx.currentTime);
+          }
+
+          const gDir = new THREE.Vector3().subVectors(camera.position, gappedRig.position).normalize();
+          gappedRig.position.x += gDir.x * gappedSpeed * dt;
+          gappedRig.position.z += gDir.z * gappedSpeed * dt;
+          gappedRig.lookAt(camera.position.x, gappedRig.position.y, camera.position.z);
+
+          if (distGapped < GAPPED_GRAB_RANGE && now > gappedGrabCooldownUntil) {
+            gappedGrabActive = true;
+            gappedGrabStartTime = now;
+            playGapPullSound();
+          }
+        } else {
+          gappedState = 'PATROL';
+          if (gapSoundGain && audioCtx && audioCtx.state === 'running') {
+            gapSoundGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+          }
+
+          if (now < gappedSearchUntil) {
+            gappedSpeed = SEARCH_SPEED;
+            if (!gappedWaypoint || gappedRig.position.distanceTo(gappedWaypoint) < 2.0) {
+              gappedWaypoint = getRandomFloorCellNear(gappedLastKnownPos.x, gappedLastKnownPos.z, 0, 5) || gappedLastKnownPos.clone();
+            }
+          } else {
+            gappedSpeed = 1.15;
+
+            // แอบโกง: ถึงเวลาแล้ววาปมาป้วนเปี้ยนใกล้ๆผู้เล่นบ้าง (ไม่โกงตอนผู้เล่นซ่อนตัว/กำลังถูกลากอยู่)
+            if (!isHiding && !gappedGrabActive && now > gappedNextCheatTime) {
+              const cheatSpot = getRandomFloorCellNear(camera.position.x, camera.position.z, CHEAT_MIN_DIST, CHEAT_MAX_DIST);
+              if (cheatSpot) {
+                gappedRig.position.x = cheatSpot.x;
+                gappedRig.position.z = cheatSpot.z;
+                gappedWaypoint = getRandomFloorCell();
+              }
+              gappedNextCheatTime = now + CHEAT_MIN_INTERVAL + Math.random() * (CHEAT_MAX_INTERVAL - CHEAT_MIN_INTERVAL);
+            }
+
+            if (!gappedWaypoint || gappedRig.position.distanceTo(gappedWaypoint) < 2.0) {
+              gappedWaypoint = getRandomFloorCell();
+            }
+          }
+          const gpDir = new THREE.Vector3().subVectors(gappedWaypoint, gappedRig.position).normalize();
+          gappedRig.position.x += gpDir.x * gappedSpeed * dt;
+          gappedRig.position.z += gpDir.z * gappedSpeed * dt;
+          gappedRig.lookAt(gappedWaypoint.x, gappedRig.position.y, gappedWaypoint.z);
+        }
+
+        // อนิเมชันเดิน 3D ของ The Gapped (ก้าวเรียบนิ่งเงียบผิดปกติ ไม่มีจังหวะสะบัดแขนแรงแบบตัวอื่น)
+        gappedWalkCycle += dt * (gappedSpeed * 3.0);
+        gappedLeftLeg.rotation.x = Math.sin(gappedWalkCycle) * 0.4;
+        gappedRightLeg.rotation.x = -Math.sin(gappedWalkCycle) * 0.4;
+        if (!gappedGrabActive) {
+          gappedLeftArm.rotation.x = -Math.sin(gappedWalkCycle) * 0.25;
+          gappedRightArm.rotation.x = Math.sin(gappedWalkCycle) * 0.25;
+        }
+        gappedTorso.rotation.z = Math.sin(gappedWalkCycle) * 0.05;
+        // วงแหวนรอยแยกที่อกหมุนช้าๆ ตลอดเวลา แม้ตอนลาดตระเวนเฉยๆ
+        if (gappedVoidRing && !gappedGrabActive) {
+          gappedVoidRing.rotation.z += dt * 1.4;
+          gappedVoidRing.scale.setScalar(1);
+        }
+
+        // อาการหยุดนิ่งจ้องมองแบบไม่กระพริบตา ก่อนเดินต่อเหมือนไม่มีอะไรเกิดขึ้น
+        if (gappedState === 'PATROL' && !isJumpscareActive && !gappedGrabActive) {
+          if (now > gappedNextTwitchTime) {
+            gappedTwitchUntil = now + 300 + Math.random() * 260;
+            gappedNextTwitchTime = now + 7500 + Math.random() * 9500;
+            if (gappedLight) {
+              gappedLight.intensity = 1.6;
+              setTimeout(() => { if (gappedLight) gappedLight.intensity = 0.7; }, 120);
+            }
+          }
+          if (now < gappedTwitchUntil) {
+            gappedRig.lookAt(camera.position.x, gappedRig.position.y, camera.position.z);
+          }
+        }
+
         // อัพเดตก้อนกรดที่กำลังบินอยู่ทั้งหมด — พุ่งตรงไปยังตำแหน่งที่ผู้เล่นยืนอยู่ตอนถูกถ่มออกมา
         // (ไม่ homing ตามผู้เล่นแบบเรียลไทม์ ให้พอมีจังหวะหลบได้ถ้าขยับตัวทัน)
         for (let pi = acidProjectiles.length - 1; pi >= 0; pi--) {
@@ -955,14 +1130,14 @@
         }
 
         // เสียงหัวใจเต้น (คงระยะเดิมไว้ให้ยังรู้สึกได้ว่ามีอะไรเข้าใกล้)
-        const closestDist = Math.min(distSmiler, distBacteria, distDuller, distAcidMan);
+        const closestDist = Math.min(distSmiler, distBacteria, distDuller, distAcidMan, distGapped);
 
         // "ตู้เอกสารไม่ได้ปลอดภัย 100% เสมอไป" — ถ้ามีบางอย่างเดินมาจ่อใกล้ตู้ตอนกำลังซ่อนอยู่
         // ช่องมองจะสั่น+มีเสียงเตือนก่อน ให้พอมีจังหวะตัดสินใจว่าจะซ่อนต่อหรือรีบวิ่งหนี
         // ก่อนที่มันจะมีโอกาสเล็กๆ "เช็คเจอ" จริงๆ ทำให้กลไกที่เคยไว้ใจได้ไม่น่าเชื่อถือ 100% อีกต่อไป
-        if (isHiding && closestDist < LOCKER_CLOSE_CALL_DIST && now > lockerCloseCallCooldownUntil && !isJumpscareActive) {
+        if (isHiding && closestDist < LOCKER_CLOSE_CALL_DIST && now > lockerCloseCallCooldownUntil && !isJumpscareActive && !gappedGrabActive) {
           lockerCloseCallCooldownUntil = now + 7000 + Math.random() * 4000;
-          const closeRig = (closestDist === distSmiler) ? smilerRig : (closestDist === distBacteria) ? bacteriaRig : (closestDist === distDuller) ? dullerRig : acidManRig;
+          const closeRig = (closestDist === distSmiler) ? smilerRig : (closestDist === distBacteria) ? bacteriaRig : (closestDist === distDuller) ? dullerRig : (closestDist === distAcidMan) ? acidManRig : gappedRig;
 
           if (lockerSlitEl) {
             lockerSlitEl.classList.add('locker-shake');
@@ -971,16 +1146,28 @@
           playHeartbeat(0.5);
           playDistantGrowl();
 
-          if (Math.random() < LOCKER_CLOSE_CALL_CATCH_CHANCE) {
+          // The Gapped ไม่จั๊มสแกร์เหมือนตัวอื่น — ถ้าเป็นตัวนี้ที่จ่ออยู่ ให้เช็คด้วยคูลดาวน์ของมันเองแทน
+          const isGappedClosest = (closeRig === gappedRig);
+          const catchChanceOk = Math.random() < LOCKER_CLOSE_CALL_CATCH_CHANCE;
+          const gappedCanGrab = !isGappedClosest || now > gappedGrabCooldownUntil;
+
+          if (catchChanceOk && gappedCanGrab) {
             setTimeout(() => {
               if (!window.gameEngineStarted || !isHiding) return; // ออกจากตู้ทันเวลา รอดไป
-              isJumpscareActive = true;
-              jumpscareTargetRig = closeRig;
-              jumpscareStartTime = performance.now();
               isHiding = false;
               if (lockerSlitEl) lockerSlitEl.style.display = 'none';
-              playViolentJumpscareSound();
-              if (document.exitPointerLock) document.exitPointerLock();
+              if (isGappedClosest) {
+                gappedRig.position.set(camera.position.x, gappedRig.position.y, camera.position.z + 0.5);
+                gappedGrabActive = true;
+                gappedGrabStartTime = performance.now();
+                playGapPullSound();
+              } else {
+                isJumpscareActive = true;
+                jumpscareTargetRig = closeRig;
+                jumpscareStartTime = performance.now();
+                playViolentJumpscareSound();
+                if (document.exitPointerLock) document.exitPointerLock();
+              }
             }, 900 + Math.random() * 500);
           }
         }
