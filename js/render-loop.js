@@ -1,0 +1,862 @@
+    // -------------------------------------------------------------
+    // Peripheral Vision Glitch: ร่างเงาวาบสั้นๆ ที่ขอบจอ ไม่ใช่ entity จริง
+    // สุ่มเวลา/ตำแหน่ง/ฝั่งทุกครั้ง เพื่อให้ผู้เล่นไม่แน่ใจว่าเห็นจริงหรือหลอนไปเอง
+    // -------------------------------------------------------------
+    function triggerPeripheralGlitch() {
+      if (!peripheralFigureEl) return;
+      const fromLeft = Math.random() < 0.5;
+      const edgeOffset = -14 - Math.random() * 22; // px ให้โผล่มาแค่บางส่วนตรงขอบจอ
+      const topPct = 6 + Math.random() * 48; // ค้างอยู่ครึ่งบนของจอ แถวสายตา
+      peripheralFigureEl.style.left = fromLeft ? (edgeOffset + 'px') : '';
+      peripheralFigureEl.style.right = fromLeft ? '' : (edgeOffset + 'px');
+      peripheralFigureEl.style.top = topPct + '%';
+      peripheralFigureEl.style.transform = fromLeft ? 'scaleX(1)' : 'scaleX(-1)';
+      peripheralFigureEl.style.transition = 'none';
+      peripheralFigureEl.style.opacity = (0.55 + Math.random() * 0.3).toFixed(2);
+      const holdTime = 70 + Math.random() * 110; // วาบไวมาก กันคนจ้องทัน
+      setTimeout(() => {
+        if (!peripheralFigureEl) return;
+        peripheralFigureEl.style.transition = 'opacity 0.12s ease';
+        peripheralFigureEl.style.opacity = 0;
+      }, holdTime);
+    }
+
+    function renderNoise() {
+      const imgData = staticCtx.createImageData(160, 120);
+      const buf = new Uint32Array(imgData.data.buffer);
+      for (let i = 0; i < buf.length; i++) buf[i] = Math.random() > 0.5 ? 0xffffffff : 0xff111111;
+      staticCtx.putImageData(imgData, 0, 0);
+    }
+
+    // -------------------------------------------------------------
+    // Main Loop
+    // -------------------------------------------------------------
+    function renderLoop() {
+      requestAnimationFrame(renderLoop);
+      if (!renderer || !scene || !camera) return;
+
+      const now = performance.now();
+      const dt = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
+
+      updateLightCulling(now); // ลดจำนวนไฟที่ active พร้อมกัน กันเครื่องมือถือกระตุก
+
+      // ใช้ dx/dy ที่สะสมไว้จากทัชมุมกล้อง "เฟรมละครั้งเดียว" ให้ตรงจังหวะกับ render loop เป๊ะๆ
+      // กันอาการกระตุกตอนอีกมือถือจอยสติ๊กพร้อมกัน (touch event ของสองนิ้วมาไม่สม่ำเสมอ)
+      if (pendingLookDX !== 0 || pendingLookDY !== 0) {
+        cameraYaw -= pendingLookDX * 0.005;
+        cameraPitch -= pendingLookDY * 0.005;
+        cameraPitch = Math.max(-1.3, Math.min(1.3, cameraPitch));
+        clampHidingLook();
+        pendingLookDX = 0;
+        pendingLookDY = 0;
+      }
+
+      if (window.gameEngineStarted) {
+
+        // =========================================================
+        // JUMPSCARE: ล็อกสบตาระยะ 1.35 เมตร (เห็นหน้าชัด ไม่จมทะลุจอ)
+        // =========================================================
+        if (isJumpscareActive && jumpscareTargetRig) {
+          // เล็งกล้องไปที่ "จุดยึดหน้าจริง" ของ entity ตัวนั้นๆ (แต่ละตัวหัวอยู่คนละความสูงกันมาก
+          // ใช้ offset คงที่ตัวเดียวแบบเดิมเลยกลายเป็นเห็นหัวหรือคางแทนหน้า)
+          let faceAnchor = smilerFaceAnchor;
+          if (jumpscareTargetRig === bacteriaRig) faceAnchor = bacteriaFaceAnchor;
+          else if (jumpscareTargetRig === dullerRig) faceAnchor = dullerFaceAnchor;
+
+          const faceWorldPos = new THREE.Vector3();
+          if (faceAnchor) {
+            faceAnchor.getWorldPosition(faceWorldPos);
+          } else {
+            faceWorldPos.set(jumpscareTargetRig.position.x, jumpscareTargetRig.position.y + 1.2, jumpscareTargetRig.position.z);
+          }
+          camera.lookAt(faceWorldPos.x, faceWorldPos.y, faceWorldPos.z);
+          
+          // รักษาระยะห่าง 1.05 เมตร (เดิม 1.35) — จ่อประชิดหน้ากล้องมากขึ้น เห็นรายละเอียดหน้าชัดแบบกดดัน
+          const targetDist = 1.05;
+          const toCam = new THREE.Vector3().subVectors(camera.position, jumpscareTargetRig.position);
+          toCam.y = 0;
+          if (toCam.length() > targetDist) {
+            jumpscareTargetRig.position.addScaledVector(toCam.normalize(), 9.0 * dt);
+          }
+
+          // อนิเมชันกระตุกและอ้าปากขย้ำ
+          if (jumpscareTargetRig === smilerRig && smilerJawMesh) {
+            smilerJawMesh.position.y = -0.3 - Math.abs(Math.sin(now * 0.03)) * 0.35; // อ้าปากกว้าง
+            smilerRig.rotation.z = (Math.random() - 0.5) * 0.25; // หัวกระตุกเอียง
+          } else if (jumpscareTargetRig === bacteriaRig) {
+            bacteriaLeftArm.rotation.x = -1.2 + (Math.random() - 0.5) * 0.5;
+            bacteriaRightArm.rotation.x = -1.2 + (Math.random() - 0.5) * 0.5;
+            bacteriaTorso.rotation.z = (Math.random() - 0.5) * 0.2;
+            if (bacteriaJawMesh) bacteriaJawMesh.scale.y = 1 + Math.abs(Math.sin(now * 0.03)) * 6; // ปากฉีกอ้ากว้างขึ้นเรื่อยๆ
+          } else if (jumpscareTargetRig === dullerRig) {
+            dullerRig.rotation.z = (Math.random() - 0.5) * 0.3;
+            dullerRig.rotation.x = (Math.random() - 0.5) * 0.15;
+            if (dullerJawMesh) dullerJawMesh.scale.y = 0.6 + Math.abs(Math.sin(now * 0.035)) * 1.4; // อ้าปากขย้ำ
+            for (let li = 0; li < dullerLegs.length; li++) {
+              dullerLegs[li].rotation.x = (Math.random() - 0.5) * 0.6;
+            }
+          }
+
+          camera.position.x += (Math.random() - 0.5) * 0.16;
+          camera.position.y += (Math.random() - 0.5) * 0.16;
+          camera.rotation.z = (Math.random() - 0.5) * 0.12; // กล้องเอียงสั่นแรงขึ้น เพิ่มความอึดอัดไร้ทิศทาง
+
+          const strobe = document.getElementById('jumpscare-strobe');
+          const jsElapsed = now - jumpscareStartTime;
+          if (jsElapsed < 110) {
+            // เฟรมแรกแฟลชขาวจ้าเต็มจอทันทีที่โดนจับตัว (สไตล์ jump scare แบบ FNAF)
+            strobe.style.background = '#ffffff';
+            strobe.style.opacity = '1';
+            strobe.style.display = 'block';
+          } else {
+            // แฟลชแดงถี่และจัดขึ้นกว่าเดิม สลับดำสนิทเป็นจังหวะ ให้รู้สึกเหมือนภาพกระตุกขาดหาย
+            const flick = Math.random();
+            strobe.style.background = flick < 0.15 ? '#000000' : '#6a0000';
+            strobe.style.opacity = flick < 0.15 ? '1' : '0.5';
+            strobe.style.display = (flick < 0.75) ? 'block' : 'none';
+          }
+
+          staticCanvas.style.opacity = Math.min(0.92, 0.12 + (jsElapsed / 1600) * 0.6);
+          renderNoise();
+
+          if (jsElapsed > 1600) {
+            isJumpscareActive = false;
+            window.gameEngineStarted = false;
+            strobe.style.display = 'none';
+            document.getElementById('over-title').innerText = "SIGNAL LOST";
+            document.getElementById('over-desc').innerHTML = "คุณถูกบางสิ่งในเงามืดดักจับตัว...<br><b>ไม่มีใครหนีออกจาก Level 0 ได้</b>";
+            document.getElementById('survival-time-over').innerText = `เวลาที่รอดมาได้: ${window.formatSurvivalTime(now - window.gameStartTime)}`;
+            document.getElementById('over-menu').style.display = 'flex';
+          }
+
+          renderer.render(scene, camera);
+          return;
+        }
+
+        // การเดินของผู้เล่น (ล็อกการเดินไว้ทั้งหมดระหว่างซ่อนตัว)
+        let moveFwd = 0, moveSide = 0;
+        if (!isHiding) {
+          if (keys.KeyW) moveFwd += 1;
+          if (keys.KeyS) moveFwd -= 1;
+          if (keys.KeyA) moveSide -= 1;
+          if (keys.KeyD) moveSide += 1;
+
+          moveFwd -= joyVector.y;
+          moveSide += joyVector.x;
+        }
+
+        // เร่ง/หน่วงความเร็วแบบนุ่มนวลเข้าหาค่าที่ผู้เล่นกำลังกด (frame-rate independent)
+        // แทนที่จะสแนปความเร็วเต็ม/ศูนย์ทันที ยังคงจังหวะก้าวเดิน/head bob ไว้เหมือนเดิม
+        if (isHiding) {
+          smoothMoveFwd = 0;
+          smoothMoveSide = 0;
+        } else {
+          const smoothT = 1 - Math.exp(-MOVE_ACCEL_RATE * dt);
+          smoothMoveFwd += (moveFwd - smoothMoveFwd) * smoothT;
+          smoothMoveSide += (moveSide - smoothMoveSide) * smoothT;
+          if (Math.abs(smoothMoveFwd) < 0.001) smoothMoveFwd = 0;
+          if (Math.abs(smoothMoveSide) < 0.001) smoothMoveSide = 0;
+        }
+
+        const moveLen = Math.hypot(smoothMoveFwd, smoothMoveSide);
+
+        if (isSprintBoost && now > sprintBoostEndTime) {
+          isSprintBoost = false; // หมดช่วงวิ่งพุ่ง กลับความเร็วปกติ
+        }
+        const playerSpeed = isSprintBoost ? 4.0 * SPRINT_SPEED_MULT : 4.0;
+
+        // อัพเดตปุ่ม Sprint บนจอ (เทาลงระหว่างคูลดาวน์)
+        if (now < sprintCooldownEndTime) {
+          sprintBtn.classList.add('cooldown');
+        } else {
+          sprintBtn.classList.remove('cooldown');
+        }
+
+        if (moveLen > 0.05) {
+          const normFwd = smoothMoveFwd / Math.max(1, moveLen);
+          const normSide = smoothMoveSide / Math.max(1, moveLen);
+
+          const cosY = Math.cos(cameraYaw);
+          const sinY = Math.sin(cameraYaw);
+          const vx = (-sinY * normFwd + cosY * normSide) * playerSpeed * dt;
+          const vz = (-cosY * normFwd - sinY * normSide) * playerSpeed * dt;
+
+          if (!isWall(camera.position.x + vx, camera.position.z)) camera.position.x += vx;
+          if (!isWall(camera.position.x, camera.position.z + vz)) camera.position.z += vz;
+
+          footstepDist += Math.hypot(vx, vz);
+          if (footstepDist > 1.8) {
+            footstepDist = 0;
+            playFootstep();
+          }
+
+          headBobTimer += dt * 9.5;
+        }
+
+        // อัพเดต UI ของจุดซ่อนตัว (prompt + ปุ่มมือถือ)
+        const hidePromptEl = document.getElementById('hide-prompt');
+        const nearestHideDist = getNearestHidingDist();
+        if (isHiding) {
+          hidePromptEl.style.display = 'block';
+          hidePromptEl.innerText = '[ กำลังซ่อนตัว — กด E เพื่อออกมา ]';
+          hideBtn.classList.add('active');
+          hideBtn.classList.remove('disabled');
+        } else if (nearestHideDist <= HIDE_INTERACT_DIST) {
+          hidePromptEl.style.display = 'block';
+          hidePromptEl.innerText = '[ กด E เพื่อซ่อนตัว ]';
+          hideBtn.classList.remove('active', 'disabled');
+        } else {
+          hidePromptEl.style.display = 'none';
+          hideBtn.classList.remove('active');
+          hideBtn.classList.add('disabled');
+        }
+
+        // พลังงานกล้อง: ค่อยๆ ฟื้นเองตลอดเวลา ไม่ต้องปิดรอเหมือนแบตไฟฉายเดิม (เพราะตอนนี้เป็นการยิงแฟลชสั้นๆ ไม่ใช่เปิดค้าง)
+        cameraCharge = Math.min(100, cameraCharge + CAMERA_CHARGE_REGEN_PER_SEC * dt);
+        updateFlashlightIndicator();
+
+        // ระบบลดค่า Energy / Sanity
+        let drainRate = 0.45 * dt;
+        if (isBlackout) drainRate = 1.5 * dt;
+        playerEnergy = Math.max(0, playerEnergy - drainRate);
+        updateEnergyHUD();
+
+        let fovWarp = 0;
+        if (playerEnergy < 50) {
+          fovWarp = Math.sin(now * 0.003) * ((50 - playerEnergy) * 0.09);
+          camera.fov = baseFov + fovWarp;
+          camera.updateProjectionMatrix();
+        }
+
+        // ภาพบิดเบี้ยวตามระดับ SANITY ที่เหลือ — เริ่มไต่ระดับตั้งแต่สติต่ำกว่า ~55%
+        // สีเพี้ยน คอนทราสต์จัดขึ้น ภาพเบลอเล็กน้อยตอนต่ำมาก + เส้นสีแดง/ฟ้าแยกออกจากกัน (chromatic aberration)
+        if (hasRevealedSanity) {
+          const corruption = Math.max(0, Math.min(1, (55 - playerEnergy) / 55));
+          if (corruption > 0.01 && viewportEl) {
+            const wobble = Math.sin(now * 0.0021);
+            const sat = 1 + corruption * 1.5 + wobble * corruption * 0.3;
+            const hue = wobble * 20 * corruption;
+            const contrast = 1 + corruption * 0.32;
+            const blurPx = corruption > 0.6 ? (corruption - 0.6) * 3.2 : 0;
+            viewportEl.style.filter = `saturate(${sat.toFixed(2)}) hue-rotate(${hue.toFixed(1)}deg) contrast(${contrast.toFixed(2)})` +
+              (blurPx > 0 ? ` blur(${blurPx.toFixed(2)}px)` : '');
+          } else if (viewportEl && viewportEl.style.filter) {
+            viewportEl.style.filter = '';
+          }
+
+          if (chromaEl) {
+            if (corruption > 0.12) {
+              const shiftPx = 1.5 + corruption * 6 + Math.sin(now * 0.05) * corruption * 2;
+              chromaEl.style.setProperty('--chroma-shift', shiftPx.toFixed(2) + 'px');
+              chromaEl.style.opacity = Math.min(0.7, corruption * 0.8).toFixed(2);
+            } else if (chromaEl.style.opacity !== '0') {
+              chromaEl.style.opacity = 0;
+            }
+          }
+
+          // HUD สั่น/กระตุกเบาๆ เป็นครั้งคราวตอนสติต่ำมาก เหมือนสัญญาณกล้องเริ่มเพี้ยน
+          if (hudEl && corruption > 0.55 && Math.random() < 0.05) {
+            hudEl.style.transform = `translate(${((Math.random() - 0.5) * 4).toFixed(1)}px, ${((Math.random() - 0.5) * 3).toFixed(1)}px)`;
+            setTimeout(() => { if (hudEl) hudEl.style.transform = ''; }, 60 + Math.random() * 70);
+          }
+        }
+
+        if (playerEnergy <= 0) {
+          window.gameEngineStarted = false;
+          document.getElementById('over-title').innerText = "INSANITY OVERTAKEN";
+          document.getElementById('over-desc').innerHTML = "สติของคุณแตกสลายโดยสมบูรณ์...<br><b>คุณกลายสภาพเป็นส่วนหนึ่งของ The Backrooms</b>";
+          document.getElementById('survival-time-over').innerText = `เวลาที่รอดมาได้: ${window.formatSurvivalTime(now - window.gameStartTime)}`;
+          document.getElementById('over-menu').style.display = 'flex';
+          return;
+        }
+
+        // เก็บขวดนมอัลมอนด์
+        for (let i = 0; i < almondBottles.length; i++) {
+          const b = almondBottles[i];
+          if (b.active) {
+            const distB = Math.hypot(camera.position.x - b.x, camera.position.z - b.z);
+            if (distB < 1.4) {
+              b.active = false;
+              scene.remove(b.mesh);
+              playerEnergy = Math.min(100, playerEnergy + 45);
+              playDrinkSound();
+              updateEnergyHUD();
+
+              const notif = document.getElementById('item-notification');
+              notif.innerText = hasRevealedSanity ? '+45% SANITY RESTORED' : '+45% ENERGY RESTORED';
+              notif.style.display = 'block';
+              setTimeout(() => { notif.style.display = 'none'; }, 2200);
+            }
+          }
+        }
+
+        // เก็บโน้ต/เอกสารเล่าเรื่อง
+        for (let i = 0; i < loreNotes.length; i++) {
+          const n = loreNotes[i];
+          if (n.active) {
+            const distN = Math.hypot(camera.position.x - n.x, camera.position.z - n.z);
+            if (distN < 1.4) {
+              n.active = false;
+              scene.remove(n.mesh);
+              collectedLoreSet.add(n.text);
+              playDrinkSound();
+              showNoteOverlay(n.text);
+            }
+          }
+        }
+
+        // เก็บบัตรผ่าน (Keycard)
+        for (let i = 0; i < keycards.length; i++) {
+          const k = keycards[i];
+          if (k.active) {
+            const distK = Math.hypot(camera.position.x - k.x, camera.position.z - k.z);
+            if (distK < 1.4) {
+              k.active = false;
+              scene.remove(k.mesh);
+              keycardsCollected++;
+              updateObjectiveHUD();
+              playGlitchShiftSound();
+
+              const notif = document.getElementById('item-notification');
+              notif.innerText = `บัตรผ่าน ${keycardsCollected}/${KEYCARDS_REQUIRED}`;
+              notif.style.display = 'block';
+              setTimeout(() => { notif.style.display = 'none'; }, 2200);
+            }
+          }
+        }
+
+        // Head Bobbing & Breathing
+        let bobY = 0, bobZ = 0;
+        if (moveLen > 0.05) {
+          bobY = Math.sin(headBobTimer) * 0.055;
+          bobZ = Math.cos(headBobTimer * 0.5) * 0.012;
+        } else {
+          bobY = Math.sin(now * 0.002) * 0.012;
+        }
+
+        camera.position.y = 1.5 + bobY;
+        camera.rotation.order = 'YXZ';
+        camera.rotation.y = cameraYaw;
+        camera.rotation.x = cameraPitch;
+        camera.rotation.z = bobZ;
+
+        // ระบบไฟดับ & จู๊คเปลี่ยนคำเป็น SANITY
+        if (!isBlackout && now > nextBlackoutTime) {
+          isBlackout = true;
+          blackoutEndTime = now + 2000;
+          ambientLight.intensity = 0.11; // เดิม 0.04 มืดสนิทจนงงเกินไป ปรับให้พอเห็นเงาลางๆ ระหว่างไฟดับ
+          if (humGain && audioCtx) humGain.gain.setValueAtTime(0.02, audioCtx.currentTime);
+          for (let i = 0; i < ceilingLights.length; i++) ceilingLights[i].intensity = 0;
+          // มุมมองบิดเบี้ยวเล็กน้อยตอนไฟดับ ให้รู้สึกพื้นที่ผิดปกติ ไม่ใช่แค่มืดเฉยๆ
+          camera.fov = 76;
+          camera.updateProjectionMatrix();
+
+          if (!hasRevealedSanity) {
+            hasRevealedSanity = true;
+            playGlitchShiftSound();
+            const label = document.getElementById('meter-label');
+            label.innerText = 'SANITY:';
+            label.style.color = '#ff4d4d';
+            document.getElementById('hud-subtitle').innerText = 'LEVEL 0: THE LOBBY // YOU NEVER LEFT';
+          }
+        } else if (isBlackout) {
+          if (now > blackoutEndTime) {
+            isBlackout = false;
+            nextBlackoutTime = now + 28000 + Math.random() * 20000;
+            ambientLight.intensity = 0.5; // เดิม 0.82 สว่างเกินไปสำหรับบรรยากาศ backrooms ทั่วไป ลดลงให้มืดขึ้น พึ่งแสงแฟลชกล้องมากขึ้น
+            if (humGain && audioCtx) humGain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+            for (let i = 0; i < ceilingLights.length; i++) ceilingLights[i].intensity = 0.6; // เดิม 0.85
+            camera.fov = 72;
+            camera.updateProjectionMatrix();
+
+            if (!firstBlackoutOccurred) {
+              firstBlackoutOccurred = true; // ไฟกลับมาติดครั้งแรก — entity เริ่มปรากฏและทำงานตามปกติ
+              nextAmbientEventTime = now + 8000 + Math.random() * 6000;
+
+              // เปลี่ยนผนัง/พื้น/เพดานจากลายออฟฟิศปกติเป็นลาย Backrooms + โทนไฟอุ่นวาบๆ
+              if (wallMat && backroomsWallTex) {
+                wallMat.map = backroomsWallTex;
+                wallMat.needsUpdate = true;
+              }
+              if (floorMat && backroomsFloorTex) {
+                floorMat.map = backroomsFloorTex;
+                floorMat.needsUpdate = true;
+              }
+              if (ceilingMat && backroomsCeilingTex) {
+                ceilingMat.map = backroomsCeilingTex;
+                ceilingMat.needsUpdate = true;
+              }
+              ambientLight.color.setHex(BACKROOMS_AMBIENT_COLOR);
+              // หมอกเปลี่ยนจากเทาสว่างจางๆ เป็นเหลืองอมน้ำตาลหนาขึ้นทันทีที่โลกเริ่มผิดปกติ
+              if (scene.fog) scene.fog.color.setHex(BACKROOMS_FOG_COLOR);
+              renderer.setClearColor(BACKROOMS_FOG_COLOR);
+              startLiminalHum();
+              corruptOfficeFurniture();
+
+              // ปุ่ม FLASHLIGHT / SPRINT / HIDE บนมือถือ เพิ่งโผล่ตอนนี้ที่เริ่มมีอะไรผิดปกติจริงๆ
+              if (isTouchDevice) {
+                document.getElementById('flash-btn').style.display = 'flex';
+                document.getElementById('sprint-btn').style.display = 'flex';
+                document.getElementById('hide-btn').style.display = 'flex';
+              }
+              // ไฟดับครั้งแรก = มืดจริง ผู้เล่นเริ่มใช้กล้อง (กด F / ปุ่มถ่ายรูป) เพื่อยิงแฟลชช่วยดูทางได้ตั้งแต่ตอนนี้
+              updateFlashlightIndicator();
+
+              // ตั้งคิวเวลา "โกง" วาปเข้าใกล้ผู้เล่นใหม่ทั้งหมด ณ จุดที่ entity เริ่มทำงานจริง
+              // (ถ้าไม่ตั้งใหม่ตรงนี้ ตัวจับเวลาเดิมที่นับมาตั้งแต่ต้นเกมจะหมดอายุพร้อมกันหมด
+              // ทำให้ทั้ง 3 ตัววาปมาใกล้ผู้เล่นพร้อมกันทันทีที่ไฟกลับมาติด) — ให้เรียงคิวมาทีละตัวแทน
+              smilerNextCheatTime = now + 22000 + Math.random() * 8000;
+              bacteriaNextCheatTime = smilerNextCheatTime + 16000 + Math.random() * 8000;
+              dullerNextCheatTime = bacteriaNextCheatTime + 16000 + Math.random() * 8000;
+            }
+          }
+        }
+
+        // เหตุการณ์หลอนแบบ ambient (ไฟกระพริบ/เสียงไกลๆ) ไม่ผูกกับระยะห่างจาก entity — เริ่มหลังไฟกลับมาติดครั้งแรกเท่านั้น
+        if (firstBlackoutOccurred && now > nextAmbientEventTime) {
+          triggerAmbientDreadEvent();
+          nextAmbientEventTime = now + 11000 + Math.random() * 10000;
+        }
+
+        // หมอก "หายใจ" เบาๆ ตลอดเวลาหลังเข้าโหมด backrooms — ความหนาแน่นสั่นขึ้นลงช้าๆ ผสมคลื่นสองความถี่
+        // ให้รู้สึกว่าทางเดินยืด/หดแบบไม่รู้ตัว ไม่ใช่หมอกนิ่งๆ ธรรมดา
+        if (scene && scene.fog && firstBlackoutOccurred) {
+          const breathe = Math.sin(now * 0.00035) * 0.006 + Math.sin(now * 0.0011) * 0.003;
+          scene.fog.density = baseFogDensity + breathe + (isBlackout ? 0.014 : 0);
+        }
+
+        // ไฟเพดานกระพริบแผ่วๆ แบบอิสระต่อดวง (ไม่รอคิวเดียวกันทั้งแมพ) — ห้องหนึ่งกระพริบ อีกห้องอาจนิ่งสนิท
+        // ยิ่ง SANITY เหลือน้อย ยิ่งกระพริบถี่ขึ้น มืดสนิทได้บ่อยขึ้น ให้รู้สึกว่าตึกเริ่ม "เสีย" ไปพร้อมกับสติ
+        // throttle ทุก ~180ms + ข้ามไฟที่ถูก cull แล้ว (มองไม่เห็นอยู่แล้ว) กันวนเช็คทั้งแมพทุกเฟรมจนเฟรมกระตุก/เสียงสะดุด
+        if (firstBlackoutOccurred && !isBlackout && ceilingLights.length > 0 && now - lastFlickerScheduleTime > 180) {
+          lastFlickerScheduleTime = now;
+          const sanityFactor = hasRevealedSanity ? Math.max(0, Math.min(1, (100 - playerEnergy) / 100)) : 0;
+          for (let li = 0; li < ceilingLights.length; li++) {
+            const l = ceilingLights[li];
+            if (!l.visible) continue;
+            if (l.baseIntensity === undefined) l.baseIntensity = l.intensity;
+            if (l.nextFlickerTime === undefined) l.nextFlickerTime = now + 2000 + Math.random() * 9000;
+            if (!l.isFlickering && now > l.nextFlickerTime) {
+              l.isFlickering = true;
+              const orig = l.baseIntensity;
+              const dipFloor = Math.max(0, 0.2 - sanityFactor * 0.2); // สติต่ำมาก = มีโอกาสดับสนิทกว่าเดิม
+              l.intensity = orig * (dipFloor + Math.random() * 0.25);
+              const dipTime = 70 + Math.random() * (120 - sanityFactor * 40);
+              setTimeout(() => { if (l) { l.intensity = orig; l.isFlickering = false; } }, dipTime);
+              const intervalMin = 2500 - sanityFactor * 1700;
+              const intervalRange = 5500 - sanityFactor * 3500;
+              l.nextFlickerTime = now + intervalMin + Math.random() * intervalRange;
+            }
+          }
+        }
+
+        // Peripheral Vision Glitch: ร่างเงาวาบที่ขอบจอ ไม่ผูกกับตำแหน่ง entity จริง — ถี่ขึ้นเมื่อ SANITY ต่ำ
+        if (firstBlackoutOccurred && !isHiding && !isJumpscareActive && now > nextPeripheralGlitchTime) {
+          triggerPeripheralGlitch();
+          const freqFactor = hasRevealedSanity ? Math.max(0, Math.min(1, (100 - playerEnergy) / 100)) : 0;
+          const intervalMin = 13000 - freqFactor * 8500;
+          const intervalRange = 9000 - freqFactor * 5000;
+          nextPeripheralGlitchTime = now + intervalMin + Math.random() * intervalRange;
+        }
+
+        // ก่อนไฟดับครั้งแรก entity ยังไม่ปรากฏตัวและไม่ขยับเลย
+        if (!firstBlackoutOccurred) {
+          if (smilerRig) smilerRig.visible = false;
+          if (bacteriaRig) bacteriaRig.visible = false;
+          if (dullerRig) dullerRig.visible = false;
+          staticCanvas.style.opacity = 0;
+          dreadVignetteEl.style.opacity = 0;
+        } else {
+        if (smilerRig) smilerRig.visible = true;
+        if (bacteriaRig) bacteriaRig.visible = true;
+        if (dullerRig) dullerRig.visible = true;
+
+        // =========================================================
+        // AI 1: The Smiler (ลอยเคว้งส่าย + อ้าขากรรไกร 3D)
+        // =========================================================
+        const distSmiler = smilerRig.position.distanceTo(camera.position);
+
+        // ไม่มีไฟฉายส่องต่อเนื่องแล้ว ปกติผู้เล่นมืดสนิทเท่า baseline / ตอนกล้องวาบแฟลช ระยะที่มันสังเกตเห็นผู้เล่นพุ่งสูงขึ้นชั่วครู่
+        const detectMult = cameraFlashActive ? 1.3 : 0.62;
+        if (!isHiding && distSmiler < 20 * detectMult) {
+          smilerState = 'CHASE';
+
+          // จำจุดที่เห็นผู้เล่นล่าสุดไว้ เผื่อคลาดกัน (เช่นผู้เล่นซ่อนตัว) จะได้ไปวนหาก่อนเลิกล่า
+          smilerLastKnownPos.copy(camera.position);
+          smilerSearchUntil = now + SEARCH_LINGER_MS;
+
+          if (monsterSoundGain && audioCtx && audioCtx.state === 'running') {
+            const mVol = (1 - distSmiler / 20) * 0.28;
+            monsterSoundGain.gain.setValueAtTime(mVol, audioCtx.currentTime);
+            monsterOsc1.frequency.setValueAtTime(80 + (20 - distSmiler) * 8, audioCtx.currentTime);
+          }
+
+          const dir = new THREE.Vector3().subVectors(camera.position, smilerRig.position).normalize();
+
+          // Smiler ล่าด้วยสายตา: ถ้าผู้เล่นถ่ายรูปวาบแฟลชจ่อหน้ามันตรงๆ ในระยะใกล้ มันจะสะดุ้งถอยแทนที่จะพุ่งเข้าหา
+          const fx = -Math.sin(cameraYaw), fz = -Math.cos(cameraYaw);
+          const litDot = fx * -dir.x + fz * -dir.z; // มุมระหว่างทิศที่มองกับทิศไปหา Smiler
+          const isBlindedByLight = cameraFlashActive && distSmiler < SMILER_LIGHT_REPEL_DIST && litDot > SMILER_LIGHT_REPEL_DOT;
+
+          if (isBlindedByLight) {
+            smilerState = 'RECOIL';
+            smilerRig.position.x -= dir.x * SMILER_RECOIL_SPEED * dt;
+            smilerRig.position.z -= dir.z * SMILER_RECOIL_SPEED * dt;
+            smilerRig.lookAt(camera.position.x, smilerRig.position.y, camera.position.z);
+          } else {
+            playerEnergy = Math.max(0, playerEnergy - 1.2 * dt);
+            smilerSpeed = (distSmiler < 9.0) ? 4.45 : (isBlackout ? 3.4 : 2.3);
+            smilerRig.position.x += dir.x * smilerSpeed * dt;
+            smilerRig.position.z += dir.z * smilerSpeed * dt;
+            smilerRig.lookAt(camera.position.x, smilerRig.position.y, camera.position.z);
+
+            if (distSmiler < 1.45) {
+              isJumpscareActive = true;
+              jumpscareTargetRig = smilerRig;
+              jumpscareStartTime = now;
+              playViolentJumpscareSound();
+              if (document.exitPointerLock) document.exitPointerLock();
+            }
+          }
+        } else {
+          smilerState = 'PATROL';
+          if (monsterSoundGain && audioCtx && audioCtx.state === 'running') {
+            monsterSoundGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+          }
+
+          if (now < smilerSearchUntil) {
+            // เพิ่งคลาดกับผู้เล่น — เดินวนดูจุดที่เห็นล่าสุดก่อนสักพัก แทนที่จะเปลี่ยนทิศหนีไปเลยทันที
+            smilerSpeed = SEARCH_SPEED;
+            if (!smilerWaypoint || smilerRig.position.distanceTo(smilerWaypoint) < 2.0) {
+              smilerWaypoint = getRandomFloorCellNear(smilerLastKnownPos.x, smilerLastKnownPos.z, 0, 5) || smilerLastKnownPos.clone();
+            }
+          } else {
+            smilerSpeed = 1.3;
+
+            // แอบโกง: ถึงเวลาแล้ววาปมาป้วนเปี้ยนใกล้ๆผู้เล่นบ้าง (ไม่โกงตอนผู้เล่นซ่อนตัวอยู่)
+            if (!isHiding && now > smilerNextCheatTime) {
+              const cheatSpot = getRandomFloorCellNear(camera.position.x, camera.position.z, CHEAT_MIN_DIST, CHEAT_MAX_DIST);
+              if (cheatSpot) {
+                smilerRig.position.x = cheatSpot.x;
+                smilerRig.position.z = cheatSpot.z;
+                smilerWaypoint = getRandomFloorCell();
+              }
+              smilerNextCheatTime = now + CHEAT_MIN_INTERVAL + Math.random() * (CHEAT_MAX_INTERVAL - CHEAT_MIN_INTERVAL);
+            }
+
+            // ลาดตระเวนสุ่มห้อง
+            if (!smilerWaypoint || smilerRig.position.distanceTo(smilerWaypoint) < 2.0) {
+              smilerWaypoint = getRandomFloorCell();
+            }
+          }
+
+          const pDir = new THREE.Vector3().subVectors(smilerWaypoint, smilerRig.position).normalize();
+          smilerRig.position.x += pDir.x * smilerSpeed * dt;
+          smilerRig.position.z += pDir.z * smilerSpeed * dt;
+          smilerRig.lookAt(smilerWaypoint.x, smilerRig.position.y, smilerWaypoint.z);
+        }
+
+        // อนิเมชันอ้าขากรรไกรและลอยเคว้ง
+        if (smilerJawMesh) {
+          // ปากขยับกระตุกๆ แบบไม่สม่ำเสมอ (ผสมคลื่นสองความถี่ต่างกัน) แทนอ้าหุบสม่ำเสมอน่าเบื่อ
+          smilerJawMesh.position.y = -0.16 - Math.abs(Math.sin(now * 0.006) * 0.6 + Math.sin(now * 0.021) * 0.4) * 0.22;
+        }
+        smilerRig.position.y = 1.4 + Math.sin(now * 0.005) * 0.15;
+        // เนื้อเยื่อที่ห้อยลงมาแกว่งช้าๆ ไม่สม่ำเสมอ ให้ดูเหมือนหนังหย่อนแขวนอยู่กับอะไรบางอย่าง ไม่ใช่แท่งแข็งติดหัว
+        if (smilerStalkMesh) {
+          smilerStalkMesh.rotation.x = Math.sin(now * 0.0009) * 0.12;
+          smilerStalkMesh.rotation.z = Math.sin(now * 0.0013 + 1.7) * 0.1;
+        }
+
+        // "หยุดนิ่งแล้วสะบัดหน้าจ้อง" — ระหว่างลาดตระเวน มันจะหยุดหันมองตรงมาที่ผู้เล่นเป็นเสี้ยววินาทีแบบไร้สาเหตุ
+        // ก่อนหันกลับไปเดินต่อเหมือนไม่มีอะไรเกิดขึ้น (ไม่กระทบระยะ/ตำแหน่งจริง แค่หลอนสายตา)
+        if (smilerState === 'PATROL' && !isJumpscareActive) {
+          if (now > smilerNextTwitchTime) {
+            smilerTwitchUntil = now + 260 + Math.random() * 220;
+            smilerNextTwitchTime = now + 5000 + Math.random() * 9000;
+            // แวบไฟจ้าขึ้นเสี้ยววินาทีพร้อมจังหวะที่มันหันมาจ้อง — ให้ความรู้สึกสะดุ้งพร้อมภาพ ไม่ใช่แค่หันหน้ามาเฉยๆ
+            if (smilerLight) {
+              smilerLight.intensity = 2.0;
+              setTimeout(() => { if (smilerLight) smilerLight.intensity = 0.55; }, 90);
+            }
+          }
+          if (now < smilerTwitchUntil) {
+            smilerRig.lookAt(camera.position.x, smilerRig.position.y, camera.position.z);
+          }
+        }
+
+        // =========================================================
+        // AI 2: The Bacteria (3D Rig ก้าวขาเดินจริง + โยกตัว)
+        // =========================================================
+        const distBacteria = bacteriaRig.position.distanceTo(camera.position);
+
+        if (!isHiding && distBacteria < 27 * detectMult) {
+          bacteriaState = 'CHASE';
+          playerEnergy = Math.max(0, playerEnergy - 1.0 * dt);
+          bacteriaSpeed = (distBacteria < 11) ? 4.55 : (isBlackout ? 3.25 : 2.4);
+
+          bacteriaLastKnownPos.copy(camera.position);
+          bacteriaSearchUntil = now + SEARCH_LINGER_MS;
+
+          if (shadowSoundGain && audioCtx && audioCtx.state === 'running') {
+            const sVol = (1 - distBacteria / 22) * 0.35;
+            shadowSoundGain.gain.setValueAtTime(sVol, audioCtx.currentTime);
+            shadowOsc.frequency.setValueAtTime(36 + (22 - distBacteria) * 3.5, audioCtx.currentTime);
+          }
+
+          const sDir = new THREE.Vector3().subVectors(camera.position, bacteriaRig.position).normalize();
+          bacteriaRig.position.x += sDir.x * bacteriaSpeed * dt;
+          bacteriaRig.position.z += sDir.z * bacteriaSpeed * dt;
+          bacteriaRig.lookAt(camera.position.x, bacteriaRig.position.y, camera.position.z);
+
+          if (distBacteria < 1.45) {
+            isJumpscareActive = true;
+            jumpscareTargetRig = bacteriaRig;
+            jumpscareStartTime = now;
+            playViolentJumpscareSound();
+            if (document.exitPointerLock) document.exitPointerLock();
+          }
+        } else {
+          bacteriaState = 'PATROL';
+          if (shadowSoundGain && audioCtx && audioCtx.state === 'running') {
+            shadowSoundGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+          }
+
+          if (now < bacteriaSearchUntil) {
+            bacteriaSpeed = SEARCH_SPEED;
+            if (!bacteriaWaypoint || bacteriaRig.position.distanceTo(bacteriaWaypoint) < 2.0) {
+              bacteriaWaypoint = getRandomFloorCellNear(bacteriaLastKnownPos.x, bacteriaLastKnownPos.z, 0, 5) || bacteriaLastKnownPos.clone();
+            }
+          } else {
+            bacteriaSpeed = 1.2;
+
+            // แอบโกง: ถึงเวลาแล้ววาปมาป้วนเปี้ยนใกล้ๆผู้เล่นบ้าง (ไม่โกงตอนผู้เล่นซ่อนตัวอยู่)
+            if (!isHiding && now > bacteriaNextCheatTime) {
+              const cheatSpot = getRandomFloorCellNear(camera.position.x, camera.position.z, CHEAT_MIN_DIST, CHEAT_MAX_DIST);
+              if (cheatSpot) {
+                bacteriaRig.position.x = cheatSpot.x;
+                bacteriaRig.position.z = cheatSpot.z;
+                bacteriaWaypoint = getRandomFloorCell();
+              }
+              bacteriaNextCheatTime = now + CHEAT_MIN_INTERVAL + Math.random() * (CHEAT_MAX_INTERVAL - CHEAT_MIN_INTERVAL);
+            }
+
+            if (!bacteriaWaypoint || bacteriaRig.position.distanceTo(bacteriaWaypoint) < 2.0) {
+              bacteriaWaypoint = getRandomFloorCell();
+            }
+          }
+          const bDir = new THREE.Vector3().subVectors(bacteriaWaypoint, bacteriaRig.position).normalize();
+          bacteriaRig.position.x += bDir.x * bacteriaSpeed * dt;
+          bacteriaRig.position.z += bDir.z * bacteriaSpeed * dt;
+          bacteriaRig.lookAt(bacteriaWaypoint.x, bacteriaRig.position.y, bacteriaWaypoint.z);
+        }
+
+        // อนิเมชันการก้าวเดิน 3D ของ The Bacteria
+        bacteriaWalkCycle += dt * (bacteriaSpeed * 3.8);
+        bacteriaLeftLeg.rotation.x = Math.sin(bacteriaWalkCycle) * 0.65;
+        bacteriaRightLeg.rotation.x = -Math.sin(bacteriaWalkCycle) * 0.65;
+        bacteriaLeftArm.rotation.x = -Math.sin(bacteriaWalkCycle) * 0.55;
+        bacteriaRightArm.rotation.x = Math.sin(bacteriaWalkCycle) * 0.55;
+        bacteriaTorso.rotation.z = Math.sin(bacteriaWalkCycle) * 0.1;
+        bacteriaRig.position.y = Math.abs(Math.sin(bacteriaWalkCycle * 2)) * 0.08;
+
+        // อาการกระตุกทั้งตัวแบบสัตว์ป่วย — หยุดเดินนิ่งเสี้ยววินาทีแล้วสะบัดคอ/แขนกระตุกแรงๆ ก่อนเดินต่อเหมือนไม่มีอะไรเกิดขึ้น
+        if (bacteriaState === 'PATROL' && !isJumpscareActive) {
+          if (now > bacteriaNextTwitchTime) {
+            bacteriaTwitchUntil = now + 180 + Math.random() * 200;
+            bacteriaNextTwitchTime = now + 6000 + Math.random() * 8000;
+            // ไฟแดงเรืองแรงขึ้นชั่วครู่ตอนสะบัดตัว ให้ดูเหมือนมันกำลังเจ็บปวด/ผิดปกติมากกว่าแค่ขยับแขน
+            if (bacteriaLight) {
+              bacteriaLight.intensity = 2.6;
+              setTimeout(() => { if (bacteriaLight) bacteriaLight.intensity = 1.4; }, 100);
+            }
+          }
+          if (now < bacteriaTwitchUntil) {
+            const jerk = Math.sin(now * 0.09) * 0.5;
+            bacteriaTorso.rotation.z = jerk;
+            bacteriaTorso.rotation.x = jerk * 0.4;
+            bacteriaLeftArm.rotation.x = jerk * 2.2;
+            bacteriaRightArm.rotation.x = -jerk * 2.2;
+          }
+        }
+
+        // =========================================================
+        // AI 3: The Duller (3D Rig คลาน 4 ขาตามพื้นพรม)
+        // =========================================================
+        const distDuller = dullerRig.position.distanceTo(camera.position);
+
+        // The Duller ตาบอด ไม่สนไฟฉายเปิด/ปิดเลย (ระยะตรวจจับคงที่) แต่หูไวมาก
+        // เสียงสปรินท์/คลิกไฟฉายจะดึงมันมาจากระยะไกลกว่าระยะมองเห็นปกติ
+        const dullerNoiseHeard = !!recentNoise && (now - recentNoise.time < 700) &&
+          Math.hypot(dullerRig.position.x - recentNoise.x, dullerRig.position.z - recentNoise.z) < recentNoise.radius;
+
+        if (!isHiding && (distDuller < DULLER_BASE_DETECT_RANGE || dullerNoiseHeard)) {
+          dullerState = 'CHASE';
+          playerEnergy = Math.max(0, playerEnergy - 0.9 * dt);
+          dullerSpeed = (distDuller < 10.0) ? 4.6 : 2.5;
+
+          dullerLastKnownPos.copy(camera.position);
+          dullerSearchUntil = now + SEARCH_LINGER_MS;
+
+          if (dullerSoundGain && audioCtx && audioCtx.state === 'running') {
+            const dVol = Math.max(0, 1 - distDuller / 18) * 0.25;
+            dullerSoundGain.gain.setValueAtTime(dVol, audioCtx.currentTime);
+            dullerOsc.frequency.setValueAtTime(130 + Math.max(0, 18 - distDuller) * 8, audioCtx.currentTime);
+          }
+
+          const dDir = new THREE.Vector3().subVectors(camera.position, dullerRig.position).normalize();
+          dullerRig.position.x += dDir.x * dullerSpeed * dt;
+          dullerRig.position.z += dDir.z * dullerSpeed * dt;
+          dullerRig.lookAt(camera.position.x, dullerRig.position.y, camera.position.z);
+
+          if (distDuller < 1.45) {
+            isJumpscareActive = true;
+            jumpscareTargetRig = dullerRig;
+            jumpscareStartTime = now;
+            playViolentJumpscareSound();
+            if (document.exitPointerLock) document.exitPointerLock();
+          }
+        } else {
+          dullerState = 'PATROL';
+          if (dullerSoundGain && audioCtx && audioCtx.state === 'running') {
+            dullerSoundGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+          }
+
+          if (now < dullerSearchUntil) {
+            dullerSpeed = SEARCH_SPEED;
+            if (!dullerWaypoint || dullerRig.position.distanceTo(dullerWaypoint) < 2.0) {
+              dullerWaypoint = getRandomFloorCellNear(dullerLastKnownPos.x, dullerLastKnownPos.z, 0, 5) || dullerLastKnownPos.clone();
+            }
+          } else {
+            dullerSpeed = 1.3;
+
+            // แอบโกง: ถึงเวลาแล้ววาปมาป้วนเปี้ยนใกล้ๆผู้เล่นบ้าง (ไม่โกงตอนผู้เล่นซ่อนตัวอยู่)
+            if (!isHiding && now > dullerNextCheatTime) {
+              const cheatSpot = getRandomFloorCellNear(camera.position.x, camera.position.z, CHEAT_MIN_DIST, CHEAT_MAX_DIST);
+              if (cheatSpot) {
+                dullerRig.position.x = cheatSpot.x;
+                dullerRig.position.z = cheatSpot.z;
+                dullerWaypoint = getRandomFloorCell();
+              }
+              dullerNextCheatTime = now + CHEAT_MIN_INTERVAL + Math.random() * (CHEAT_MAX_INTERVAL - CHEAT_MIN_INTERVAL);
+            }
+
+            if (!dullerWaypoint || dullerRig.position.distanceTo(dullerWaypoint) < 2.0) {
+              dullerWaypoint = getRandomFloorCell();
+            }
+          }
+          const dDir = new THREE.Vector3().subVectors(dullerWaypoint, dullerRig.position).normalize();
+          dullerRig.position.x += dDir.x * dullerSpeed * dt;
+          dullerRig.position.z += dDir.z * dullerSpeed * dt;
+          dullerRig.lookAt(dullerWaypoint.x, dullerRig.position.y, dullerWaypoint.z);
+        }
+
+        // อนิเมชันคลานสี่ขา 3D ของ The Duller
+        dullerCrawlCycle += dt * (dullerSpeed * 8.0);
+        if (dullerLegs.length === 4) {
+          dullerLegs[0].rotation.x = Math.sin(dullerCrawlCycle) * 0.7;
+          dullerLegs[3].rotation.x = Math.sin(dullerCrawlCycle) * 0.7;
+          dullerLegs[1].rotation.x = -Math.sin(dullerCrawlCycle) * 0.7;
+          dullerLegs[2].rotation.x = -Math.sin(dullerCrawlCycle) * 0.7;
+        }
+
+        // อาการสะดุ้งกระตุกแบบไร้สาเหตุ ตัวมันจะหยุดคลานฉับพลันแล้วสั่นทั้งตัวเร็วๆ ก่อนคลานต่อ (ยิ่งน่ากลัวเพราะมันตาบอด ไม่รู้ว่ามันสะดุ้งเพราะอะไร)
+        if (dullerState === 'PATROL' && !isJumpscareActive) {
+          if (now > dullerNextTwitchTime) {
+            dullerTwitchUntil = now + 150 + Math.random() * 180;
+            dullerNextTwitchTime = now + 7000 + Math.random() * 9000;
+            if (dullerLight) {
+              dullerLight.intensity = 2.0;
+              setTimeout(() => { if (dullerLight) dullerLight.intensity = 1.0; }, 80);
+            }
+          }
+          if (now < dullerTwitchUntil) {
+            dullerRig.rotation.z = (Math.random() - 0.5) * 0.35;
+            dullerRig.rotation.x = (Math.random() - 0.5) * 0.2;
+            if (dullerJawMesh) dullerJawMesh.scale.y = 0.6 + Math.random() * 1.2;
+          }
+        }
+
+        // เสียงหัวใจเต้น (คงระยะเดิมไว้ให้ยังรู้สึกได้ว่ามีอะไรเข้าใกล้)
+        const closestDist = Math.min(distSmiler, distBacteria, distDuller);
+
+        // "ตู้เอกสารไม่ได้ปลอดภัย 100% เสมอไป" — ถ้ามีบางอย่างเดินมาจ่อใกล้ตู้ตอนกำลังซ่อนอยู่
+        // ช่องมองจะสั่น+มีเสียงเตือนก่อน ให้พอมีจังหวะตัดสินใจว่าจะซ่อนต่อหรือรีบวิ่งหนี
+        // ก่อนที่มันจะมีโอกาสเล็กๆ "เช็คเจอ" จริงๆ ทำให้กลไกที่เคยไว้ใจได้ไม่น่าเชื่อถือ 100% อีกต่อไป
+        if (isHiding && closestDist < LOCKER_CLOSE_CALL_DIST && now > lockerCloseCallCooldownUntil && !isJumpscareActive) {
+          lockerCloseCallCooldownUntil = now + 7000 + Math.random() * 4000;
+          const closeRig = (closestDist === distSmiler) ? smilerRig : (closestDist === distBacteria) ? bacteriaRig : dullerRig;
+
+          if (lockerSlitEl) {
+            lockerSlitEl.classList.add('locker-shake');
+            setTimeout(() => { if (lockerSlitEl) lockerSlitEl.classList.remove('locker-shake'); }, 900);
+          }
+          playHeartbeat(0.5);
+          playDistantGrowl();
+
+          if (Math.random() < LOCKER_CLOSE_CALL_CATCH_CHANCE) {
+            setTimeout(() => {
+              if (!window.gameEngineStarted || !isHiding) return; // ออกจากตู้ทันเวลา รอดไป
+              isJumpscareActive = true;
+              jumpscareTargetRig = closeRig;
+              jumpscareStartTime = performance.now();
+              isHiding = false;
+              if (lockerSlitEl) lockerSlitEl.style.display = 'none';
+              playViolentJumpscareSound();
+              if (document.exitPointerLock) document.exitPointerLock();
+            }, 900 + Math.random() * 500);
+          }
+        }
+
+        if (closestDist < 18) {
+          const heartRateInterval = Math.max(360, closestDist * 60);
+          if (now > nextHeartbeatTime) {
+            const hbVolume = Math.min(0.45, (1 - closestDist / 18) * 0.55);
+            playHeartbeat(hbVolume);
+            nextHeartbeatTime = now + heartRateInterval;
+          }
+        }
+
+        // จอซ่า: ให้ขึ้นเฉพาะตอนใกล้จริงๆ (ไม่งั้นบังทางตอนพยายามหนี) และลดความจัดลงมาก
+        if (closestDist < 10) {
+          const glitchStrength = Math.pow(1 - closestDist / 10, 1.8);
+          staticCanvas.style.opacity = Math.min(0.28, glitchStrength * 0.28);
+          renderNoise();
+        } else {
+          staticCanvas.style.opacity = 0;
+        }
+
+        // จอเหลืองป่วยๆ ของ backrooms: มีระดับพื้นฐานเบาๆ ตลอดเวลาหลังไฟดับครั้งแรก แล้วไล่เข้มขึ้นเรื่อยๆ
+        // ตามระยะห่างจาก entity ที่ใกล้ที่สุด — ให้รู้สึกบีบเข้ามาก่อนจะโดนไล่จริงๆ ไม่ใช่โผล่ปุ๊บจัดปั๊บ
+        {
+          const proximityDread = closestDist < 16 ? Math.pow(1 - Math.min(closestDist, 16) / 16, 1.4) * 0.55 : 0;
+          dreadVignetteEl.style.opacity = Math.min(0.7, 0.12 + proximityDread + (isBlackout ? 0.15 : 0));
+        }
+        } // จบเงื่อนไข firstBlackoutOccurred: ปิดการทำงานของ entity ทั้งหมดก่อนไฟดับครั้งแรก
+
+        // ทางออกฉุกเฉิน (ต้องเก็บบัตรผ่านให้ครบก่อน)
+        if (camera.position.distanceTo(exitPos) < 2.0) {
+          if (keycardsCollected >= KEYCARDS_REQUIRED) {
+            window.gameEngineStarted = false;
+            if (document.exitPointerLock) document.exitPointerLock();
+            document.getElementById('survival-time-win').innerText = `เวลาที่ใช้หนี: ${window.formatSurvivalTime(now - window.gameStartTime)}`;
+            document.getElementById('win-menu').style.display = 'flex';
+          } else if (now > lastExitLockedNoticeTime + 2500) {
+            lastExitLockedNoticeTime = now;
+            const notif = document.getElementById('item-notification');
+            notif.innerText = `ประตูล็อกอยู่ — ต้องมีบัตรผ่านครบ ${KEYCARDS_REQUIRED} ใบ (มี ${keycardsCollected})`;
+            notif.style.display = 'block';
+            setTimeout(() => { notif.style.display = 'none'; }, 2400);
+            playGlitchShiftSound();
+          }
+        }
+      } else {
+        if (document.getElementById('over-menu').style.display === 'flex') {
+          renderNoise();
+        }
+      }
+
+      renderer.render(scene, camera);
+    }
+
